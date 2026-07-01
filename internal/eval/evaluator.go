@@ -208,7 +208,8 @@ func heuristicMatches(expression string, input *roomv1.EvaluationInput) bool {
 	text := strings.ToLower(input.GetPlan() + "\n" + input.GetDiff())
 	switch strings.TrimSpace(expression) {
 	case "touches_tenant_data_without_scope":
-		touchesTenantData := containsAny(text, "tenant", "organization", "workspace", "account", "customer", "project", "user", "membership", "database", "query", "repository", "handler", "endpoint")
+		touchesTenantEntity := containsAny(text, "tenant", "organization", "workspace", "account", "customer", "project", "membership")
+		touchesTenantData := touchesTenantEntity || (containsAny(text, "user") && containsAny(text, "database", "query", "repository", "read", "write", "insert", "update", "delete"))
 		hasScope := containsAny(text, "organization_id", "workspace_id", "tenant_id", "org-scoped", "workspace-scoped", "membership", "authorize", "authorization")
 		return touchesTenantData && !hasScope
 	case "secret_literal":
@@ -247,6 +248,44 @@ func heuristicMatches(expression string, input *roomv1.EvaluationInput) bool {
 		sensitiveFlow := containsAny(text, "login", "signup", "password", "otp", "token", "magic link", "reset")
 		hasRateLimit := containsAny(text, "rate limit", "ratelimit", "throttle", "quota", "abuse limit")
 		return publicEndpoint && sensitiveFlow && !hasRateLimit
+	case "rust_unsafe_without_safety_rationale":
+		usesUnsafe := containsAny(text, "unsafe {", "unsafe fn", "unsafe impl", "unsafe trait", "unsafe extern")
+		hasSafetyRationale := containsAny(text, "safety:", "safety invariant", "soundness", "invariant", "justification")
+		return usesUnsafe && !hasSafetyRationale
+	case "rust_unwrap_or_expect_in_request_path":
+		requestPath := containsAny(text, "handler", "endpoint", "route", "api", "request", "axum", "actix", "warp", "rocket")
+		usesPanicResult := containsAny(text, ".unwrap()", ".expect(")
+		hasFallibleHandling := containsAny(text, "map_err", "ok_or", "context(", "thiserror", "anyhow", "return error", "propagate")
+		return requestPath && usesPanicResult && !hasFallibleHandling
+	case "rust_command_with_user_input":
+		usesCommand := containsAny(text, "std::process::command", "tokio::process::command", "command::new", ".arg(")
+		userControlled := containsAny(text, "user input", "user supplied", "user-supplied", "request", "query param", "path param", "payload", "filename", "form")
+		hasAllowlist := containsAny(text, "allowlist", "allowed", "validated", "enum", "fixed args", "fixed argument", "no shell")
+		return usesCommand && userControlled && !hasAllowlist
+	case "rust_weak_rng_for_secret":
+		weakRandom := containsAny(text, "rand::thread_rng", "rand::random", "smallrng", "fastrand")
+		securitySensitive := containsAny(text, "token", "secret", "session", "password reset", "nonce", "api key", "credential")
+		cryptoRandom := containsAny(text, "osrng", "rand_core::osrng", "getrandom", "ring::rand", "crypto rng", "cryptographic")
+		return weakRandom && securitySensitive && !cryptoRandom
+	case "rust_path_traversal_without_canonicalize":
+		pathIO := containsAny(text, "pathbuf", "std::fs", "tokio::fs", "read_to_string", "file upload", "download", "filename", "user supplied path", "user-supplied path")
+		userPath := containsAny(text, "user", "request", "param", "filename", "upload", "download")
+		hasPathDefense := containsAny(text, "canonicalize", "starts_with", "safe base", "base dir", "sanitize", "path_clean")
+		return pathIO && userPath && !hasPathDefense
+	case "rust_panic_in_library_or_api":
+		libraryOrAPI := containsAny(text, "library", "api", "handler", "service", "crate", "server")
+		panics := containsAny(text, "panic!", "todo!", "unimplemented!", "unreachable!")
+		return libraryOrAPI && panics
+	case "rust_std_mutex_across_await":
+		syncLock := containsAny(text, "std::sync::mutex", "std::sync::rwlock", "parking_lot::mutex", "parking_lot::rwlock")
+		asyncContext := containsAny(text, "async", ".await", "tokio", "actix", "axum")
+		hasSafeLocking := containsAny(text, "tokio::sync::mutex", "drop(", "release before await", "no await while locked")
+		return syncLock && asyncContext && !hasSafeLocking
+	case "rust_serde_external_input_missing_deny_unknown_fields":
+		externalInput := containsAny(text, "api", "webhook", "request", "external input", "json", "payload")
+		deserializes := containsAny(text, "serde", "deserialize", "#[derive(deserialize)]")
+		hasValidation := containsAny(text, "deny_unknown_fields", "validator", "validate(", "schemars", "jsonschema")
+		return externalInput && deserializes && !hasValidation
 	default:
 		return false
 	}

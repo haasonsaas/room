@@ -155,11 +155,59 @@ func evaluationInput(payload map[string]any, raw []byte) *roomv1.EvaluationInput
 			Repository:   repositoryName(),
 			AgentType:    agentType(),
 			Cwd:          cwd,
-			ChangedFiles: gitChangedFiles(),
+			ChangedFiles: hookChangedFiles(payload),
 		},
 		Plan: plan,
 		Diff: gitDiff(),
 	}
+}
+
+func hookChangedFiles(payload map[string]any) []string {
+	files := gitChangedFiles()
+	files = append(files, hookFilePaths(payload)...)
+	return uniqueNonEmpty(files)
+}
+
+func hookFilePaths(payload map[string]any) []string {
+	files := make([]string, 0, 2)
+	addPath := func(value any) {
+		path, ok := value.(string)
+		if ok && strings.TrimSpace(path) != "" {
+			files = append(files, path)
+		}
+	}
+	addFromMap := func(value any) {
+		fields, ok := value.(map[string]any)
+		if !ok {
+			return
+		}
+		for _, key := range []string{"file_path", "path", "file"} {
+			addPath(fields[key])
+		}
+		if values, ok := fields["files"].([]any); ok {
+			for _, value := range values {
+				addPath(value)
+			}
+		}
+	}
+
+	addFromMap(payload)
+	addFromMap(payload["tool_input"])
+	return files
+}
+
+func uniqueNonEmpty(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func writeHookDecision(kind string, result *roomv1.EvaluationResult) error {

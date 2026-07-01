@@ -44,3 +44,19 @@ curl \
   -d '{"author":"you","notes":"tighten tenant rules"}' \
   http://localhost:8787/room.v1.RuleAdminService/PublishRuleset
 ```
+
+## Bundled Rust rules
+
+New Room stores publish the generic security rules plus Rust-specific guardrails:
+
+- `rust-unsafe-requires-safety-rationale`: flags unsafe Rust without a nearby safety rationale.
+- `rust-request-paths-must-not-unwrap`: flags `unwrap` or `expect` in handlers, routes, and API request paths.
+- `rust-command-exec-requires-allowlist`: flags process execution that passes request-controlled arguments without an allowlist.
+- `rust-secrets-require-crypto-rng`: flags token, nonce, session, password-reset, and API-key generation that uses non-cryptographic randomness.
+- `rust-paths-must-be-canonicalized`: flags user-controlled file paths without canonicalization and trusted-base checks.
+- `rust-library-api-must-not-panic`: flags `panic!`, `todo!`, `unimplemented!`, and `unreachable!` in library, service, and API code paths.
+- `rust-no-std-mutex-across-await`: flags blocking mutex/RwLock usage across async await points.
+- `rust-serde-external-input-deny-unknown-fields`: flags external JSON payload deserialization without `deny_unknown_fields` or explicit validation.
+
+Each of these rules uses a `CHECK_KIND_HEURISTIC` expression, so the dashboard
+can edit severity, tags, evidence, and remediation without changing code.

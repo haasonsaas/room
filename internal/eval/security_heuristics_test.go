@@ -47,6 +47,46 @@ func TestSecurityHeuristicsCatchUnsafePatterns(t *testing.T) {
 			expression: "public_sensitive_endpoint_without_rate_limit",
 			plan:       "Add a public password reset endpoint that sends login tokens.",
 		},
+		{
+			name:       "rust unsafe without safety rationale",
+			expression: "rust_unsafe_without_safety_rationale",
+			plan:       "Add Rust code in src/ffi.rs with unsafe fn parse_ptr(ptr: *const u8) { unsafe { *ptr }; }.",
+		},
+		{
+			name:       "rust unwrap in request path",
+			expression: "rust_unwrap_or_expect_in_request_path",
+			plan:       "Update the axum API handler to parse the request body with payload.user_id.parse::<Uuid>().unwrap().",
+		},
+		{
+			name:       "rust command with user input",
+			expression: "rust_command_with_user_input",
+			plan:       "In a Rust upload endpoint, pass the request filename into std::process::Command::new(\"convert\").arg(filename).output().",
+		},
+		{
+			name:       "rust weak rng for secret",
+			expression: "rust_weak_rng_for_secret",
+			plan:       "Generate password reset tokens in Rust with rand::thread_rng and store them on the session.",
+		},
+		{
+			name:       "rust path traversal without canonicalize",
+			expression: "rust_path_traversal_without_canonicalize",
+			plan:       "Build a Rust download handler that takes a user supplied filename and uses PathBuf::push before tokio::fs::read.",
+		},
+		{
+			name:       "rust panic in library api",
+			expression: "rust_panic_in_library_or_api",
+			plan:       "Add a Rust library API for billing calculations and call panic!(\"invalid state\") on bad input.",
+		},
+		{
+			name:       "rust std mutex across await",
+			expression: "rust_std_mutex_across_await",
+			plan:       "In an async Rust axum service, lock a std::sync::Mutex and then call client.fetch().await while the guard is held.",
+		},
+		{
+			name:       "rust serde external input missing deny unknown fields",
+			expression: "rust_serde_external_input_missing_deny_unknown_fields",
+			plan:       "Create a Rust webhook JSON payload struct with #[derive(Deserialize)] using serde for external input.",
+		},
 	}
 
 	for _, tt := range tests {
@@ -65,5 +105,24 @@ func TestSecurityHeuristicsCatchUnsafePatterns(t *testing.T) {
 				t.Fatalf("decision = %s, want needs_changes", result.GetDecision())
 			}
 		})
+	}
+}
+
+func TestTenantScopeHeuristicIgnoresPlainHandlers(t *testing.T) {
+	rules := []*roomv1.Rule{{
+		Id:       "tenant-org-scope-required",
+		Title:    "Tenant data must be organization scoped",
+		Severity: roomv1.Severity_SEVERITY_CRITICAL,
+		Enabled:  true,
+		Checks: []*roomv1.RuleCheck{
+			{Kind: roomv1.CheckKind_CHECK_KIND_HEURISTIC, Expression: "touches_tenant_data_without_scope"},
+		},
+	}}
+
+	result := Evaluate(rules, nil, &roomv1.EvaluationInput{
+		Plan: "Add a Rust upload handler that shells out to convert a filename.",
+	})
+	if result.GetDecision() != roomv1.Decision_DECISION_ALLOW {
+		t.Fatalf("decision = %s, want allow; matches = %v", result.GetDecision(), result.GetMatches())
 	}
 }

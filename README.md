@@ -13,7 +13,7 @@ MCP-capable agents before they make implementation choices.
 - A small dashboard at `/` for creating, editing, deleting, previewing, and publishing rules.
 - Hook runner support through `roomctl hook`.
 - Example hook templates for Claude Code, Codex, and Cursor-style command hooks.
-- A starter security ruleset for tenant scoping, auth context, secrets, SQL injection, SSRF, auditability, and destructive actions.
+- A starter security ruleset for tenant scoping, auth context, secrets, SQL injection, SSRF, auditability, Rust safety, and destructive actions.
 
 ## Run locally
 
@@ -88,6 +88,34 @@ Room currently supports these simple rule expressions:
   - `touches_tenant_data_without_scope`
   - `secret_literal`
   - `destructive_shell`
+  - `protected_handler_without_auth_context`
+  - `unsafe_sql_construction`
+  - `external_fetch_without_allowlist`
+  - `privilege_change_without_audit`
+  - `webhook_without_signature_verification`
+  - `password_storage_without_hashing`
+  - `public_sensitive_endpoint_without_rate_limit`
+  - `rust_unsafe_without_safety_rationale`
+  - `rust_unwrap_or_expect_in_request_path`
+  - `rust_command_with_user_input`
+  - `rust_weak_rng_for_secret`
+  - `rust_path_traversal_without_canonicalize`
+  - `rust_panic_in_library_or_api`
+  - `rust_std_mutex_across_await`
+  - `rust_serde_external_input_missing_deny_unknown_fields`
+
+## Bundled Rust guardrails
+
+Fresh Room stores publish these Rust rules by default:
+
+- `rust-unsafe-requires-safety-rationale`
+- `rust-request-paths-must-not-unwrap`
+- `rust-command-exec-requires-allowlist`
+- `rust-secrets-require-crypto-rng`
+- `rust-paths-must-be-canonicalized`
+- `rust-library-api-must-not-panic`
+- `rust-no-std-mutex-across-await`
+- `rust-serde-external-input-deny-unknown-fields`
 
 The intent is to keep the public MVP deterministic and easy to audit, then add
 Semgrep, AST, and policy-engine integrations behind the same protobuf contract.
