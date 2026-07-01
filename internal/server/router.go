@@ -3,7 +3,9 @@ package server
 import (
 	"embed"
 	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/grpcreflect"
@@ -48,11 +50,42 @@ func New(service *app.Service) http.Handler {
 	})
 
 	mux.HandleFunc("/api/rules", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
+			resp, err := service.ListRules(r.Context(), connect.NewRequest(&roomv1.ListRulesRequest{IncludeDisabled: true}))
+			writeProtoJSON(w, resp.Msg, err)
+		case http.MethodPost:
+			var msg roomv1.CreateRuleRequest
+			if err := readProtoJSON(r, &msg); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			resp, err := service.CreateRule(r.Context(), connect.NewRequest(&msg))
+			writeProtoJSON(w, resp.Msg, err)
+		case http.MethodPut:
+			var msg roomv1.UpdateRuleRequest
+			if err := readProtoJSON(r, &msg); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			resp, err := service.UpdateRule(r.Context(), connect.NewRequest(&msg))
+			writeProtoJSON(w, resp.Msg, err)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc("/api/rules/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		resp, err := service.ListRules(r.Context(), connect.NewRequest(&roomv1.ListRulesRequest{IncludeDisabled: true}))
+		ruleID := strings.TrimPrefix(r.URL.Path, "/api/rules/")
+		if ruleID == "" {
+			http.Error(w, "rule id is required", http.StatusBadRequest)
+			return
+		}
+		resp, err := service.DeleteRule(r.Context(), connect.NewRequest(&roomv1.DeleteRuleRequest{RuleId: ruleID}))
 		writeProtoJSON(w, resp.Msg, err)
 	})
 
@@ -108,4 +141,13 @@ func writeProtoJSON(w http.ResponseWriter, value proto.Message, err error) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(data)
+}
+
+func readProtoJSON(r *http.Request, value proto.Message) error {
+	defer r.Body.Close()
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(data, value)
 }

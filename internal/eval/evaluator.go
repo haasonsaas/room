@@ -215,6 +215,38 @@ func heuristicMatches(expression string, input *roomv1.EvaluationInput) bool {
 		return secretPattern.MatchString(input.GetPlan()) || secretPattern.MatchString(input.GetDiff())
 	case "destructive_shell":
 		return containsAny(text, "rm -rf", "drop database", "truncate table", "terraform destroy", "kubectl delete")
+	case "protected_handler_without_auth_context":
+		touchesProtectedPath := containsAny(text, "protected", "admin", "private", "authenticated", "handler", "endpoint", "route", "api")
+		touchesData := containsAny(text, "database", "query", "invoice", "customer", "user", "account", "project", "order", "billing")
+		hasAuthContext := containsAny(text, "auth", "session", "principal", "claims", "middleware", "authorize", "authenticated context")
+		return touchesProtectedPath && touchesData && !hasAuthContext
+	case "unsafe_sql_construction":
+		touchesSQL := containsAny(text, "select ", "insert ", "update ", "delete ", "where ", "query", "sql")
+		buildsDynamically := containsAny(text, "concatenat", "string builder", "sprintf", "fmt.sprintf", "template", "`select", "' +", "\" +")
+		hasParameterization := containsAny(text, "parameter", "prepared", "bind", "placeholder", "$1", "?", "sqlc", "gorm", "query builder")
+		return touchesSQL && buildsDynamically && !hasParameterization
+	case "external_fetch_without_allowlist":
+		fetchesExternal := containsAny(text, "http.get", "fetch(", "axios", "request(", "urlopen", "net/http", "external url", "user supplied url", "user-supplied url", "webhook")
+		hasAllowlist := containsAny(text, "allowlist", "allowed host", "allowed domain", "url validation", "dns pin", "block private", "ssrf")
+		return fetchesExternal && !hasAllowlist
+	case "privilege_change_without_audit":
+		changesPrivilege := containsAny(text, "grant", "role", "permission", "owner", "admin", "privilege", "membership", "invite")
+		hasAudit := containsAny(text, "audit", "event", "log", "activity", "security trail")
+		return changesPrivilege && !hasAudit
+	case "webhook_without_signature_verification":
+		handlesWebhook := containsAny(text, "webhook", "provider event", "callback endpoint", "stripe event", "github event")
+		hasSignatureCheck := containsAny(text, "signature", "hmac", "verify", "verification", "secret header", "signed payload")
+		return handlesWebhook && !hasSignatureCheck
+	case "password_storage_without_hashing":
+		handlesPassword := containsAny(text, "password")
+		storesPassword := containsAny(text, "store", "save", "database", "persist", "insert")
+		hasHashing := containsAny(text, "hash", "bcrypt", "argon2", "scrypt", "pbkdf2")
+		return handlesPassword && storesPassword && !hasHashing
+	case "public_sensitive_endpoint_without_rate_limit":
+		publicEndpoint := containsAny(text, "public", "unauthenticated", "anonymous", "login", "signup", "password reset", "reset password")
+		sensitiveFlow := containsAny(text, "login", "signup", "password", "otp", "token", "magic link", "reset")
+		hasRateLimit := containsAny(text, "rate limit", "ratelimit", "throttle", "quota", "abuse limit")
+		return publicEndpoint && sensitiveFlow && !hasRateLimit
 	default:
 		return false
 	}

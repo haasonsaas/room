@@ -10,10 +10,10 @@ MCP-capable agents before they make implementation choices.
 
 - ConnectRPC + Protobuf API for rule administration and agent consumption.
 - A local MCP sidecar with `room_get_rules`, `room_analyze_plan`, and `room_check_diff`.
-- A small dashboard at `/` for previewing active rules and publishing versions.
+- A small dashboard at `/` for creating, editing, deleting, previewing, and publishing rules.
 - Hook runner support through `roomctl hook`.
 - Example hook templates for Claude Code, Codex, and Cursor-style command hooks.
-- A starter security ruleset for tenant scoping, secrets, and destructive actions.
+- A starter security ruleset for tenant scoping, auth context, secrets, SQL injection, SSRF, auditability, and destructive actions.
 
 ## Run locally
 
@@ -34,14 +34,23 @@ Register the MCP endpoint with your agent as `http://localhost:8788/mcp`.
 ## Hook runner
 
 `roomctl` reads hook JSON on stdin and evaluates it against the active Room
-ruleset:
+ruleset. It fetches the active ruleset, stores it in a local cache, and falls
+back to that cache if Room is unavailable.
 
 ```bash
 go install ./cmd/roomctl
+roomctl sync-rules
+roomctl watch-rules
 roomctl hook pre-tool < hook-payload.json
 roomctl hook post-tool < hook-payload.json
 roomctl hook prompt < hook-payload.json
 ```
+
+The default cache path is `${XDG_CACHE_HOME:-~/.cache}/room/ruleset.json`.
+Override it with `ROOM_CACHE_FILE`.
+
+Use `watch-rules` for long-running sidecars that should keep the cache updated
+as new rulesets are published.
 
 By default hooks fail open if Room is unavailable. Set
 `ROOM_HOOK_FAIL_CLOSED=true` to deny when the control plane cannot be reached.
@@ -80,4 +89,3 @@ Semgrep, AST, and policy-engine integrations behind the same protobuf contract.
 This is an early standalone scaffold. The API shape is intentionally small and
 versioned so the dashboard, MCP server, and hooks can evolve without coupling to
 any existing internal platform.
-

@@ -10,10 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	roomv1 "github.com/haasonsaas/room/gen/go/room/v1"
 	"github.com/haasonsaas/room/gen/go/room/v1/roomv1connect"
+	"github.com/haasonsaas/room/internal/agentclient"
 	"github.com/haasonsaas/room/internal/config"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -31,16 +33,20 @@ func run(ctx context.Context, args []string) error {
 		return usage()
 	}
 	cfg := config.Load()
-	client := roomv1connect.NewAgentRulesServiceClient(http.DefaultClient, strings.TrimRight(cfg.ServerURL, "/"))
-	admin := roomv1connect.NewRuleAdminServiceClient(http.DefaultClient, strings.TrimRight(cfg.ServerURL, "/"))
+	client := agentclient.New(cfg.ServerURL, agentclient.DefaultCachePath())
+	serverURL := strings.TrimRight(cfg.ServerURL, "/")
+	rawAgent := roomv1connect.NewAgentRulesServiceClient(http.DefaultClient, serverURL)
+	admin := roomv1connect.NewRuleAdminServiceClient(http.DefaultClient, serverURL)
 
 	switch args[0] {
-	case "rules":
-		resp, err := client.GetActiveRuleset(ctx, connect.NewRequest(&roomv1.AgentRulesServiceGetActiveRulesetRequest{}))
+	case "rules", "sync-rules":
+		ruleset, err := client.ActiveRuleset(ctx, &roomv1.EvaluationContext{})
 		if err != nil {
 			return err
 		}
-		return printProto(resp.Msg)
+		return printProto(&roomv1.AgentRulesServiceGetActiveRulesetResponse{Ruleset: ruleset})
+	case "watch-rules":
+		return watchRules(ctx, rawAgent)
 	case "publish":
 		resp, err := admin.PublishRuleset(ctx, connect.NewRequest(&roomv1.PublishRulesetRequest{Author: "roomctl", Notes: "Published from roomctl"}))
 		if err != nil {
@@ -55,10 +61,49 @@ func run(ctx context.Context, args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: roomctl rules | publish | hook <prompt|pre-tool|post-tool>")
+	return fmt.Errorf("usage: roomctl rules | sync-rules | watch-rules | publish | hook <prompt|pre-tool|post-tool>")
 }
 
-func runHook(ctx context.Context, client roomv1connect.AgentRulesServiceClient, args []string) error {
+func watchRules(ctx context.Context, client roomv1connect.AgentRulesServiceClient) error {
+	for {
+		err := watchRulesOnce(ctx, client)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		fmt.Fprintln(os.Stderr, "roomctl watch-rules reconnecting:", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func watchRulesOnce(ctx context.Context, client roomv1connect.AgentRulesServiceClient) error {
+	currentVersion := int32(0)
+	if cached, err := agentclient.LoadRuleset(agentclient.DefaultCachePath()); err == nil && cached != nil {
+		currentVersion = cached.GetVersion()
+	}
+	stream, err := client.WatchRuleset(ctx, connect.NewRequest(&roomv1.WatchRulesetRequest{CurrentVersion: currentVersion}))
+	if err != nil {
+		return err
+	}
+	for stream.Receive() {
+		ruleset := stream.Msg().GetRuleset()
+		if ruleset == nil {
+			continue
+		}
+		if err := agentclient.SaveRuleset(agentclient.DefaultCachePath(), ruleset); err != nil {
+			return err
+		}
+		if err := printProto(&roomv1.AgentRulesServiceGetActiveRulesetResponse{Ruleset: ruleset}); err != nil {
+			return err
+		}
+	}
+	return stream.Err()
+}
+
+func runHook(ctx context.Context, client *agentclient.Client, args []string) error {
 	if len(args) == 0 {
 		return usage()
 	}
@@ -70,21 +115,21 @@ func runHook(ctx context.Context, client roomv1connect.AgentRulesServiceClient, 
 	var result *roomv1.EvaluationResult
 	switch args[0] {
 	case "prompt", "pre-tool":
-		resp, err := client.EvaluatePlan(ctx, connect.NewRequest(&roomv1.EvaluatePlanRequest{Input: input}))
+		var err error
+		result, err = client.EvaluatePlan(ctx, input)
 		if err != nil {
 			return hookFailure(err)
 		}
-		result = resp.Msg.GetResult()
 	case "post-tool":
 		diff := gitDiff()
 		if diff != "" {
 			input.Diff = diff
 		}
-		resp, err := client.EvaluateDiff(ctx, connect.NewRequest(&roomv1.EvaluateDiffRequest{Input: input}))
+		var err error
+		result, err = client.EvaluateDiff(ctx, input)
 		if err != nil {
 			return hookFailure(err)
 		}
-		result = resp.Msg.GetResult()
 	default:
 		return usage()
 	}

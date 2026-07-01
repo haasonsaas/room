@@ -12,6 +12,16 @@ The runner accepts the agent hook payload on stdin, forwards it to Room, and
 prints a hook decision shape accepted by Codex and Claude Code for blocking
 tool calls or injecting additional context.
 
+Run this once per machine or repository to warm the local ruleset cache:
+
+```bash
+roomctl sync-rules
+```
+
+Set `ROOM_CACHE_FILE` to control where the active ruleset is cached.
+Use `roomctl watch-rules` in a long-running sidecar when you want server-pushed
+ruleset updates to refresh that cache continuously.
+
 ## Claude Code
 
 Claude Code supports `PreToolUse`, `PostToolUse`, and `UserPromptSubmit`
@@ -49,4 +59,3 @@ ROOM_HOOK_FAIL_CLOSED=true
 ```
 
 Strict mode denies pre-tool calls when Room is unavailable.
-

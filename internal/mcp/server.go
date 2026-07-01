@@ -5,21 +5,20 @@ import (
 	"net/http"
 	"strings"
 
-	"connectrpc.com/connect"
 	roomv1 "github.com/haasonsaas/room/gen/go/room/v1"
-	"github.com/haasonsaas/room/gen/go/room/v1/roomv1connect"
+	"github.com/haasonsaas/room/internal/agentclient"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
 type Handler struct {
-	client roomv1connect.AgentRulesServiceClient
+	client *agentclient.Client
 }
 
 func NewHandler(serverURL string) http.Handler {
 	h := &Handler{
-		client: roomv1connect.NewAgentRulesServiceClient(http.DefaultClient, strings.TrimRight(serverURL, "/")),
+		client: agentclient.New(strings.TrimRight(serverURL, "/"), agentclient.DefaultCachePath()),
 	}
 	return mcpsdk.NewStreamableHTTPHandler(func(_ *http.Request) *mcpsdk.Server {
 		return h.server()
@@ -75,31 +74,27 @@ type toolOutput struct {
 }
 
 func (h *Handler) getRules(ctx context.Context, _ *mcpsdk.CallToolRequest, input ruleInput) (*mcpsdk.CallToolResult, toolOutput, error) {
-	resp, err := h.client.GetActiveRuleset(ctx, connect.NewRequest(&roomv1.AgentRulesServiceGetActiveRulesetRequest{Context: input.context()}))
+	ruleset, err := h.client.ActiveRuleset(ctx, input.context())
 	if err != nil {
 		return nil, toolOutput{}, err
 	}
-	return nil, marshal(resp.Msg), nil
+	return nil, marshal(&roomv1.AgentRulesServiceGetActiveRulesetResponse{Ruleset: ruleset}), nil
 }
 
 func (h *Handler) analyzePlan(ctx context.Context, _ *mcpsdk.CallToolRequest, input planInput) (*mcpsdk.CallToolResult, toolOutput, error) {
-	resp, err := h.client.EvaluatePlan(ctx, connect.NewRequest(&roomv1.EvaluatePlanRequest{
-		Input: &roomv1.EvaluationInput{Context: input.context(), Plan: input.Plan},
-	}))
+	result, err := h.client.EvaluatePlan(ctx, &roomv1.EvaluationInput{Context: input.context(), Plan: input.Plan})
 	if err != nil {
 		return nil, toolOutput{}, err
 	}
-	return nil, marshal(resp.Msg), nil
+	return nil, marshal(&roomv1.EvaluatePlanResponse{Result: result}), nil
 }
 
 func (h *Handler) checkDiff(ctx context.Context, _ *mcpsdk.CallToolRequest, input diffInput) (*mcpsdk.CallToolResult, toolOutput, error) {
-	resp, err := h.client.EvaluateDiff(ctx, connect.NewRequest(&roomv1.EvaluateDiffRequest{
-		Input: &roomv1.EvaluationInput{Context: input.context(), Diff: input.Diff},
-	}))
+	result, err := h.client.EvaluateDiff(ctx, &roomv1.EvaluationInput{Context: input.context(), Diff: input.Diff})
 	if err != nil {
 		return nil, toolOutput{}, err
 	}
-	return nil, marshal(resp.Msg), nil
+	return nil, marshal(&roomv1.EvaluateDiffResponse{Result: result}), nil
 }
 
 func (i ruleInput) context() *roomv1.EvaluationContext {

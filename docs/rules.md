@@ -3,6 +3,9 @@
 Rules are ordinary protobuf messages and can be managed through
 `RuleAdminService`.
 
+The bundled dashboard at `http://localhost:8787` can create, update, delete,
+preview, and publish rules without a separate frontend build.
+
 Minimal JSON payload for `CreateRule`:
 
 ```json
@@ -41,4 +44,3 @@ curl \
   -d '{"author":"you","notes":"tighten tenant rules"}' \
   http://localhost:8787/room.v1.RuleAdminService/PublishRuleset
 ```
-

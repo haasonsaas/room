@@ -13,8 +13,8 @@
         --line: #d9dee7;
         --panel: #ffffff;
         --accent: #0f766e;
+        --danger: #b42318;
         --warn: #b45309;
-        --bad: #b42318;
       }
       * { box-sizing: border-box; }
       body {
@@ -33,9 +33,10 @@
         background: var(--panel);
       }
       h1 { margin: 0; font-size: 18px; letter-spacing: 0; }
+      h2 { margin: 0 0 14px; font-size: 15px; letter-spacing: 0; }
       main {
         display: grid;
-        grid-template-columns: minmax(280px, 440px) 1fr;
+        grid-template-columns: minmax(360px, 460px) minmax(420px, 1fr);
         min-height: calc(100vh - 64px);
       }
       section {
@@ -43,7 +44,26 @@
         border-right: 1px solid var(--line);
       }
       section + section { border-right: 0; }
-      h2 { margin: 0 0 14px; font-size: 15px; letter-spacing: 0; }
+      label {
+        display: block;
+        margin: 10px 0 5px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      input, select, textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px 10px;
+        font: inherit;
+        background: white;
+      }
+      textarea {
+        min-height: 84px;
+        resize: vertical;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+      }
       button {
         appearance: none;
         border: 1px solid var(--accent);
@@ -58,14 +78,10 @@
         background: white;
         color: var(--accent);
       }
-      textarea {
-        width: 100%;
-        min-height: 220px;
-        resize: vertical;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 10px;
-        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      button.danger {
+        border-color: var(--danger);
+        background: white;
+        color: var(--danger);
       }
       table {
         width: 100%;
@@ -84,8 +100,11 @@
         color: var(--muted);
         background: #f1f4f8;
       }
-      .toolbar { display: flex; gap: 8px; align-items: center; }
+      .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
       .muted { color: var(--muted); }
+      .critical { color: var(--danger); font-weight: 700; }
+      .high { color: var(--warn); font-weight: 700; }
       .result {
         margin-top: 14px;
         white-space: pre-wrap;
@@ -96,9 +115,8 @@
         min-height: 120px;
         overflow: auto;
       }
-      .critical { color: var(--bad); font-weight: 700; }
-      .high { color: var(--warn); font-weight: 700; }
-      @media (max-width: 820px) {
+      .rule-actions { display: flex; gap: 6px; }
+      @media (max-width: 900px) {
         main { grid-template-columns: 1fr; }
         section { border-right: 0; border-bottom: 1px solid var(--line); }
       }
@@ -114,54 +132,162 @@
     </header>
     <main>
       <section>
-        <h2>Plan Preview</h2>
+        <h2>Rule Editor</h2>
+        <form id="rule-form">
+          <label for="id">Rule ID</label>
+          <input id="id" required placeholder="tenant-org-scope-required" />
+          <label for="title">Title</label>
+          <input id="title" required placeholder="Tenant data must be organization scoped" />
+          <label for="description">Description</label>
+          <textarea id="description" required></textarea>
+          <div class="split">
+            <div>
+              <label for="severity">Severity</label>
+              <select id="severity">
+                <option value="5">critical</option>
+                <option value="4">high</option>
+                <option value="3">medium</option>
+                <option value="2">low</option>
+                <option value="1">info</option>
+              </select>
+            </div>
+            <div>
+              <label for="kind">Check Kind</label>
+              <select id="kind">
+                <option value="6">heuristic</option>
+                <option value="1">plan text</option>
+                <option value="2">diff text</option>
+                <option value="3">file path</option>
+              </select>
+            </div>
+          </div>
+          <label for="expression">Expression</label>
+          <input id="expression" required placeholder="touches_tenant_data_without_scope" />
+          <label for="tags">Tags, comma separated</label>
+          <input id="tags" placeholder="security, tenancy" />
+          <label for="evidence">Required Evidence, one per line</label>
+          <textarea id="evidence"></textarea>
+          <label for="remediation">Remediation, one per line</label>
+          <textarea id="remediation"></textarea>
+          <div class="toolbar" style="margin-top: 12px">
+            <button type="submit">Save Draft Rule</button>
+            <button type="button" class="secondary" id="new-rule">New</button>
+          </div>
+        </form>
+        <h2 style="margin-top: 24px">Plan Preview</h2>
         <textarea id="plan">Add a new customer endpoint that reads projects from the database.</textarea>
         <div class="toolbar" style="margin-top: 10px">
           <button id="evaluate">Evaluate</button>
-          <span class="muted">Uses the active ruleset</span>
+          <span class="muted">Uses the active published ruleset</span>
         </div>
         <pre class="result" id="result"></pre>
       </section>
       <section>
-        <h2>Rules</h2>
+        <h2>Draft Rules</h2>
         <table>
-          <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Tags</th></tr></thead>
+          <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Tags</th><th></th></tr></thead>
           <tbody id="rules"></tbody>
         </table>
       </section>
     </main>
     <script>
-      const rules = document.getElementById("rules");
-      const result = document.getElementById("result");
+      const state = { rules: [] };
+      const $ = id => document.getElementById(id);
       const severityName = value => ["", "info", "low", "medium", "high", "critical"][value] || "unspecified";
+      const lineList = value => value.split("\n").map(v => v.trim()).filter(Boolean);
+      const csv = value => value.split(",").map(v => v.trim()).filter(Boolean);
+
+      function fillForm(rule) {
+        $("id").value = rule?.id || "";
+        $("title").value = rule?.title || "";
+        $("description").value = rule?.description || "";
+        $("severity").value = String(rule?.severity || 5);
+        $("kind").value = String(rule?.checks?.[0]?.kind || 6);
+        $("expression").value = rule?.checks?.[0]?.expression || "";
+        $("tags").value = (rule?.tags || []).join(", ");
+        $("evidence").value = (rule?.requiredEvidence || []).join("\n");
+        $("remediation").value = (rule?.remediation || []).join("\n");
+      }
+
+      function formRule() {
+        return {
+          id: $("id").value.trim(),
+          title: $("title").value.trim(),
+          description: $("description").value.trim(),
+          severity: Number($("severity").value),
+          tags: csv($("tags").value),
+          enabled: true,
+          checks: [{ kind: Number($("kind").value), expression: $("expression").value.trim() }],
+          requiredEvidence: lineList($("evidence").value),
+          remediation: lineList($("remediation").value)
+        };
+      }
+
       async function refresh() {
         const response = await fetch("/api/rules");
         const data = await response.json();
-        rules.innerHTML = "";
-        for (const rule of data.rules || []) {
+        state.rules = data.rules || [];
+        $("rules").innerHTML = "";
+        for (const rule of state.rules) {
           const tr = document.createElement("tr");
           const severity = severityName(rule.severity);
           tr.innerHTML = `<td>${rule.id}</td><td class="${severity}">${severity}</td><td>${rule.title}</td><td>${(rule.tags || []).join(", ")}</td>`;
-          rules.appendChild(tr);
+          const actions = document.createElement("td");
+          actions.className = "rule-actions";
+          const edit = document.createElement("button");
+          edit.className = "secondary";
+          edit.textContent = "Edit";
+          edit.onclick = () => fillForm(rule);
+          const del = document.createElement("button");
+          del.className = "danger";
+          del.textContent = "Delete";
+          del.onclick = () => deleteRule(rule.id);
+          actions.append(edit, del);
+          tr.append(actions);
+          $("rules").appendChild(tr);
         }
       }
+
+      async function saveRule(event) {
+        event.preventDefault();
+        const rule = formRule();
+        const response = await fetch("/api/rules", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ rule })
+        });
+        $("result").textContent = JSON.stringify(await response.json(), null, 2);
+        await refresh();
+      }
+
+      async function deleteRule(id) {
+        const response = await fetch(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+        $("result").textContent = JSON.stringify(await response.json(), null, 2);
+        fillForm(null);
+        await refresh();
+      }
+
       async function evaluate() {
         const response = await fetch("/api/evaluate", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ plan: document.getElementById("plan").value })
+          body: JSON.stringify({ plan: $("plan").value })
         });
-        result.textContent = JSON.stringify(await response.json(), null, 2);
+        $("result").textContent = JSON.stringify(await response.json(), null, 2);
       }
-      document.getElementById("refresh").onclick = refresh;
-      document.getElementById("evaluate").onclick = evaluate;
-      document.getElementById("publish").onclick = async () => {
-        result.textContent = JSON.stringify(await (await fetch("/api/publish", { method: "POST" })).json(), null, 2);
+
+      $("rule-form").onsubmit = saveRule;
+      $("new-rule").onclick = () => fillForm(null);
+      $("refresh").onclick = refresh;
+      $("evaluate").onclick = evaluate;
+      $("publish").onclick = async () => {
+        $("result").textContent = JSON.stringify(await (await fetch("/api/publish", { method: "POST" })).json(), null, 2);
         await refresh();
       };
-      refresh();
+      refresh().then(() => {
+        if (state.rules[0]) fillForm(state.rules[0]);
+      });
       evaluate();
     </script>
   </body>
 </html>
-
