@@ -1,0 +1,5 @@
+room-data.json
+dist/
+coverage.out
+.DS_Store
+

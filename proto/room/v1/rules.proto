@@ -1,0 +1,256 @@
+syntax = "proto3";
+
+package room.v1;
+
+option go_package = "github.com/haasonsaas/room/gen/go/room/v1;roomv1";
+
+import "google/protobuf/timestamp.proto";
+
+service RuleAdminService {
+  rpc CreateRule(CreateRuleRequest) returns (CreateRuleResponse);
+  rpc UpdateRule(UpdateRuleRequest) returns (UpdateRuleResponse);
+  rpc DeleteRule(DeleteRuleRequest) returns (DeleteRuleResponse);
+  rpc ListRules(ListRulesRequest) returns (ListRulesResponse);
+  rpc PreviewRuleset(PreviewRulesetRequest) returns (PreviewRulesetResponse);
+  rpc PublishRuleset(PublishRulesetRequest) returns (PublishRulesetResponse);
+  rpc RollbackRuleset(RollbackRulesetRequest) returns (RollbackRulesetResponse);
+  rpc GetActiveRuleset(RuleAdminServiceGetActiveRulesetRequest) returns (RuleAdminServiceGetActiveRulesetResponse);
+}
+
+service AgentRulesService {
+  rpc GetActiveRuleset(AgentRulesServiceGetActiveRulesetRequest) returns (AgentRulesServiceGetActiveRulesetResponse);
+  rpc WatchRuleset(WatchRulesetRequest) returns (stream WatchRulesetResponse);
+  rpc EvaluatePlan(EvaluatePlanRequest) returns (EvaluatePlanResponse);
+  rpc EvaluateDiff(EvaluateDiffRequest) returns (EvaluateDiffResponse);
+  rpc ReportEvaluation(ReportEvaluationRequest) returns (ReportEvaluationResponse);
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_INFO = 1;
+  SEVERITY_LOW = 2;
+  SEVERITY_MEDIUM = 3;
+  SEVERITY_HIGH = 4;
+  SEVERITY_CRITICAL = 5;
+}
+
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  DECISION_ALLOW = 1;
+  DECISION_WARN = 2;
+  DECISION_NEEDS_CHANGES = 3;
+  DECISION_DENY = 4;
+}
+
+enum CheckKind {
+  CHECK_KIND_UNSPECIFIED = 0;
+  CHECK_KIND_PLAN_TEXT = 1;
+  CHECK_KIND_DIFF_TEXT = 2;
+  CHECK_KIND_FILE_PATH = 3;
+  CHECK_KIND_AST_PATTERN = 4;
+  CHECK_KIND_SEMGREP = 5;
+  CHECK_KIND_HEURISTIC = 6;
+}
+
+enum RulesetStatus {
+  RULESET_STATUS_UNSPECIFIED = 0;
+  RULESET_STATUS_DRAFT = 1;
+  RULESET_STATUS_ACTIVE = 2;
+  RULESET_STATUS_ARCHIVED = 3;
+}
+
+message RuleScope {
+  repeated string workspaces = 1;
+  repeated string repositories = 2;
+  repeated string languages = 3;
+  repeated string frameworks = 4;
+  repeated string paths = 5;
+  repeated string agent_types = 6;
+}
+
+message RuleCheck {
+  CheckKind kind = 1;
+  string expression = 2;
+  repeated string file_globs = 3;
+  string message = 4;
+}
+
+message Rule {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  Severity severity = 4;
+  repeated string tags = 5;
+  RuleScope scope = 6;
+  repeated RuleCheck checks = 7;
+  repeated string required_evidence = 8;
+  repeated string remediation = 9;
+  bool enabled = 10;
+  string owner = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+message RulesetVersion {
+  string id = 1;
+  int32 version = 2;
+  string hash = 3;
+  RulesetStatus status = 4;
+  repeated Rule rules = 5;
+  string author = 6;
+  string notes = 7;
+  google.protobuf.Timestamp published_at = 8;
+}
+
+message EvaluationContext {
+  string workspace_id = 1;
+  string repository = 2;
+  string agent_type = 3;
+  string cwd = 4;
+  repeated string changed_files = 5;
+  repeated string languages = 6;
+  repeated string frameworks = 7;
+}
+
+message EvaluationInput {
+  EvaluationContext context = 1;
+  string plan = 2;
+  string diff = 3;
+}
+
+message RuleMatch {
+  string rule_id = 1;
+  string title = 2;
+  Severity severity = 3;
+  string message = 4;
+  repeated string tags = 5;
+  repeated string required_evidence = 6;
+  repeated string remediation = 7;
+}
+
+message EvaluationResult {
+  Decision decision = 1;
+  Severity highest_severity = 2;
+  repeated RuleMatch matches = 3;
+  repeated string required_checks = 4;
+  string ruleset_id = 5;
+  int32 ruleset_version = 6;
+  string ruleset_hash = 7;
+}
+
+message CreateRuleRequest {
+  Rule rule = 1;
+}
+
+message CreateRuleResponse {
+  Rule rule = 1;
+}
+
+message UpdateRuleRequest {
+  Rule rule = 1;
+}
+
+message UpdateRuleResponse {
+  Rule rule = 1;
+}
+
+message DeleteRuleRequest {
+  string rule_id = 1;
+}
+
+message DeleteRuleResponse {
+  bool deleted = 1;
+}
+
+message ListRulesRequest {
+  EvaluationContext context = 1;
+  bool include_disabled = 2;
+}
+
+message ListRulesResponse {
+  repeated Rule rules = 1;
+}
+
+message PreviewRulesetRequest {
+  repeated Rule rules = 1;
+  EvaluationInput input = 2;
+}
+
+message PreviewRulesetResponse {
+  EvaluationResult result = 1;
+}
+
+message PublishRulesetRequest {
+  string author = 1;
+  string notes = 2;
+}
+
+message PublishRulesetResponse {
+  RulesetVersion ruleset = 1;
+}
+
+message RollbackRulesetRequest {
+  int32 version = 1;
+}
+
+message RollbackRulesetResponse {
+  RulesetVersion ruleset = 1;
+}
+
+message RuleAdminServiceGetActiveRulesetRequest {
+  EvaluationContext context = 1;
+}
+
+message RuleAdminServiceGetActiveRulesetResponse {
+  RulesetVersion ruleset = 1;
+}
+
+message AgentRulesServiceGetActiveRulesetRequest {
+  EvaluationContext context = 1;
+}
+
+message AgentRulesServiceGetActiveRulesetResponse {
+  RulesetVersion ruleset = 1;
+}
+
+message WatchRulesetRequest {
+  EvaluationContext context = 1;
+  int32 current_version = 2;
+}
+
+message WatchRulesetResponse {
+  RulesetVersion ruleset = 1;
+}
+
+message EvaluatePlanRequest {
+  EvaluationInput input = 1;
+}
+
+message EvaluatePlanResponse {
+  EvaluationResult result = 1;
+}
+
+message EvaluateDiffRequest {
+  EvaluationInput input = 1;
+}
+
+message EvaluateDiffResponse {
+  EvaluationResult result = 1;
+}
+
+message ReportEvaluationRequest {
+  EvaluationResult result = 1;
+  string session_id = 2;
+  string tool_name = 3;
+}
+
+message ReportEvaluationResponse {
+  bool accepted = 1;
+}
+
+message StoreSnapshot {
+  repeated Rule draft_rules = 1;
+  repeated RulesetVersion versions = 2;
+  int32 active_version = 3;
+  int32 next_version = 4;
+}

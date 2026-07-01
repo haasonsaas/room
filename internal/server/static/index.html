@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Room Rules</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f8fa;
+        --ink: #20242c;
+        --muted: #667085;
+        --line: #d9dee7;
+        --panel: #ffffff;
+        --accent: #0f766e;
+        --warn: #b45309;
+        --bad: #b42318;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+      h1 { margin: 0; font-size: 18px; letter-spacing: 0; }
+      main {
+        display: grid;
+        grid-template-columns: minmax(280px, 440px) 1fr;
+        min-height: calc(100vh - 64px);
+      }
+      section {
+        padding: 22px 24px;
+        border-right: 1px solid var(--line);
+      }
+      section + section { border-right: 0; }
+      h2 { margin: 0 0 14px; font-size: 15px; letter-spacing: 0; }
+      button {
+        appearance: none;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: white;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: white;
+        color: var(--accent);
+      }
+      textarea {
+        width: 100%;
+        min-height: 220px;
+        resize: vertical;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border: 1px solid var(--line);
+      }
+      th, td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        font-size: 12px;
+        color: var(--muted);
+        background: #f1f4f8;
+      }
+      .toolbar { display: flex; gap: 8px; align-items: center; }
+      .muted { color: var(--muted); }
+      .result {
+        margin-top: 14px;
+        white-space: pre-wrap;
+        background: #111827;
+        color: #e5e7eb;
+        border-radius: 6px;
+        padding: 12px;
+        min-height: 120px;
+        overflow: auto;
+      }
+      .critical { color: var(--bad); font-weight: 700; }
+      .high { color: var(--warn); font-weight: 700; }
+      @media (max-width: 820px) {
+        main { grid-template-columns: 1fr; }
+        section { border-right: 0; border-bottom: 1px solid var(--line); }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Room Rules</h1>
+      <div class="toolbar">
+        <button class="secondary" id="refresh">Refresh</button>
+        <button id="publish">Publish Ruleset</button>
+      </div>
+    </header>
+    <main>
+      <section>
+        <h2>Plan Preview</h2>
+        <textarea id="plan">Add a new customer endpoint that reads projects from the database.</textarea>
+        <div class="toolbar" style="margin-top: 10px">
+          <button id="evaluate">Evaluate</button>
+          <span class="muted">Uses the active ruleset</span>
+        </div>
+        <pre class="result" id="result"></pre>
+      </section>
+      <section>
+        <h2>Rules</h2>
+        <table>
+          <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Tags</th></tr></thead>
+          <tbody id="rules"></tbody>
+        </table>
+      </section>
+    </main>
+    <script>
+      const rules = document.getElementById("rules");
+      const result = document.getElementById("result");
+      const severityName = value => ["", "info", "low", "medium", "high", "critical"][value] || "unspecified";
+      async function refresh() {
+        const response = await fetch("/api/rules");
+        const data = await response.json();
+        rules.innerHTML = "";
+        for (const rule of data.rules || []) {
+          const tr = document.createElement("tr");
+          const severity = severityName(rule.severity);
+          tr.innerHTML = `<td>${rule.id}</td><td class="${severity}">${severity}</td><td>${rule.title}</td><td>${(rule.tags || []).join(", ")}</td>`;
+          rules.appendChild(tr);
+        }
+      }
+      async function evaluate() {
+        const response = await fetch("/api/evaluate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ plan: document.getElementById("plan").value })
+        });
+        result.textContent = JSON.stringify(await response.json(), null, 2);
+      }
+      document.getElementById("refresh").onclick = refresh;
+      document.getElementById("evaluate").onclick = evaluate;
+      document.getElementById("publish").onclick = async () => {
+        result.textContent = JSON.stringify(await (await fetch("/api/publish", { method: "POST" })).json(), null, 2);
+        await refresh();
+      };
+      refresh();
+      evaluate();
+    </script>
+  </body>
+</html>
+

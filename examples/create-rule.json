@@ -1,0 +1,28 @@
+{
+  "rule": {
+    "id": "auth-context-required",
+    "title": "Auth context is required for protected handlers",
+    "description": "New protected handlers must mention auth/session context in the plan or diff.",
+    "severity": "SEVERITY_HIGH",
+    "tags": ["security", "authorization"],
+    "enabled": true,
+    "scope": {
+      "paths": ["app/**", "internal/**", "src/**"]
+    },
+    "checks": [
+      {
+        "kind": "CHECK_KIND_PLAN_TEXT",
+        "expression": "missing_any:auth,session,principal,claims"
+      }
+    ],
+    "requiredEvidence": [
+      "handler loads authenticated principal",
+      "authorization check happens before data access"
+    ],
+    "remediation": [
+      "thread auth context through the handler",
+      "add an unauthenticated request test"
+    ]
+  }
+}
+
