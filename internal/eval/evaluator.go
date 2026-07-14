@@ -73,6 +73,10 @@ func (p *Policy) Evaluate(ruleset *roomv1.RulesetVersion, context *roomv1.Evalua
 	verifiedContext := cloneContext(context)
 	if report != nil && report.GetArtifact() != nil {
 		verifiedContext.ChangedFiles = append([]string(nil), report.GetArtifact().GetChangedFiles()...)
+		if len(validReceipts) > 0 {
+			verifiedContext.Languages = append([]string(nil), report.GetArtifact().GetLanguages()...)
+			verifiedContext.Frameworks = append([]string(nil), report.GetArtifact().GetFrameworks()...)
+		}
 	}
 	phase := roomv1.AnalysisPhase_ANALYSIS_PHASE_UNSPECIFIED
 	if report != nil && report.GetArtifact() != nil {
@@ -260,8 +264,10 @@ func listIntersects(patterns, values []string) bool {
 		return true
 	}
 	for _, value := range values {
-		if listMatches(patterns, value) {
-			return true
+		for _, pattern := range patterns {
+			if globMatch(strings.ToLower(pattern), strings.ToLower(value)) {
+				return true
+			}
 		}
 	}
 	return false

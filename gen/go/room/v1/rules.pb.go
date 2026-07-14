@@ -895,6 +895,8 @@ type ArtifactRef struct {
 	Phase         AnalysisPhase          `protobuf:"varint,1,opt,name=phase,proto3,enum=room.v1.AnalysisPhase" json:"phase,omitempty"`
 	Sha256        []byte                 `protobuf:"bytes,2,opt,name=sha256,proto3" json:"sha256,omitempty"`
 	ChangedFiles  []string               `protobuf:"bytes,3,rep,name=changed_files,json=changedFiles,proto3" json:"changed_files,omitempty"`
+	Languages     []string               `protobuf:"bytes,4,rep,name=languages,proto3" json:"languages,omitempty"`
+	Frameworks    []string               `protobuf:"bytes,5,rep,name=frameworks,proto3" json:"frameworks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -946,6 +948,20 @@ func (x *ArtifactRef) GetSha256() []byte {
 func (x *ArtifactRef) GetChangedFiles() []string {
 	if x != nil {
 		return x.ChangedFiles
+	}
+	return nil
+}
+
+func (x *ArtifactRef) GetLanguages() []string {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
+}
+
+func (x *ArtifactRef) GetFrameworks() []string {
+	if x != nil {
+		return x.Frameworks
 	}
 	return nil
 }
@@ -4307,11 +4323,15 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x1d\n" +
 	"\n" +
 	"start_line\x18\x03 \x01(\x05R\tstartLine\x12\x19\n" +
-	"\bend_line\x18\x04 \x01(\x05R\aendLine\"x\n" +
+	"\bend_line\x18\x04 \x01(\x05R\aendLine\"\xb6\x01\n" +
 	"\vArtifactRef\x12,\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x16.room.v1.AnalysisPhaseR\x05phase\x12\x16\n" +
 	"\x06sha256\x18\x02 \x01(\fR\x06sha256\x12#\n" +
-	"\rchanged_files\x18\x03 \x03(\tR\fchangedFiles\"a\n" +
+	"\rchanged_files\x18\x03 \x03(\tR\fchangedFiles\x12\x1c\n" +
+	"\tlanguages\x18\x04 \x03(\tR\tlanguages\x12\x1e\n" +
+	"\n" +
+	"frameworks\x18\x05 \x03(\tR\n" +
+	"frameworks\"a\n" +
 	"\x10AnalyzerIdentity\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12#\n" +

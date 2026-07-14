@@ -147,6 +147,8 @@ type providerRequest struct {
 type providerResponse struct {
 	Phase          string           `json:"phase"`
 	Status         string           `json:"status"`
+	Languages      []string         `json:"languages,omitempty"`
+	Frameworks     []string         `json:"frameworks,omitempty"`
 	CoveredSignals []string         `json:"covered_signals"`
 	Signals        []providerSignal `json:"signals,omitempty"`
 	FailureCode    string           `json:"failure_code,omitempty"`
@@ -212,9 +214,40 @@ func (a *externalAnalyzer) Analyze(ctx context.Context, input Input) *roomv1.Ana
 	if code != "" {
 		return a.failure(report, roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, code, digest[:])
 	}
+	languages, code := normalizeClassifications(response.Languages)
+	if code != "" {
+		return a.failure(report, roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, code, digest[:])
+	}
+	frameworks, code := normalizeClassifications(response.Frameworks)
+	if code != "" {
+		return a.failure(report, roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, code, digest[:])
+	}
+	report.Artifact.Languages = languages
+	report.Artifact.Frameworks = frameworks
 	report.Status = receipt.Status
 	report.Receipts = []*roomv1.AnalyzerReceipt{receipt}
 	return report
+}
+
+func normalizeClassifications(values []string) ([]string, string) {
+	if len(values) == 0 {
+		return nil, ""
+	}
+	normalized := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, raw := range values {
+		value := strings.ToLower(strings.TrimSpace(raw))
+		if value == "" || len(value) > 128 || strings.ContainsAny(value, "\x00\r\n") {
+			return nil, "classification_invalid"
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return nil, "classification_invalid"
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+	sort.Strings(normalized)
+	return normalized, ""
 }
 
 func decodeProviderResponse(output []byte) (providerResponse, string) {

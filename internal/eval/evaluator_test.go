@@ -66,8 +66,8 @@ func TestScopeMatchesLanguageAndFrameworkSelectors(t *testing.T) {
 		},
 		{
 			name:    "framework glob matches",
-			scope:   &roomv1.RuleScope{Frameworks: []string{"next*"}},
-			context: &roomv1.EvaluationContext{Frameworks: []string{"nextjs"}},
+			scope:   &roomv1.RuleScope{Frameworks: []string{"Next*"}},
+			context: &roomv1.EvaluationContext{Frameworks: []string{"NEXTJS"}},
 			want:    true,
 		},
 		{
@@ -81,6 +81,36 @@ func TestScopeMatchesLanguageAndFrameworkSelectors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ScopeMatches(tt.scope, tt.context); got != tt.want {
 				t.Fatalf("ScopeMatches() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTrustedArtifactClassificationScopesRules(t *testing.T) {
+	tests := []struct {
+		name       string
+		scope      *roomv1.RuleScope
+		languages  []string
+		frameworks []string
+		want       roomv1.Decision
+	}{
+		{name: "language match", scope: &roomv1.RuleScope{Languages: []string{"rust"}}, languages: []string{"rust"}, want: roomv1.Decision_DECISION_DENY},
+		{name: "language mismatch", scope: &roomv1.RuleScope{Languages: []string{"rust"}}, languages: []string{"go"}, want: roomv1.Decision_DECISION_ALLOW},
+		{name: "framework match", scope: &roomv1.RuleScope{Frameworks: []string{"react"}}, frameworks: []string{"react"}, want: roomv1.Decision_DECISION_DENY},
+		{name: "framework mismatch", scope: &roomv1.RuleScope{Frameworks: []string{"react"}}, frameworks: []string{"vue"}, want: roomv1.Decision_DECISION_ALLOW},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ruleset := testRuleset(roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL, roomv1.Severity_SEVERITY_CRITICAL)
+			ruleset.Rules[0].Scope = tt.scope
+			report := completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF, roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL)
+			report.Artifact.Languages = tt.languages
+			report.Artifact.Frameworks = tt.frameworks
+			callerContext := &roomv1.EvaluationContext{Languages: []string{"caller-language"}, Frameworks: []string{"caller-framework"}}
+
+			result := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false).Evaluate(ruleset, callerContext, report)
+			if result.GetDecision() != tt.want {
+				t.Fatalf("decision = %s, want %s; matches=%+v gaps=%+v", result.GetDecision(), tt.want, result.GetMatches(), result.GetGaps())
 			}
 		})
 	}

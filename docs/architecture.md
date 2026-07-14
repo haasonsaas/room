@@ -16,8 +16,10 @@ cache from one credential cannot masquerade as another scope.
 
 The analyzer is the only component that receives raw plans and diffs. The policy
 engine accepts fixed `SignalKind` values, analyzer identity/config digests,
-coverage receipts, artifact hashes, and confidence values. Missing, partial,
-invalid, or untrusted analysis produces `INDETERMINATE`, not an implicit allow.
+coverage receipts, artifact hashes, analyzer-stamped language/framework
+classification, and confidence values. Caller-supplied classification cannot
+narrow scoped rules. Missing, partial, invalid, or untrusted analysis produces
+`INDETERMINATE`, not an implicit allow.
 
 MCP governance likewise consumes typed identity. Direct proxies can provide
 transport-verified server/tool identity; hook adapters must use explicit provider

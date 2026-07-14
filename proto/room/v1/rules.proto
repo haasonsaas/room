@@ -160,6 +160,8 @@ message ArtifactRef {
   AnalysisPhase phase = 1;
   bytes sha256 = 2;
   repeated string changed_files = 3;
+  repeated string languages = 4;
+  repeated string frameworks = 5;
 }
 
 message AnalyzerIdentity {

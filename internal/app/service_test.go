@@ -209,6 +209,54 @@ func TestForgedChangedFilesCannotBypassPathScopedRule(t *testing.T) {
 	}
 }
 
+func TestAgentEvaluationUsesTrustedAnalyzerClassification(t *testing.T) {
+	database, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer database.Close()
+	for _, rule := range database.ListRules(true) {
+		if _, err := database.DeleteRule(rule.GetId()); err != nil {
+			t.Fatalf("delete default rule %q: %v", rule.GetId(), err)
+		}
+	}
+	_, err = database.UpsertRule(&roomv1.Rule{
+		Id: "rust-only", Title: "Rust only", Description: "classified by the trusted analyzer", Enabled: true, Severity: roomv1.Severity_SEVERITY_CRITICAL,
+		Scope:            &roomv1.RuleScope{Languages: []string{"rust"}},
+		Triggers:         []*roomv1.SignalSelector{{Signal: roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL, Phases: []roomv1.AnalysisPhase{roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF}, MinimumConfidenceBasisPoints: 8000}},
+		RequiredCoverage: []roomv1.SignalKind{roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL},
+	})
+	if err != nil {
+		t.Fatalf("upsert classified rule: %v", err)
+	}
+	if _, err := database.Publish("test", "trusted classification"); err != nil {
+		t.Fatalf("publish classified rule: %v", err)
+	}
+
+	provider := newClassifiedAnalyzer("go")
+	service := New(database, WithAnalyzer(provider))
+	ctx := auth.WithPrincipal(context.Background(), auth.Principal{ID: "agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "w", Repository: "r", AgentID: "a"}})
+	request := connect.NewRequest(&roomv1.EvaluateDiffRequest{Input: &roomv1.EvaluationInput{
+		Diff: "classified artifact", Context: &roomv1.EvaluationContext{Languages: []string{"rust"}},
+	}})
+	response, err := service.EvaluateDiff(ctx, request)
+	if err != nil {
+		t.Fatalf("evaluate analyzer language mismatch: %v", err)
+	}
+	if response.Msg.GetResult().GetDecision() != roomv1.Decision_DECISION_ALLOW {
+		t.Fatalf("forged caller language narrowed analyzer scope: %+v", response.Msg.GetResult())
+	}
+
+	provider.language = "rust"
+	response, err = service.EvaluateDiff(ctx, request)
+	if err != nil {
+		t.Fatalf("evaluate analyzer language match: %v", err)
+	}
+	if response.Msg.GetResult().GetDecision() != roomv1.Decision_DECISION_DENY {
+		t.Fatalf("trusted analyzer language did not activate rule: %+v", response.Msg.GetResult())
+	}
+}
+
 func TestPreviewRulesetUsesExplicitEvaluationPhase(t *testing.T) {
 	database, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
 	if err != nil {
@@ -273,6 +321,31 @@ type completeAnalyzer struct {
 	identity      *roomv1.AnalyzerIdentity
 	identityCalls int
 	inputs        []analyzer.Input
+}
+
+type classifiedAnalyzer struct {
+	identity *roomv1.AnalyzerIdentity
+	language string
+}
+
+func newClassifiedAnalyzer(language string) *classifiedAnalyzer {
+	return &classifiedAnalyzer{identity: &roomv1.AnalyzerIdentity{Id: "classifier", Version: "1", ConfigSha256: make([]byte, 32)}, language: language}
+}
+
+func (a *classifiedAnalyzer) Identity() *roomv1.AnalyzerIdentity { return a.identity }
+
+func (a *classifiedAnalyzer) Analyze(_ context.Context, input analyzer.Input) *roomv1.AnalysisReport {
+	digest := sha256.Sum256(input.Content)
+	signal := &roomv1.SecuritySignal{Kind: roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL, Fingerprint: "secret", Analyzer: a.identity, ConfidenceBasisPoints: 10000}
+	receipt := &roomv1.AnalyzerReceipt{
+		Analyzer: a.identity, Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_COMPLETE,
+		CoveredSignals: []roomv1.SignalKind{roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL}, Signals: []*roomv1.SecuritySignal{signal}, InputSha256: digest[:],
+	}
+	return &roomv1.AnalysisReport{
+		Status:   roomv1.AnalysisStatus_ANALYSIS_STATUS_COMPLETE,
+		Artifact: &roomv1.ArtifactRef{Phase: input.Phase, Sha256: digest[:], Languages: []string{a.language}},
+		Receipts: []*roomv1.AnalyzerReceipt{receipt},
+	}
 }
 
 type pathSignalAnalyzer struct {
