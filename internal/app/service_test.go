@@ -237,9 +237,31 @@ func TestPreviewRulesetUsesExplicitEvaluationPhase(t *testing.T) {
 	}
 }
 
-func TestScopedRulesetUsesCanonicalRecursiveIdentityScope(t *testing.T) {
+func TestAuthorizedContextKeepsIdentityTrustedAndClassificationConservative(t *testing.T) {
+	principal := auth.Principal{ID: "agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "trusted-workspace", Repository: "trusted-repo", AgentID: "trusted-agent"}}
+	supplied := &roomv1.EvaluationContext{
+		WorkspaceId: "forged-workspace", Repository: "forged-repo", AgentType: "forged-agent", SubjectId: "forged-subject",
+		Cwd: "/workspace", ChangedFiles: []string{"harmless.txt"}, Languages: []string{"forged-language"}, Frameworks: []string{"forged-framework"},
+	}
+
+	got := authorizedContext(principal, supplied)
+	if got.GetWorkspaceId() != principal.Scope.WorkspaceID || got.GetRepository() != principal.Scope.Repository || got.GetAgentType() != principal.Scope.AgentID || got.GetSubjectId() != principal.ID {
+		t.Fatalf("authorized identity = %+v", got)
+	}
+	if got.GetCwd() != supplied.GetCwd() {
+		t.Fatalf("cwd = %q, want %q", got.GetCwd(), supplied.GetCwd())
+	}
+	if len(got.GetChangedFiles()) != 0 || len(got.GetLanguages()) != 0 || len(got.GetFrameworks()) != 0 {
+		t.Fatalf("untrusted artifact classification survived authorization: %+v", got)
+	}
+}
+
+func TestScopedRulesetUsesIdentityScopeWithoutDiscardingArtifactScopes(t *testing.T) {
 	principal := auth.Principal{ID: "agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: " w ", Repository: "org/team/repo", AgentID: "Codex"}}
-	rule := &roomv1.Rule{Id: "recursive", Enabled: true, Scope: &roomv1.RuleScope{Workspaces: []string{"w"}, Repositories: []string{"org/**"}, AgentTypes: []string{"codex"}}}
+	rule := &roomv1.Rule{Id: "recursive", Enabled: true, Scope: &roomv1.RuleScope{
+		Workspaces: []string{"w"}, Repositories: []string{"org/**"}, AgentTypes: []string{"codex"},
+		Languages: []string{"go"}, Frameworks: []string{"connectrpc"}, Paths: []string{"internal/**"},
+	}}
 	source := &roomv1.RulesetVersion{Id: "ruleset-1", Version: 1, Hash: "source", Rules: []*roomv1.Rule{rule}}
 	view := scopedRuleset(source, principal)
 	if len(view.GetRules()) != 1 || view.GetRules()[0].GetId() != rule.GetId() {

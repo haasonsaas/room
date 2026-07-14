@@ -59,10 +59,10 @@ func TestScopeMatchesLanguageAndFrameworkSelectors(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "scoped language requires context",
+			name:    "unknown language does not discard scoped rule",
 			scope:   &roomv1.RuleScope{Languages: []string{"go"}},
 			context: &roomv1.EvaluationContext{},
-			want:    false,
+			want:    true,
 		},
 		{
 			name:    "framework glob matches",

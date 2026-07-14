@@ -256,7 +256,7 @@ func ScopeMatches(scope *roomv1.RuleScope, context *roomv1.EvaluationContext) bo
 }
 
 func listIntersects(patterns, values []string) bool {
-	if len(patterns) == 0 {
+	if len(patterns) == 0 || len(values) == 0 {
 		return true
 	}
 	for _, value := range values {
