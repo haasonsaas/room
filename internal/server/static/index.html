@@ -229,11 +229,14 @@
       }
 
       function formRule() {
+        const id = $("id").value.trim();
+        const existing = state.rules.find(rule => rule.id === id);
         return {
-          id: $("id").value.trim(),
+          id,
           title: $("title").value.trim(),
           description: $("description").value.trim(),
           severity: Number($("severity").value),
+          scope: existing?.scope,
           tags: csv($("tags").value),
           enabled: true,
           triggers: [{ signal: Number($("signal").value), phases: [1, 2], minimumConfidenceBasisPoints: 8000 }],

@@ -66,6 +66,75 @@ func TestDashboardRuleLifecycleAPI(t *testing.T) {
 	}
 }
 
+func TestDashboardEditPreservesExistingRuleScope(t *testing.T) {
+	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer ruleStore.Close()
+	server := httptest.NewServer(New(app.New(ruleStore), WithLocalAuth()))
+	defer server.Close()
+
+	var original *roomv1.Rule
+	for _, rule := range ruleStore.ListRules(true) {
+		if rule.GetId() == "tenant-org-scope-required" {
+			original = rule
+			break
+		}
+	}
+	if original == nil || len(original.GetScope().GetPaths()) == 0 {
+		t.Fatalf("expected path-scoped built-in rule, got %+v", original)
+	}
+	originalScope := proto.Clone(original.GetScope()).(*roomv1.RuleScope)
+	edited := proto.Clone(original).(*roomv1.Rule)
+	edited.Title = "Edited title"
+	edited.Scope = nil // The dashboard's legacy form omitted non-editable scope fields.
+	body, err := protojson.Marshal(&roomv1.CreateRuleRequest{Rule: edited})
+	if err != nil {
+		t.Fatalf("marshal dashboard edit: %v", err)
+	}
+
+	response, err := http.Post(server.URL+"/api/rules", "application/json", strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("save dashboard edit: %v", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("save status = %d, want 200", response.StatusCode)
+	}
+	created := &roomv1.CreateRuleResponse{}
+	decodeProtoResponse(t, response, created)
+	if !proto.Equal(created.GetRule().GetScope(), originalScope) {
+		t.Fatalf("saved scope = %+v, want %+v", created.GetRule().GetScope(), originalScope)
+	}
+
+	cleared := proto.Clone(created.GetRule()).(*roomv1.Rule)
+	cleared.Scope = &roomv1.RuleScope{}
+	body, err = protojson.Marshal(&roomv1.CreateRuleRequest{Rule: cleared})
+	if err != nil {
+		t.Fatalf("marshal explicit scope clear: %v", err)
+	}
+	response, err = http.Post(server.URL+"/api/rules", "application/json", strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("save explicit scope clear: %v", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("clear status = %d, want 200", response.StatusCode)
+	}
+	decodeProtoResponse(t, response, &roomv1.CreateRuleResponse{})
+	found := false
+	for _, rule := range ruleStore.ListRules(true) {
+		if rule.GetId() == cleared.GetId() {
+			found = true
+			if rule.Scope == nil || len(rule.GetScope().GetPaths()) != 0 {
+				t.Fatalf("explicit empty scope was not persisted: %+v", rule.GetScope())
+			}
+		}
+	}
+	if !found {
+		t.Fatal("explicitly cleared rule was not persisted")
+	}
+}
+
 func TestDashboardEvaluationUsesExplicitPhase(t *testing.T) {
 	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
 	if err != nil {

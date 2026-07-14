@@ -39,6 +39,53 @@ func TestCompleteCoverageWithoutSignalAllows(t *testing.T) {
 	}
 }
 
+func TestScopeMatchesLanguageAndFrameworkSelectors(t *testing.T) {
+	tests := []struct {
+		name    string
+		scope   *roomv1.RuleScope
+		context *roomv1.EvaluationContext
+		want    bool
+	}{
+		{
+			name:    "language matches",
+			scope:   &roomv1.RuleScope{Languages: []string{"go"}},
+			context: &roomv1.EvaluationContext{Languages: []string{"go", "sql"}},
+			want:    true,
+		},
+		{
+			name:    "language does not match",
+			scope:   &roomv1.RuleScope{Languages: []string{"rust"}},
+			context: &roomv1.EvaluationContext{Languages: []string{"go"}},
+			want:    false,
+		},
+		{
+			name:    "unknown language does not discard scoped rule",
+			scope:   &roomv1.RuleScope{Languages: []string{"go"}},
+			context: &roomv1.EvaluationContext{},
+			want:    true,
+		},
+		{
+			name:    "framework glob matches",
+			scope:   &roomv1.RuleScope{Frameworks: []string{"next*"}},
+			context: &roomv1.EvaluationContext{Frameworks: []string{"nextjs"}},
+			want:    true,
+		},
+		{
+			name:    "all populated dimensions must match",
+			scope:   &roomv1.RuleScope{Languages: []string{"typescript"}, Frameworks: []string{"react"}},
+			context: &roomv1.EvaluationContext{Languages: []string{"typescript"}, Frameworks: []string{"vue"}},
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ScopeMatches(tt.scope, tt.context); got != tt.want {
+				t.Fatalf("ScopeMatches() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMissingCoverageIsIndeterminate(t *testing.T) {
 	policy := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false)
 	result := policy.Evaluate(testRuleset(roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL, roomv1.Severity_SEVERITY_HIGH), &roomv1.EvaluationContext{}, completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF))

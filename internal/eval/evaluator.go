@@ -229,12 +229,17 @@ func phaseMatches(phases []roomv1.AnalysisPhase, phase roomv1.AnalysisPhase) boo
 	return false
 }
 
-// ScopeMatches is the canonical matcher for identity and path rule scope.
+// ScopeMatches is the canonical matcher for identity, technology, and path rule scope.
 func ScopeMatches(scope *roomv1.RuleScope, context *roomv1.EvaluationContext) bool {
 	if scope == nil {
 		return true
 	}
-	if context == nil || !listMatches(scope.GetWorkspaces(), context.GetWorkspaceId()) || !listMatches(scope.GetRepositories(), context.GetRepository()) || !listMatches(scope.GetAgentTypes(), context.GetAgentType()) {
+	if context == nil ||
+		!listMatches(scope.GetWorkspaces(), context.GetWorkspaceId()) ||
+		!listMatches(scope.GetRepositories(), context.GetRepository()) ||
+		!listMatches(scope.GetAgentTypes(), context.GetAgentType()) ||
+		!listIntersects(scope.GetLanguages(), context.GetLanguages()) ||
+		!listIntersects(scope.GetFrameworks(), context.GetFrameworks()) {
 		return false
 	}
 	if len(scope.GetPaths()) == 0 || len(context.GetChangedFiles()) == 0 {
@@ -245,6 +250,18 @@ func ScopeMatches(scope *roomv1.RuleScope, context *roomv1.EvaluationContext) bo
 			if globMatch(pattern, changed) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func listIntersects(patterns, values []string) bool {
+	if len(patterns) == 0 || len(values) == 0 {
+		return true
+	}
+	for _, value := range values {
+		if listMatches(patterns, value) {
+			return true
 		}
 	}
 	return false
