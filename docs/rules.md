@@ -1,62 +1,48 @@
-# Rules
+# Rules and MCP policy
 
-Rules are ordinary protobuf messages and can be managed through
-`RuleAdminService`.
+Rules select typed analyzer signals. Room converts the exact legacy v1 check
+identifiers it previously shipped into typed signals during import or update;
+unknown/free-form checks are rejected rather than executed as text policy.
 
-The bundled dashboard at `http://localhost:8787` can create, update, delete,
-preview, and publish rules without a separate frontend build.
-
-Minimal JSON payload for `CreateRule`:
+Minimal `CreateRule` JSON:
 
 ```json
 {
   "rule": {
-    "id": "tenant-org-scope-required",
-    "title": "Tenant data must be organization scoped",
-    "description": "Tenant reads and writes must derive organization scope from trusted auth context.",
-    "severity": "SEVERITY_CRITICAL",
-    "tags": ["security", "tenancy"],
+    "id": "auth-context-required",
+    "title": "Protected handlers require auth context",
+    "description": "Protected access without a verified principal is prohibited.",
+    "severity": "SEVERITY_HIGH",
+    "tags": ["security", "authorization"],
     "enabled": true,
-    "checks": [
-      {
-        "kind": "CHECK_KIND_HEURISTIC",
-        "expression": "touches_tenant_data_without_scope"
-      }
-    ],
-    "requiredEvidence": [
-      "organization_id/workspace_id comes from authenticated context",
-      "query filters by organization/workspace",
-      "cross-organization denial test is present"
-    ],
-    "remediation": [
-      "use an org-scoped repository/helper",
-      "reject request-body organization ids unless membership is verified"
-    ]
+    "scope": { "paths": ["app/**", "internal/**", "src/**"] },
+    "triggers": [{
+      "signal": "SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT",
+      "phases": ["ANALYSIS_PHASE_PLAN", "ANALYSIS_PHASE_DIFF"],
+      "minimumConfidenceBasisPoints": 8000
+    }],
+    "requiredCoverage": ["SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT"],
+    "requiredEvidence": ["unauthenticated request coverage"],
+    "remediation": ["derive authorization from trusted middleware"]
   }
 }
 ```
 
-Publish after edits:
+Admin API calls require an admin bearer token:
 
 ```bash
-curl \
+curl -H "Authorization: Bearer $(cat .room/admin.token)" \
   -H 'content-type: application/json' \
-  -d '{"author":"you","notes":"tighten tenant rules"}' \
-  http://localhost:8787/room.v1.RuleAdminService/PublishRuleset
+  -d '{"author":"you","notes":"publish typed rules"}' \
+  http://127.0.0.1:8787/room.v1.RuleAdminService/PublishRuleset
 ```
 
-## Bundled Rust rules
+The MCP policy supports disabled, allowlist, and blocklist modes. Its default is
+an empty allowlist with unknown identities denied. Selectors match exact
+`server_id`/`tool_name` values or a whole-field `*`; provider bindings map one
+opaque provider tool ID to one canonical server/tool identity. Duplicate
+selectors and bindings are rejected.
 
-New Room stores publish the generic security rules plus Rust-specific guardrails:
-
-- `rust-unsafe-requires-safety-rationale`: flags unsafe Rust without a nearby safety rationale.
-- `rust-request-paths-must-not-unwrap`: flags `unwrap` or `expect` in handlers, routes, and API request paths.
-- `rust-command-exec-requires-allowlist`: flags process execution that passes request-controlled arguments without an allowlist.
-- `rust-secrets-require-crypto-rng`: flags token, nonce, session, password-reset, and API-key generation that uses non-cryptographic randomness.
-- `rust-paths-must-be-canonicalized`: flags user-controlled file paths without canonicalization and trusted-base checks.
-- `rust-library-api-must-not-panic`: flags `panic!`, `todo!`, `unimplemented!`, and `unreachable!` in library, service, and API code paths.
-- `rust-no-std-mutex-across-await`: flags blocking mutex/RwLock usage across async await points.
-- `rust-serde-external-input-deny-unknown-fields`: flags external JSON payload deserialization without `deny_unknown_fields` or explicit validation.
-
-Each of these rules uses a `CHECK_KIND_HEURISTIC` expression, so the dashboard
-can edit severity, tags, evidence, and remediation without changing code.
+Every policy update, ruleset publication/rollback, evaluation, and MCP decision
+is written to the audit log. Admins can query it through `ListAuditEvents` or
+`GET /api/audit`.

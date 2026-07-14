@@ -13,5 +13,10 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.26.x"
+      - uses: bufbuild/buf-setup-action@v1.50.0
+      - run: buf format -d --exit-code
+      - run: buf lint
+      - run: buf generate && git diff --exit-code
+      - run: go vet ./...
       - run: go test ./...
-
+      - run: go test -race ./...

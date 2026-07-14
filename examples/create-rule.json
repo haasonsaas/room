@@ -2,27 +2,22 @@
   "rule": {
     "id": "auth-context-required",
     "title": "Auth context is required for protected handlers",
-    "description": "New protected handlers must mention auth/session context in the plan or diff.",
+    "description": "Protected access without a verified principal is prohibited.",
     "severity": "SEVERITY_HIGH",
     "tags": ["security", "authorization"],
     "enabled": true,
     "scope": {
       "paths": ["app/**", "internal/**", "src/**"]
     },
-    "checks": [
+    "triggers": [
       {
-        "kind": "CHECK_KIND_PLAN_TEXT",
-        "expression": "missing_any:auth,session,principal,claims"
+        "signal": "SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT",
+        "phases": ["ANALYSIS_PHASE_PLAN", "ANALYSIS_PHASE_DIFF"],
+        "minimumConfidenceBasisPoints": 8000
       }
     ],
-    "requiredEvidence": [
-      "handler loads authenticated principal",
-      "authorization check happens before data access"
-    ],
-    "remediation": [
-      "thread auth context through the handler",
-      "add an unauthenticated request test"
-    ]
+    "requiredCoverage": ["SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT"],
+    "requiredEvidence": ["unauthenticated request coverage"],
+    "remediation": ["derive authorization from trusted middleware"]
   }
 }
-

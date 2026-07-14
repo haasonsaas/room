@@ -6,7 +6,7 @@
           {
             "type": "command",
             "command": "roomctl hook prompt",
-            "timeout": 30,
+            "timeout": 50,
             "statusMessage": "Checking Room guardrails"
           }
         ]
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "roomctl hook pre-tool",
-            "timeout": 30,
+            "timeout": 50,
             "statusMessage": "Checking Room guardrails"
           }
         ]
@@ -32,7 +32,7 @@
           {
             "type": "command",
             "command": "roomctl hook post-tool",
-            "timeout": 30,
+            "timeout": 50,
             "statusMessage": "Checking Room diff guardrails"
           }
         ]
@@ -40,4 +40,3 @@
     ]
   }
 }
-

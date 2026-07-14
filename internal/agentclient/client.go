@@ -2,28 +2,53 @@ package agentclient
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	roomv1 "github.com/haasonsaas/room/gen/go/room/v1"
 	"github.com/haasonsaas/room/gen/go/room/v1/roomv1connect"
-	"github.com/haasonsaas/room/internal/eval"
+	"github.com/haasonsaas/room/internal/auth"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type Client struct {
-	service  roomv1connect.AgentRulesServiceClient
-	cache    string
-	server   string
-	lastWarn error
+	service      roomv1connect.AgentRulesServiceClient
+	cache        string
+	server       string
+	credentialID string
+}
+
+type RulesetSource string
+
+const (
+	RulesetSourceServer RulesetSource = "server"
+	RulesetSourceCache  RulesetSource = "cache"
+)
+
+type RulesetProvenance struct {
+	Source   RulesetSource
+	Stale    bool
+	CachedAt time.Time
+	Warning  string
 }
 
 func New(serverURL, cachePath string) *Client {
+	return NewAuthenticated(serverURL, cachePath, "")
+}
+
+// NewAuthenticated creates a client whose bearer credential is applied to
+// every Connect request. Credentials are never persisted in the rules cache.
+func NewAuthenticated(serverURL, cachePath, token string) *Client {
+	return NewAuthenticatedWithTimeout(serverURL, cachePath, token, 45*time.Second)
+}
+
+func NewAuthenticatedWithTimeout(serverURL, cachePath, token string, timeout time.Duration) *Client {
 	serverURL = strings.TrimRight(strings.TrimSpace(serverURL), "/")
 	if serverURL == "" {
 		serverURL = "http://localhost:8787"
@@ -31,10 +56,16 @@ func New(serverURL, cachePath string) *Client {
 	if cachePath == "" {
 		cachePath = DefaultCachePath()
 	}
+	credentialID, authenticated := auth.TokenCredentialID(token)
+	if authenticated {
+		cachePath = scopedCachePath(cachePath, token)
+	}
+	httpClient := auth.NewHTTPClientWithTimeout(token, timeout)
 	return &Client{
-		service: roomv1connect.NewAgentRulesServiceClient(http.DefaultClient, serverURL),
-		cache:   cachePath,
-		server:  serverURL,
+		service:      roomv1connect.NewAgentRulesServiceClient(httpClient, serverURL),
+		cache:        cachePath,
+		server:       serverURL,
+		credentialID: credentialID,
 	}
 }
 
@@ -51,47 +82,83 @@ func DefaultCachePath() string {
 }
 
 func (c *Client) ActiveRuleset(ctx context.Context, contextInfo *roomv1.EvaluationContext) (*roomv1.RulesetVersion, error) {
+	ruleset, _, err := c.ActiveRulesetWithProvenance(ctx, contextInfo)
+	return ruleset, err
+}
+
+func (c *Client) ActiveRulesetWithProvenance(ctx context.Context, contextInfo *roomv1.EvaluationContext) (*roomv1.RulesetVersion, RulesetProvenance, error) {
 	resp, err := c.service.GetActiveRuleset(ctx, connect.NewRequest(&roomv1.AgentRulesServiceGetActiveRulesetRequest{Context: contextInfo}))
 	if err == nil && resp.Msg.GetRuleset() != nil {
 		ruleset := resp.Msg.GetRuleset()
-		if saveErr := SaveRuleset(c.cache, ruleset); saveErr != nil {
-			return ruleset, saveErr
+		if scopeErr := c.validateScope(ruleset); scopeErr != nil {
+			return nil, RulesetProvenance{}, scopeErr
 		}
-		c.lastWarn = nil
-		return ruleset, nil
+		provenance := RulesetProvenance{Source: RulesetSourceServer}
+		if saveErr := SaveRuleset(c.cache, ruleset); saveErr != nil {
+			provenance.Warning = "live ruleset returned but advisory cache update failed"
+		}
+		return ruleset, provenance, nil
 	}
-	c.lastWarn = err
 	cached, cacheErr := LoadRuleset(c.cache)
 	if cacheErr == nil && cached != nil {
-		return cached, nil
+		if scopeErr := c.validateScope(cached); scopeErr != nil {
+			return nil, RulesetProvenance{}, scopeErr
+		}
+		provenance := RulesetProvenance{Source: RulesetSourceCache, Stale: true, Warning: "server unavailable; using scoped advisory cache"}
+		if info, statErr := os.Stat(c.cache); statErr == nil {
+			provenance.CachedAt = info.ModTime()
+		}
+		return cached, provenance, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("fetch active ruleset from %s: %w", c.server, err)
+		return nil, RulesetProvenance{}, fmt.Errorf("fetch active ruleset from %s: %w", c.server, err)
 	}
-	return nil, cacheErr
+	return nil, RulesetProvenance{}, cacheErr
 }
 
 func (c *Client) EvaluatePlan(ctx context.Context, input *roomv1.EvaluationInput) (*roomv1.EvaluationResult, error) {
-	return c.evaluate(ctx, input)
-}
-
-func (c *Client) EvaluateDiff(ctx context.Context, input *roomv1.EvaluationInput) (*roomv1.EvaluationResult, error) {
-	return c.evaluate(ctx, input)
-}
-
-func (c *Client) LastWarning() error {
-	return c.lastWarn
-}
-
-func (c *Client) evaluate(ctx context.Context, input *roomv1.EvaluationInput) (*roomv1.EvaluationResult, error) {
 	if input == nil {
 		input = &roomv1.EvaluationInput{}
 	}
-	ruleset, err := c.ActiveRuleset(ctx, input.GetContext())
+	resp, err := c.service.EvaluatePlan(ctx, connect.NewRequest(&roomv1.EvaluatePlanRequest{Input: input}))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("evaluate plan at %s: %w", c.server, err)
 	}
-	return eval.Evaluate(ruleset.GetRules(), ruleset, input), nil
+	return resp.Msg.GetResult(), nil
+}
+
+func (c *Client) EvaluateDiff(ctx context.Context, input *roomv1.EvaluationInput) (*roomv1.EvaluationResult, error) {
+	if input == nil {
+		input = &roomv1.EvaluationInput{}
+	}
+	resp, err := c.service.EvaluateDiff(ctx, connect.NewRequest(&roomv1.EvaluateDiffRequest{Input: input}))
+	if err != nil {
+		return nil, fmt.Errorf("evaluate diff at %s: %w", c.server, err)
+	}
+	return resp.Msg.GetResult(), nil
+}
+
+func (c *Client) CachePath() string { return c.cache }
+
+func (c *Client) ValidateRuleset(ruleset *roomv1.RulesetVersion) error {
+	return c.validateScope(ruleset)
+}
+
+func (c *Client) validateScope(ruleset *roomv1.RulesetVersion) error {
+	if c.credentialID == "" {
+		return nil
+	}
+	if ruleset.GetAuthorizedScope().GetCredentialId() != c.credentialID {
+		return errors.New("ruleset authorized scope does not match agent credential")
+	}
+	return nil
+}
+
+func scopedCachePath(path, token string) string {
+	digest := sha256.Sum256([]byte(token))
+	extension := filepath.Ext(path)
+	base := strings.TrimSuffix(filepath.Base(path), extension)
+	return filepath.Join(filepath.Dir(path), fmt.Sprintf("%s-%x%s", base, digest[:8], extension))
 }
 
 func SaveRuleset(path string, ruleset *roomv1.RulesetVersion) error {
@@ -101,14 +168,17 @@ func SaveRuleset(path string, ruleset *roomv1.RulesetVersion) error {
 	if path == "" {
 		return errors.New("cache path is required")
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	data, err := protojson.MarshalOptions{Multiline: true, Indent: "  "}.Marshal(ruleset)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
 }
 
 func LoadRuleset(path string) (*roomv1.RulesetVersion, error) {

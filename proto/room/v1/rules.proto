@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package room.v1;
 
-option go_package = "github.com/haasonsaas/room/gen/go/room/v1;roomv1";
-
 import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/haasonsaas/room/gen/go/room/v1;roomv1";
 
 service RuleAdminService {
   rpc CreateRule(CreateRuleRequest) returns (CreateRuleResponse);
@@ -15,6 +15,9 @@ service RuleAdminService {
   rpc PublishRuleset(PublishRulesetRequest) returns (PublishRulesetResponse);
   rpc RollbackRuleset(RollbackRulesetRequest) returns (RollbackRulesetResponse);
   rpc GetActiveRuleset(RuleAdminServiceGetActiveRulesetRequest) returns (RuleAdminServiceGetActiveRulesetResponse);
+  rpc GetMcpPolicy(GetMcpPolicyRequest) returns (GetMcpPolicyResponse);
+  rpc UpdateMcpPolicy(UpdateMcpPolicyRequest) returns (UpdateMcpPolicyResponse);
+  rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
 }
 
 service AgentRulesService {
@@ -22,6 +25,7 @@ service AgentRulesService {
   rpc WatchRuleset(WatchRulesetRequest) returns (stream WatchRulesetResponse);
   rpc EvaluatePlan(EvaluatePlanRequest) returns (EvaluatePlanResponse);
   rpc EvaluateDiff(EvaluateDiffRequest) returns (EvaluateDiffResponse);
+  rpc EvaluateMcpInvocation(EvaluateMcpInvocationRequest) returns (EvaluateMcpInvocationResponse);
   rpc ReportEvaluation(ReportEvaluationRequest) returns (ReportEvaluationResponse);
 }
 
@@ -40,6 +44,7 @@ enum Decision {
   DECISION_WARN = 2;
   DECISION_NEEDS_CHANGES = 3;
   DECISION_DENY = 4;
+  DECISION_INDETERMINATE = 5;
 }
 
 enum CheckKind {
@@ -50,6 +55,76 @@ enum CheckKind {
   CHECK_KIND_AST_PATTERN = 4;
   CHECK_KIND_SEMGREP = 5;
   CHECK_KIND_HEURISTIC = 6;
+}
+
+enum AnalysisPhase {
+  ANALYSIS_PHASE_UNSPECIFIED = 0;
+  ANALYSIS_PHASE_PLAN = 1;
+  ANALYSIS_PHASE_DIFF = 2;
+}
+
+enum AnalysisStatus {
+  ANALYSIS_STATUS_UNSPECIFIED = 0;
+  ANALYSIS_STATUS_COMPLETE = 1;
+  ANALYSIS_STATUS_PARTIAL = 2;
+  ANALYSIS_STATUS_UNAVAILABLE = 3;
+  ANALYSIS_STATUS_FAILED = 4;
+  ANALYSIS_STATUS_INVALID = 5;
+  ANALYSIS_STATUS_UNTRUSTED = 6;
+}
+
+enum SignalKind {
+  SIGNAL_KIND_UNSPECIFIED = 0;
+  SIGNAL_KIND_TENANT_ACCESS_WITHOUT_TRUSTED_SCOPE = 1;
+  SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT = 2;
+  SIGNAL_KIND_SECRET_LITERAL = 3;
+  SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT = 4;
+  SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION = 5;
+  SIGNAL_KIND_PRIVILEGE_MUTATION_WITHOUT_AUDIT = 6;
+  SIGNAL_KIND_UNSIGNED_WEBHOOK = 7;
+  SIGNAL_KIND_PASSWORD_PERSISTENCE_WITHOUT_KDF = 8;
+  SIGNAL_KIND_PUBLIC_CREDENTIAL_FLOW_WITHOUT_RATE_LIMIT = 9;
+  SIGNAL_KIND_DESTRUCTIVE_OPERATION = 10;
+  SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT = 11;
+  SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH = 12;
+  SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT = 13;
+  SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET = 14;
+  SIGNAL_KIND_RUST_UNTRUSTED_PATH = 15;
+  SIGNAL_KIND_RUST_PANIC_IN_LIBRARY_API = 16;
+  SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT = 17;
+  SIGNAL_KIND_RUST_UNVALIDATED_EXTERNAL_DESERIALIZATION = 18;
+}
+
+enum McpComplianceMode {
+  MCP_COMPLIANCE_MODE_UNSPECIFIED = 0;
+  MCP_COMPLIANCE_MODE_DISABLED = 1;
+  MCP_COMPLIANCE_MODE_ALLOWLIST = 2;
+  MCP_COMPLIANCE_MODE_BLOCKLIST = 3;
+}
+
+enum AuditEventKind {
+  AUDIT_EVENT_KIND_UNSPECIFIED = 0;
+  AUDIT_EVENT_KIND_EVALUATION = 1;
+  AUDIT_EVENT_KIND_MCP_INVOCATION = 2;
+  AUDIT_EVENT_KIND_RULESET_PUBLISHED = 3;
+  AUDIT_EVENT_KIND_RULESET_ROLLED_BACK = 4;
+  AUDIT_EVENT_KIND_POLICY_UPDATED = 5;
+  AUDIT_EVENT_KIND_AUTH_DENIED = 6;
+}
+
+enum HookProvider {
+  HOOK_PROVIDER_UNSPECIFIED = 0;
+  HOOK_PROVIDER_CLAUDE_CODE = 1;
+  HOOK_PROVIDER_CODEX = 2;
+  HOOK_PROVIDER_CURSOR = 3;
+  HOOK_PROVIDER_MCP_PROXY = 4;
+}
+
+enum IdentityAssurance {
+  IDENTITY_ASSURANCE_UNSPECIFIED = 0;
+  IDENTITY_ASSURANCE_UNVERIFIED = 1;
+  IDENTITY_ASSURANCE_CONFIG_BOUND = 2;
+  IDENTITY_ASSURANCE_TRANSPORT_VERIFIED = 3;
 }
 
 enum RulesetStatus {
@@ -75,6 +150,98 @@ message RuleCheck {
   string message = 4;
 }
 
+message SourceLocation {
+  string file_path = 2;
+  int32 start_line = 3;
+  int32 end_line = 4;
+}
+
+message ArtifactRef {
+  AnalysisPhase phase = 1;
+  bytes sha256 = 2;
+  repeated string changed_files = 3;
+}
+
+message AnalyzerIdentity {
+  string id = 1;
+  string version = 2;
+  bytes config_sha256 = 3;
+}
+
+message SecuritySignal {
+  SignalKind kind = 1;
+  string fingerprint = 2;
+  AnalyzerIdentity analyzer = 3;
+  SourceLocation location = 4;
+  uint32 confidence_basis_points = 5;
+  bytes evidence_sha256 = 6;
+}
+
+message AnalyzerReceipt {
+  AnalyzerIdentity analyzer = 1;
+  AnalysisStatus status = 2;
+  repeated SignalKind covered_signals = 3;
+  repeated SecuritySignal signals = 4;
+  string failure_code = 5;
+  bytes input_sha256 = 6;
+}
+
+message AnalysisReport {
+  string report_id = 1;
+  ArtifactRef artifact = 2;
+  AnalysisStatus status = 3;
+  repeated AnalyzerReceipt receipts = 4;
+}
+
+message SignalSelector {
+  SignalKind signal = 1;
+  repeated AnalysisPhase phases = 2;
+  uint32 minimum_confidence_basis_points = 3;
+}
+
+message EvaluationGap {
+  SignalKind required_signal = 1;
+  string analyzer_id = 2;
+  AnalysisStatus status = 3;
+  string reason_code = 4;
+}
+
+message McpToolSelector {
+  string server_id = 1;
+  string tool_name = 2;
+}
+
+message McpCompliancePolicy {
+  McpComplianceMode mode = 1;
+  repeated McpToolSelector selectors = 2;
+  bool audit_allowed = 3;
+  bool deny_unknown_identity = 4;
+  repeated ProviderToolBinding provider_bindings = 5;
+}
+
+message ProviderToolBinding {
+  HookProvider provider = 1;
+  string provider_tool_id = 2;
+  string server_id = 3;
+  string tool_name = 4;
+}
+
+message McpInvocation {
+  string server_id = 1;
+  string tool_name = 2;
+  string transport = 3;
+  string endpoint = 4;
+  HookProvider provider = 5;
+  string provider_tool_id = 6;
+  IdentityAssurance identity_assurance = 7;
+}
+
+message McpInvocationDecision {
+  bool allowed = 1;
+  string reason_code = 2;
+  McpToolSelector matched_selector = 3;
+}
+
 message Rule {
   string id = 1;
   string title = 2;
@@ -89,6 +256,8 @@ message Rule {
   string owner = 11;
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
+  repeated SignalSelector triggers = 14;
+  repeated SignalKind required_coverage = 15;
 }
 
 message RulesetVersion {
@@ -100,6 +269,17 @@ message RulesetVersion {
   string author = 6;
   string notes = 7;
   google.protobuf.Timestamp published_at = 8;
+  McpCompliancePolicy mcp_policy = 9;
+  AuthorizationScope authorized_scope = 10;
+  string source_hash = 11;
+}
+
+message AuthorizationScope {
+  string credential_id = 1;
+  string subject_id = 2;
+  string workspace_id = 3;
+  string repository = 4;
+  string agent_type = 5;
 }
 
 message EvaluationContext {
@@ -110,12 +290,14 @@ message EvaluationContext {
   repeated string changed_files = 5;
   repeated string languages = 6;
   repeated string frameworks = 7;
+  string subject_id = 8;
 }
 
 message EvaluationInput {
   EvaluationContext context = 1;
   string plan = 2;
   string diff = 3;
+  AnalysisPhase phase = 4;
 }
 
 message RuleMatch {
@@ -136,6 +318,31 @@ message EvaluationResult {
   string ruleset_id = 5;
   int32 ruleset_version = 6;
   string ruleset_hash = 7;
+  AnalysisStatus analysis_status = 8;
+  string audit_event_id = 9;
+  repeated AnalyzerReceipt analyzer_receipts = 10;
+  repeated EvaluationGap gaps = 11;
+  bytes input_sha256 = 12;
+  string evaluation_id = 13;
+}
+
+message AuditEvent {
+  string id = 1;
+  AuditEventKind kind = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+  string subject_id = 4;
+  string workspace_id = 5;
+  string repository = 6;
+  string agent_type = 7;
+  string ruleset_id = 8;
+  int32 ruleset_version = 9;
+  string ruleset_hash = 10;
+  Decision decision = 11;
+  Severity highest_severity = 12;
+  AnalysisStatus analysis_status = 13;
+  McpInvocation mcp_invocation = 14;
+  string reason_code = 15;
+  repeated string matched_rule_ids = 16;
 }
 
 message CreateRuleRequest {
@@ -197,6 +404,29 @@ message RollbackRulesetResponse {
   RulesetVersion ruleset = 1;
 }
 
+message GetMcpPolicyRequest {}
+
+message GetMcpPolicyResponse {
+  McpCompliancePolicy policy = 1;
+}
+
+message UpdateMcpPolicyRequest {
+  McpCompliancePolicy policy = 1;
+}
+
+message UpdateMcpPolicyResponse {
+  McpCompliancePolicy policy = 1;
+}
+
+message ListAuditEventsRequest {
+  int32 limit = 1;
+  AuditEventKind kind = 2;
+}
+
+message ListAuditEventsResponse {
+  repeated AuditEvent events = 1;
+}
+
 message RuleAdminServiceGetActiveRulesetRequest {
   EvaluationContext context = 1;
 }
@@ -238,6 +468,16 @@ message EvaluateDiffResponse {
   EvaluationResult result = 1;
 }
 
+message EvaluateMcpInvocationRequest {
+  EvaluationContext context = 1;
+  McpInvocation invocation = 2;
+}
+
+message EvaluateMcpInvocationResponse {
+  McpInvocationDecision decision = 1;
+  string audit_event_id = 2;
+}
+
 message ReportEvaluationRequest {
   EvaluationResult result = 1;
   string session_id = 2;
@@ -253,4 +493,5 @@ message StoreSnapshot {
   repeated RulesetVersion versions = 2;
   int32 active_version = 3;
   int32 next_version = 4;
+  McpCompliancePolicy draft_mcp_policy = 5;
 }

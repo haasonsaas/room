@@ -2,53 +2,45 @@ package agentclient
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"connectrpc.com/connect"
 	roomv1 "github.com/haasonsaas/room/gen/go/room/v1"
 	"github.com/haasonsaas/room/gen/go/room/v1/roomv1connect"
+	"github.com/haasonsaas/room/internal/auth"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestEvaluateFallsBackToCachedRulesetWhenServerUnavailable(t *testing.T) {
-	cachePath := filepath.Join(t.TempDir(), "ruleset.json")
-	client := New("http://127.0.0.1:1", cachePath)
-	ruleset := &roomv1.RulesetVersion{
-		Id:      "ruleset-test",
-		Version: 7,
-		Hash:    "abc123",
-		Status:  roomv1.RulesetStatus_RULESET_STATUS_ACTIVE,
-		Rules: []*roomv1.Rule{
-			{
-				Id:          "tenant-org-scope-required",
-				Title:       "Tenant data must be organization scoped",
-				Description: "Tenant reads need org scope.",
-				Severity:    roomv1.Severity_SEVERITY_CRITICAL,
-				Enabled:     true,
-				Checks: []*roomv1.RuleCheck{
-					{Kind: roomv1.CheckKind_CHECK_KIND_HEURISTIC, Expression: "touches_tenant_data_without_scope"},
-				},
-			},
-		},
-		PublishedAt: timestamppb.Now(),
+func TestEvaluateDoesNotUseUnauthenticatedCacheAsPolicyEngine(t *testing.T) {
+	client := New("http://127.0.0.1:1", filepath.Join(t.TempDir(), "ruleset.json"))
+	if _, err := client.EvaluatePlan(context.Background(), &roomv1.EvaluationInput{}); err == nil {
+		t.Fatal("expected unavailable server to fail closed")
 	}
-	if err := SaveRuleset(cachePath, ruleset); err != nil {
-		t.Fatalf("save cached ruleset: %v", err)
-	}
+}
 
-	result, err := client.EvaluatePlan(context.Background(), &roomv1.EvaluationInput{
-		Plan: "Add customer endpoint that queries projects from the database.",
-	})
+func TestAuthenticatedCacheIsCredentialScoped(t *testing.T) {
+	registry := filepath.Join(t.TempDir(), "credentials.json")
+	token, err := auth.IssueOrUpdateToken(registry, auth.Principal{ID: "agent-one", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "w", Repository: "r", AgentID: "a"}})
 	if err != nil {
-		t.Fatalf("evaluate with cache fallback: %v", err)
+		t.Fatalf("issue token: %v", err)
 	}
-	if result.GetDecision() != roomv1.Decision_DECISION_DENY {
-		t.Fatalf("decision = %s, want deny", result.GetDecision())
+	base := filepath.Join(t.TempDir(), "ruleset.json")
+	client := NewAuthenticated("http://127.0.0.1:1", base, token)
+	if client.CachePath() == base {
+		t.Fatal("authenticated cache path was not credential scoped")
 	}
-	if result.GetRulesetVersion() != 7 {
-		t.Fatalf("ruleset version = %d, want 7", result.GetRulesetVersion())
+	matching := &roomv1.RulesetVersion{AuthorizedScope: &roomv1.AuthorizationScope{CredentialId: "agent-one"}}
+	if err := client.ValidateRuleset(matching); err != nil {
+		t.Fatalf("matching scope rejected: %v", err)
+	}
+	matching.AuthorizedScope.CredentialId = "agent-two"
+	if err := client.ValidateRuleset(matching); err == nil {
+		t.Fatal("mismatched credential scope accepted")
 	}
 }
 
@@ -68,9 +60,12 @@ func TestActiveRulesetFetchUpdatesCache(t *testing.T) {
 	defer server.Close()
 
 	client := New(server.URL, cachePath)
-	ruleset, err := client.ActiveRuleset(context.Background(), &roomv1.EvaluationContext{})
+	ruleset, provenance, err := client.ActiveRulesetWithProvenance(context.Background(), &roomv1.EvaluationContext{})
 	if err != nil {
 		t.Fatalf("active ruleset: %v", err)
+	}
+	if provenance.Source != RulesetSourceServer || provenance.Stale {
+		t.Fatalf("provenance = %+v, want live server", provenance)
 	}
 	if ruleset.GetVersion() != 3 {
 		t.Fatalf("version = %d, want 3", ruleset.GetVersion())
@@ -82,8 +77,59 @@ func TestActiveRulesetFetchUpdatesCache(t *testing.T) {
 	if cached.GetHash() != "live-hash" {
 		t.Fatalf("cached hash = %q, want live-hash", cached.GetHash())
 	}
+	info, err := os.Stat(cachePath)
+	if err != nil {
+		t.Fatalf("stat cache: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("cache mode = %o, want 600", got)
+	}
 	if path == "" {
 		t.Fatal("generated handler path is empty")
+	}
+}
+
+func TestActiveRulesetFallbackReportsStaleCacheProvenance(t *testing.T) {
+	cachePath := filepath.Join(t.TempDir(), "ruleset.json")
+	service := &stubAgentRulesService{ruleset: &roomv1.RulesetVersion{Id: "ruleset-cached", Version: 7, Hash: "cached-hash"}}
+	_, handler := roomv1connect.NewAgentRulesServiceHandler(service)
+	server := httptest.NewServer(handler)
+	client := New(server.URL, cachePath)
+	if _, provenance, err := client.ActiveRulesetWithProvenance(context.Background(), &roomv1.EvaluationContext{}); err != nil {
+		server.Close()
+		t.Fatalf("prime ruleset cache: %v", err)
+	} else if provenance.Source != RulesetSourceServer || provenance.Stale {
+		server.Close()
+		t.Fatalf("prime provenance = %+v, want live server", provenance)
+	}
+	server.Close()
+
+	ruleset, provenance, err := client.ActiveRulesetWithProvenance(context.Background(), &roomv1.EvaluationContext{})
+	if err != nil {
+		t.Fatalf("cached ruleset: %v", err)
+	}
+	if ruleset.GetVersion() != 7 {
+		t.Fatalf("cached version = %d, want 7", ruleset.GetVersion())
+	}
+	if provenance.Source != RulesetSourceCache || !provenance.Stale || provenance.CachedAt.IsZero() || provenance.Warning == "" {
+		t.Fatalf("cache provenance = %+v, want stale cache metadata", provenance)
+	}
+}
+
+func TestAuthenticatedClientSendsBearerToken(t *testing.T) {
+	service := &stubAgentRulesService{ruleset: &roomv1.RulesetVersion{Id: "scoped"}}
+	path, handler := roomv1connect.NewAgentRulesServiceHandler(service)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == path && r.Header.Get("Authorization") != "Bearer secret" {
+			http.Error(w, "missing token", http.StatusUnauthorized)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+	client := NewAuthenticated(server.URL, filepath.Join(t.TempDir(), "ruleset.json"), "secret")
+	if _, err := client.ActiveRuleset(context.Background(), &roomv1.EvaluationContext{}); err != nil {
+		t.Fatalf("active ruleset: %v", err)
 	}
 }
 
@@ -101,7 +147,7 @@ func (s *stubAgentRulesService) WatchRuleset(context.Context, *connect.Request[r
 }
 
 func (s *stubAgentRulesService) EvaluatePlan(context.Context, *connect.Request[roomv1.EvaluatePlanRequest]) (*connect.Response[roomv1.EvaluatePlanResponse], error) {
-	return nil, nil
+	return nil, errors.New("not implemented")
 }
 
 func (s *stubAgentRulesService) EvaluateDiff(context.Context, *connect.Request[roomv1.EvaluateDiffRequest]) (*connect.Response[roomv1.EvaluateDiffResponse], error) {

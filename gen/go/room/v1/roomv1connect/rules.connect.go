@@ -59,6 +59,15 @@ const (
 	// RuleAdminServiceGetActiveRulesetProcedure is the fully-qualified name of the RuleAdminService's
 	// GetActiveRuleset RPC.
 	RuleAdminServiceGetActiveRulesetProcedure = "/room.v1.RuleAdminService/GetActiveRuleset"
+	// RuleAdminServiceGetMcpPolicyProcedure is the fully-qualified name of the RuleAdminService's
+	// GetMcpPolicy RPC.
+	RuleAdminServiceGetMcpPolicyProcedure = "/room.v1.RuleAdminService/GetMcpPolicy"
+	// RuleAdminServiceUpdateMcpPolicyProcedure is the fully-qualified name of the RuleAdminService's
+	// UpdateMcpPolicy RPC.
+	RuleAdminServiceUpdateMcpPolicyProcedure = "/room.v1.RuleAdminService/UpdateMcpPolicy"
+	// RuleAdminServiceListAuditEventsProcedure is the fully-qualified name of the RuleAdminService's
+	// ListAuditEvents RPC.
+	RuleAdminServiceListAuditEventsProcedure = "/room.v1.RuleAdminService/ListAuditEvents"
 	// AgentRulesServiceGetActiveRulesetProcedure is the fully-qualified name of the AgentRulesService's
 	// GetActiveRuleset RPC.
 	AgentRulesServiceGetActiveRulesetProcedure = "/room.v1.AgentRulesService/GetActiveRuleset"
@@ -71,6 +80,9 @@ const (
 	// AgentRulesServiceEvaluateDiffProcedure is the fully-qualified name of the AgentRulesService's
 	// EvaluateDiff RPC.
 	AgentRulesServiceEvaluateDiffProcedure = "/room.v1.AgentRulesService/EvaluateDiff"
+	// AgentRulesServiceEvaluateMcpInvocationProcedure is the fully-qualified name of the
+	// AgentRulesService's EvaluateMcpInvocation RPC.
+	AgentRulesServiceEvaluateMcpInvocationProcedure = "/room.v1.AgentRulesService/EvaluateMcpInvocation"
 	// AgentRulesServiceReportEvaluationProcedure is the fully-qualified name of the AgentRulesService's
 	// ReportEvaluation RPC.
 	AgentRulesServiceReportEvaluationProcedure = "/room.v1.AgentRulesService/ReportEvaluation"
@@ -86,6 +98,9 @@ type RuleAdminServiceClient interface {
 	PublishRuleset(context.Context, *connect.Request[v1.PublishRulesetRequest]) (*connect.Response[v1.PublishRulesetResponse], error)
 	RollbackRuleset(context.Context, *connect.Request[v1.RollbackRulesetRequest]) (*connect.Response[v1.RollbackRulesetResponse], error)
 	GetActiveRuleset(context.Context, *connect.Request[v1.RuleAdminServiceGetActiveRulesetRequest]) (*connect.Response[v1.RuleAdminServiceGetActiveRulesetResponse], error)
+	GetMcpPolicy(context.Context, *connect.Request[v1.GetMcpPolicyRequest]) (*connect.Response[v1.GetMcpPolicyResponse], error)
+	UpdateMcpPolicy(context.Context, *connect.Request[v1.UpdateMcpPolicyRequest]) (*connect.Response[v1.UpdateMcpPolicyResponse], error)
+	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 }
 
 // NewRuleAdminServiceClient constructs a client for the room.v1.RuleAdminService service. By
@@ -147,6 +162,24 @@ func NewRuleAdminServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(ruleAdminServiceMethods.ByName("GetActiveRuleset")),
 			connect.WithClientOptions(opts...),
 		),
+		getMcpPolicy: connect.NewClient[v1.GetMcpPolicyRequest, v1.GetMcpPolicyResponse](
+			httpClient,
+			baseURL+RuleAdminServiceGetMcpPolicyProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("GetMcpPolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		updateMcpPolicy: connect.NewClient[v1.UpdateMcpPolicyRequest, v1.UpdateMcpPolicyResponse](
+			httpClient,
+			baseURL+RuleAdminServiceUpdateMcpPolicyProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("UpdateMcpPolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		listAuditEvents: connect.NewClient[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse](
+			httpClient,
+			baseURL+RuleAdminServiceListAuditEventsProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("ListAuditEvents")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -160,6 +193,9 @@ type ruleAdminServiceClient struct {
 	publishRuleset   *connect.Client[v1.PublishRulesetRequest, v1.PublishRulesetResponse]
 	rollbackRuleset  *connect.Client[v1.RollbackRulesetRequest, v1.RollbackRulesetResponse]
 	getActiveRuleset *connect.Client[v1.RuleAdminServiceGetActiveRulesetRequest, v1.RuleAdminServiceGetActiveRulesetResponse]
+	getMcpPolicy     *connect.Client[v1.GetMcpPolicyRequest, v1.GetMcpPolicyResponse]
+	updateMcpPolicy  *connect.Client[v1.UpdateMcpPolicyRequest, v1.UpdateMcpPolicyResponse]
+	listAuditEvents  *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
 }
 
 // CreateRule calls room.v1.RuleAdminService.CreateRule.
@@ -202,6 +238,21 @@ func (c *ruleAdminServiceClient) GetActiveRuleset(ctx context.Context, req *conn
 	return c.getActiveRuleset.CallUnary(ctx, req)
 }
 
+// GetMcpPolicy calls room.v1.RuleAdminService.GetMcpPolicy.
+func (c *ruleAdminServiceClient) GetMcpPolicy(ctx context.Context, req *connect.Request[v1.GetMcpPolicyRequest]) (*connect.Response[v1.GetMcpPolicyResponse], error) {
+	return c.getMcpPolicy.CallUnary(ctx, req)
+}
+
+// UpdateMcpPolicy calls room.v1.RuleAdminService.UpdateMcpPolicy.
+func (c *ruleAdminServiceClient) UpdateMcpPolicy(ctx context.Context, req *connect.Request[v1.UpdateMcpPolicyRequest]) (*connect.Response[v1.UpdateMcpPolicyResponse], error) {
+	return c.updateMcpPolicy.CallUnary(ctx, req)
+}
+
+// ListAuditEvents calls room.v1.RuleAdminService.ListAuditEvents.
+func (c *ruleAdminServiceClient) ListAuditEvents(ctx context.Context, req *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {
+	return c.listAuditEvents.CallUnary(ctx, req)
+}
+
 // RuleAdminServiceHandler is an implementation of the room.v1.RuleAdminService service.
 type RuleAdminServiceHandler interface {
 	CreateRule(context.Context, *connect.Request[v1.CreateRuleRequest]) (*connect.Response[v1.CreateRuleResponse], error)
@@ -212,6 +263,9 @@ type RuleAdminServiceHandler interface {
 	PublishRuleset(context.Context, *connect.Request[v1.PublishRulesetRequest]) (*connect.Response[v1.PublishRulesetResponse], error)
 	RollbackRuleset(context.Context, *connect.Request[v1.RollbackRulesetRequest]) (*connect.Response[v1.RollbackRulesetResponse], error)
 	GetActiveRuleset(context.Context, *connect.Request[v1.RuleAdminServiceGetActiveRulesetRequest]) (*connect.Response[v1.RuleAdminServiceGetActiveRulesetResponse], error)
+	GetMcpPolicy(context.Context, *connect.Request[v1.GetMcpPolicyRequest]) (*connect.Response[v1.GetMcpPolicyResponse], error)
+	UpdateMcpPolicy(context.Context, *connect.Request[v1.UpdateMcpPolicyRequest]) (*connect.Response[v1.UpdateMcpPolicyResponse], error)
+	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 }
 
 // NewRuleAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -269,6 +323,24 @@ func NewRuleAdminServiceHandler(svc RuleAdminServiceHandler, opts ...connect.Han
 		connect.WithSchema(ruleAdminServiceMethods.ByName("GetActiveRuleset")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ruleAdminServiceGetMcpPolicyHandler := connect.NewUnaryHandler(
+		RuleAdminServiceGetMcpPolicyProcedure,
+		svc.GetMcpPolicy,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("GetMcpPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceUpdateMcpPolicyHandler := connect.NewUnaryHandler(
+		RuleAdminServiceUpdateMcpPolicyProcedure,
+		svc.UpdateMcpPolicy,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("UpdateMcpPolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceListAuditEventsHandler := connect.NewUnaryHandler(
+		RuleAdminServiceListAuditEventsProcedure,
+		svc.ListAuditEvents,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("ListAuditEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/room.v1.RuleAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RuleAdminServiceCreateRuleProcedure:
@@ -287,6 +359,12 @@ func NewRuleAdminServiceHandler(svc RuleAdminServiceHandler, opts ...connect.Han
 			ruleAdminServiceRollbackRulesetHandler.ServeHTTP(w, r)
 		case RuleAdminServiceGetActiveRulesetProcedure:
 			ruleAdminServiceGetActiveRulesetHandler.ServeHTTP(w, r)
+		case RuleAdminServiceGetMcpPolicyProcedure:
+			ruleAdminServiceGetMcpPolicyHandler.ServeHTTP(w, r)
+		case RuleAdminServiceUpdateMcpPolicyProcedure:
+			ruleAdminServiceUpdateMcpPolicyHandler.ServeHTTP(w, r)
+		case RuleAdminServiceListAuditEventsProcedure:
+			ruleAdminServiceListAuditEventsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -328,12 +406,25 @@ func (UnimplementedRuleAdminServiceHandler) GetActiveRuleset(context.Context, *c
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.GetActiveRuleset is not implemented"))
 }
 
+func (UnimplementedRuleAdminServiceHandler) GetMcpPolicy(context.Context, *connect.Request[v1.GetMcpPolicyRequest]) (*connect.Response[v1.GetMcpPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.GetMcpPolicy is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) UpdateMcpPolicy(context.Context, *connect.Request[v1.UpdateMcpPolicyRequest]) (*connect.Response[v1.UpdateMcpPolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.UpdateMcpPolicy is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.ListAuditEvents is not implemented"))
+}
+
 // AgentRulesServiceClient is a client for the room.v1.AgentRulesService service.
 type AgentRulesServiceClient interface {
 	GetActiveRuleset(context.Context, *connect.Request[v1.AgentRulesServiceGetActiveRulesetRequest]) (*connect.Response[v1.AgentRulesServiceGetActiveRulesetResponse], error)
 	WatchRuleset(context.Context, *connect.Request[v1.WatchRulesetRequest]) (*connect.ServerStreamForClient[v1.WatchRulesetResponse], error)
 	EvaluatePlan(context.Context, *connect.Request[v1.EvaluatePlanRequest]) (*connect.Response[v1.EvaluatePlanResponse], error)
 	EvaluateDiff(context.Context, *connect.Request[v1.EvaluateDiffRequest]) (*connect.Response[v1.EvaluateDiffResponse], error)
+	EvaluateMcpInvocation(context.Context, *connect.Request[v1.EvaluateMcpInvocationRequest]) (*connect.Response[v1.EvaluateMcpInvocationResponse], error)
 	ReportEvaluation(context.Context, *connect.Request[v1.ReportEvaluationRequest]) (*connect.Response[v1.ReportEvaluationResponse], error)
 }
 
@@ -372,6 +463,12 @@ func NewAgentRulesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(agentRulesServiceMethods.ByName("EvaluateDiff")),
 			connect.WithClientOptions(opts...),
 		),
+		evaluateMcpInvocation: connect.NewClient[v1.EvaluateMcpInvocationRequest, v1.EvaluateMcpInvocationResponse](
+			httpClient,
+			baseURL+AgentRulesServiceEvaluateMcpInvocationProcedure,
+			connect.WithSchema(agentRulesServiceMethods.ByName("EvaluateMcpInvocation")),
+			connect.WithClientOptions(opts...),
+		),
 		reportEvaluation: connect.NewClient[v1.ReportEvaluationRequest, v1.ReportEvaluationResponse](
 			httpClient,
 			baseURL+AgentRulesServiceReportEvaluationProcedure,
@@ -383,11 +480,12 @@ func NewAgentRulesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 
 // agentRulesServiceClient implements AgentRulesServiceClient.
 type agentRulesServiceClient struct {
-	getActiveRuleset *connect.Client[v1.AgentRulesServiceGetActiveRulesetRequest, v1.AgentRulesServiceGetActiveRulesetResponse]
-	watchRuleset     *connect.Client[v1.WatchRulesetRequest, v1.WatchRulesetResponse]
-	evaluatePlan     *connect.Client[v1.EvaluatePlanRequest, v1.EvaluatePlanResponse]
-	evaluateDiff     *connect.Client[v1.EvaluateDiffRequest, v1.EvaluateDiffResponse]
-	reportEvaluation *connect.Client[v1.ReportEvaluationRequest, v1.ReportEvaluationResponse]
+	getActiveRuleset      *connect.Client[v1.AgentRulesServiceGetActiveRulesetRequest, v1.AgentRulesServiceGetActiveRulesetResponse]
+	watchRuleset          *connect.Client[v1.WatchRulesetRequest, v1.WatchRulesetResponse]
+	evaluatePlan          *connect.Client[v1.EvaluatePlanRequest, v1.EvaluatePlanResponse]
+	evaluateDiff          *connect.Client[v1.EvaluateDiffRequest, v1.EvaluateDiffResponse]
+	evaluateMcpInvocation *connect.Client[v1.EvaluateMcpInvocationRequest, v1.EvaluateMcpInvocationResponse]
+	reportEvaluation      *connect.Client[v1.ReportEvaluationRequest, v1.ReportEvaluationResponse]
 }
 
 // GetActiveRuleset calls room.v1.AgentRulesService.GetActiveRuleset.
@@ -410,6 +508,11 @@ func (c *agentRulesServiceClient) EvaluateDiff(ctx context.Context, req *connect
 	return c.evaluateDiff.CallUnary(ctx, req)
 }
 
+// EvaluateMcpInvocation calls room.v1.AgentRulesService.EvaluateMcpInvocation.
+func (c *agentRulesServiceClient) EvaluateMcpInvocation(ctx context.Context, req *connect.Request[v1.EvaluateMcpInvocationRequest]) (*connect.Response[v1.EvaluateMcpInvocationResponse], error) {
+	return c.evaluateMcpInvocation.CallUnary(ctx, req)
+}
+
 // ReportEvaluation calls room.v1.AgentRulesService.ReportEvaluation.
 func (c *agentRulesServiceClient) ReportEvaluation(ctx context.Context, req *connect.Request[v1.ReportEvaluationRequest]) (*connect.Response[v1.ReportEvaluationResponse], error) {
 	return c.reportEvaluation.CallUnary(ctx, req)
@@ -421,6 +524,7 @@ type AgentRulesServiceHandler interface {
 	WatchRuleset(context.Context, *connect.Request[v1.WatchRulesetRequest], *connect.ServerStream[v1.WatchRulesetResponse]) error
 	EvaluatePlan(context.Context, *connect.Request[v1.EvaluatePlanRequest]) (*connect.Response[v1.EvaluatePlanResponse], error)
 	EvaluateDiff(context.Context, *connect.Request[v1.EvaluateDiffRequest]) (*connect.Response[v1.EvaluateDiffResponse], error)
+	EvaluateMcpInvocation(context.Context, *connect.Request[v1.EvaluateMcpInvocationRequest]) (*connect.Response[v1.EvaluateMcpInvocationResponse], error)
 	ReportEvaluation(context.Context, *connect.Request[v1.ReportEvaluationRequest]) (*connect.Response[v1.ReportEvaluationResponse], error)
 }
 
@@ -455,6 +559,12 @@ func NewAgentRulesServiceHandler(svc AgentRulesServiceHandler, opts ...connect.H
 		connect.WithSchema(agentRulesServiceMethods.ByName("EvaluateDiff")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentRulesServiceEvaluateMcpInvocationHandler := connect.NewUnaryHandler(
+		AgentRulesServiceEvaluateMcpInvocationProcedure,
+		svc.EvaluateMcpInvocation,
+		connect.WithSchema(agentRulesServiceMethods.ByName("EvaluateMcpInvocation")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentRulesServiceReportEvaluationHandler := connect.NewUnaryHandler(
 		AgentRulesServiceReportEvaluationProcedure,
 		svc.ReportEvaluation,
@@ -471,6 +581,8 @@ func NewAgentRulesServiceHandler(svc AgentRulesServiceHandler, opts ...connect.H
 			agentRulesServiceEvaluatePlanHandler.ServeHTTP(w, r)
 		case AgentRulesServiceEvaluateDiffProcedure:
 			agentRulesServiceEvaluateDiffHandler.ServeHTTP(w, r)
+		case AgentRulesServiceEvaluateMcpInvocationProcedure:
+			agentRulesServiceEvaluateMcpInvocationHandler.ServeHTTP(w, r)
 		case AgentRulesServiceReportEvaluationProcedure:
 			agentRulesServiceReportEvaluationHandler.ServeHTTP(w, r)
 		default:
@@ -496,6 +608,10 @@ func (UnimplementedAgentRulesServiceHandler) EvaluatePlan(context.Context, *conn
 
 func (UnimplementedAgentRulesServiceHandler) EvaluateDiff(context.Context, *connect.Request[v1.EvaluateDiffRequest]) (*connect.Response[v1.EvaluateDiffResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.AgentRulesService.EvaluateDiff is not implemented"))
+}
+
+func (UnimplementedAgentRulesServiceHandler) EvaluateMcpInvocation(context.Context, *connect.Request[v1.EvaluateMcpInvocationRequest]) (*connect.Response[v1.EvaluateMcpInvocationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.AgentRulesService.EvaluateMcpInvocation is not implemented"))
 }
 
 func (UnimplementedAgentRulesServiceHandler) ReportEvaluation(context.Context, *connect.Request[v1.ReportEvaluationRequest]) (*connect.Response[v1.ReportEvaluationResponse], error) {

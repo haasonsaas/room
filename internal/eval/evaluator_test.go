@@ -1,54 +1,100 @@
 package eval
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"testing"
 
 	roomv1 "github.com/haasonsaas/room/gen/go/room/v1"
+	"google.golang.org/protobuf/proto"
 )
 
-func TestTenantPlanWithoutOrgScopeDenied(t *testing.T) {
-	rules := []*roomv1.Rule{
-		{
-			Id:       "tenant-org-scope-required",
-			Title:    "Tenant data must be organization scoped",
-			Severity: roomv1.Severity_SEVERITY_CRITICAL,
-			Enabled:  true,
-			Checks: []*roomv1.RuleCheck{
-				{Kind: roomv1.CheckKind_CHECK_KIND_HEURISTIC, Expression: "touches_tenant_data_without_scope"},
-			},
-		},
-	}
+var testIdentity = &roomv1.AnalyzerIdentity{Id: "test.static", Version: "1", ConfigSha256: []byte("config")}
 
-	result := Evaluate(rules, nil, &roomv1.EvaluationInput{
-		Plan: "Add a customer endpoint that queries projects from the database.",
-	})
+func TestPositiveSignalDrivesDecisionIndependentOfProse(t *testing.T) {
+	policy := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false)
+	ruleset := testRuleset(roomv1.SignalKind_SIGNAL_KIND_TENANT_ACCESS_WITHOUT_TRUSTED_SCOPE, roomv1.Severity_SEVERITY_CRITICAL)
+	report := completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN, roomv1.SignalKind_SIGNAL_KIND_TENANT_ACCESS_WITHOUT_TRUSTED_SCOPE)
 
-	if result.GetDecision() != roomv1.Decision_DECISION_DENY {
-		t.Fatalf("decision = %s, want deny", result.GetDecision())
+	first := policy.Evaluate(ruleset, &roomv1.EvaluationContext{Repository: "github.com/acme/repo"}, report)
+	second := policy.Evaluate(ruleset, &roomv1.EvaluationContext{Repository: "github.com/acme/repo"}, report)
+
+	if first.GetDecision() != roomv1.Decision_DECISION_DENY || second.GetDecision() != first.GetDecision() {
+		t.Fatalf("decisions = %s, %s; want deny", first.GetDecision(), second.GetDecision())
 	}
-	if len(result.GetMatches()) != 1 {
-		t.Fatalf("matches = %d, want 1", len(result.GetMatches()))
+	if len(first.GetMatches()) != 1 {
+		t.Fatalf("matches = %d, want 1", len(first.GetMatches()))
 	}
 }
 
-func TestTenantPlanWithOrgScopeAllowed(t *testing.T) {
-	rules := []*roomv1.Rule{
-		{
-			Id:       "tenant-org-scope-required",
-			Title:    "Tenant data must be organization scoped",
-			Severity: roomv1.Severity_SEVERITY_CRITICAL,
-			Enabled:  true,
-			Checks: []*roomv1.RuleCheck{
-				{Kind: roomv1.CheckKind_CHECK_KIND_HEURISTIC, Expression: "touches_tenant_data_without_scope"},
-			},
-		},
-	}
+func TestCompleteCoverageWithoutSignalAllows(t *testing.T) {
+	policy := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false)
+	ruleset := testRuleset(roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL, roomv1.Severity_SEVERITY_CRITICAL)
+	report := completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF)
+	report.Receipts[0].CoveredSignals = []roomv1.SignalKind{roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL}
 
-	result := Evaluate(rules, nil, &roomv1.EvaluationInput{
-		Plan: "Add a customer endpoint that queries projects with organization_id from authenticated context and adds a cross-org denial test.",
-	})
-
+	result := policy.Evaluate(ruleset, &roomv1.EvaluationContext{}, report)
 	if result.GetDecision() != roomv1.Decision_DECISION_ALLOW {
-		t.Fatalf("decision = %s, want allow", result.GetDecision())
+		t.Fatalf("decision = %s, gaps=%v", result.GetDecision(), result.GetGaps())
 	}
+}
+
+func TestMissingCoverageIsIndeterminate(t *testing.T) {
+	policy := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false)
+	result := policy.Evaluate(testRuleset(roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL, roomv1.Severity_SEVERITY_HIGH), &roomv1.EvaluationContext{}, completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF))
+	if result.GetDecision() != roomv1.Decision_DECISION_INDETERMINATE {
+		t.Fatalf("decision = %s, want indeterminate", result.GetDecision())
+	}
+	if len(result.GetGaps()) == 0 {
+		t.Fatal("expected coverage gap")
+	}
+}
+
+func TestUntrustedAndDigestMismatchAreIndeterminate(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*roomv1.AnalysisReport)
+	}{
+		{"untrusted", func(r *roomv1.AnalysisReport) { r.Receipts[0].Analyzer.Id = "attacker" }},
+		{"digest mismatch", func(r *roomv1.AnalysisReport) { r.Receipts[0].InputSha256 = []byte("wrong") }},
+		{"partial", func(r *roomv1.AnalysisReport) { r.Receipts[0].Status = roomv1.AnalysisStatus_ANALYSIS_STATUS_PARTIAL }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			report := completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF)
+			report.Receipts[0].CoveredSignals = []roomv1.SignalKind{roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL}
+			tt.mutate(report)
+			result := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false).Evaluate(testRuleset(roomv1.SignalKind_SIGNAL_KIND_SECRET_LITERAL, roomv1.Severity_SEVERITY_HIGH), &roomv1.EvaluationContext{}, report)
+			if result.GetDecision() != roomv1.Decision_DECISION_INDETERMINATE {
+				t.Fatalf("decision = %s", result.GetDecision())
+			}
+		})
+	}
+}
+
+func TestLegacyExpressionRuleFailsSafely(t *testing.T) {
+	ruleset := &roomv1.RulesetVersion{Id: "r", Version: 1, Rules: []*roomv1.Rule{{Id: "legacy", Enabled: true, Checks: []*roomv1.RuleCheck{{Kind: roomv1.CheckKind_CHECK_KIND_PLAN_TEXT, Expression: "auth"}}}}}
+	result := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false).Evaluate(ruleset, &roomv1.EvaluationContext{}, completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN))
+	if result.GetDecision() != roomv1.Decision_DECISION_INDETERMINATE {
+		t.Fatalf("decision = %s", result.GetDecision())
+	}
+}
+
+func testRuleset(signal roomv1.SignalKind, severity roomv1.Severity) *roomv1.RulesetVersion {
+	return &roomv1.RulesetVersion{Id: "ruleset-1", Version: 1, Hash: "hash", Rules: []*roomv1.Rule{{
+		Id: "rule", Title: "Rule", Description: "display only", Enabled: true, Severity: severity,
+		Triggers:         []*roomv1.SignalSelector{{Signal: signal, Phases: []roomv1.AnalysisPhase{roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN, roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF}, MinimumConfidenceBasisPoints: 8000}},
+		RequiredCoverage: []roomv1.SignalKind{signal},
+	}}}
+}
+
+func completeReport(phase roomv1.AnalysisPhase, signals ...roomv1.SignalKind) *roomv1.AnalysisReport {
+	digest := sha256.Sum256([]byte("artifact"))
+	identity := proto.Clone(testIdentity).(*roomv1.AnalyzerIdentity)
+	receipt := &roomv1.AnalyzerReceipt{Analyzer: identity, Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_COMPLETE, InputSha256: digest[:]}
+	for _, signal := range signals {
+		receipt.CoveredSignals = append(receipt.CoveredSignals, signal)
+		receipt.Signals = append(receipt.Signals, &roomv1.SecuritySignal{Kind: signal, Analyzer: proto.Clone(identity).(*roomv1.AnalyzerIdentity), ConfidenceBasisPoints: 9000, Fingerprint: "finding"})
+	}
+	return &roomv1.AnalysisReport{ReportId: "report", Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_COMPLETE, Artifact: &roomv1.ArtifactRef{Phase: phase, Sha256: bytes.Clone(digest[:])}, Receipts: []*roomv1.AnalyzerReceipt{receipt}}
 }

@@ -1,5 +1,11 @@
 room-data.json
+room-data.json-shm
+room-data.json-wal
+room.db
+room.db-shm
+room.db-wal
+room-credentials.json
+.room/
 dist/
 coverage.out
 .DS_Store
-

@@ -88,6 +88,7 @@ const (
 	Decision_DECISION_WARN          Decision = 2
 	Decision_DECISION_NEEDS_CHANGES Decision = 3
 	Decision_DECISION_DENY          Decision = 4
+	Decision_DECISION_INDETERMINATE Decision = 5
 )
 
 // Enum value maps for Decision.
@@ -98,6 +99,7 @@ var (
 		2: "DECISION_WARN",
 		3: "DECISION_NEEDS_CHANGES",
 		4: "DECISION_DENY",
+		5: "DECISION_INDETERMINATE",
 	}
 	Decision_value = map[string]int32{
 		"DECISION_UNSPECIFIED":   0,
@@ -105,6 +107,7 @@ var (
 		"DECISION_WARN":          2,
 		"DECISION_NEEDS_CHANGES": 3,
 		"DECISION_DENY":          4,
+		"DECISION_INDETERMINATE": 5,
 	}
 )
 
@@ -196,6 +199,433 @@ func (CheckKind) EnumDescriptor() ([]byte, []int) {
 	return file_room_v1_rules_proto_rawDescGZIP(), []int{2}
 }
 
+type AnalysisPhase int32
+
+const (
+	AnalysisPhase_ANALYSIS_PHASE_UNSPECIFIED AnalysisPhase = 0
+	AnalysisPhase_ANALYSIS_PHASE_PLAN        AnalysisPhase = 1
+	AnalysisPhase_ANALYSIS_PHASE_DIFF        AnalysisPhase = 2
+)
+
+// Enum value maps for AnalysisPhase.
+var (
+	AnalysisPhase_name = map[int32]string{
+		0: "ANALYSIS_PHASE_UNSPECIFIED",
+		1: "ANALYSIS_PHASE_PLAN",
+		2: "ANALYSIS_PHASE_DIFF",
+	}
+	AnalysisPhase_value = map[string]int32{
+		"ANALYSIS_PHASE_UNSPECIFIED": 0,
+		"ANALYSIS_PHASE_PLAN":        1,
+		"ANALYSIS_PHASE_DIFF":        2,
+	}
+)
+
+func (x AnalysisPhase) Enum() *AnalysisPhase {
+	p := new(AnalysisPhase)
+	*p = x
+	return p
+}
+
+func (x AnalysisPhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AnalysisPhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_room_v1_rules_proto_enumTypes[3].Descriptor()
+}
+
+func (AnalysisPhase) Type() protoreflect.EnumType {
+	return &file_room_v1_rules_proto_enumTypes[3]
+}
+
+func (x AnalysisPhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AnalysisPhase.Descriptor instead.
+func (AnalysisPhase) EnumDescriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{3}
+}
+
+type AnalysisStatus int32
+
+const (
+	AnalysisStatus_ANALYSIS_STATUS_UNSPECIFIED AnalysisStatus = 0
+	AnalysisStatus_ANALYSIS_STATUS_COMPLETE    AnalysisStatus = 1
+	AnalysisStatus_ANALYSIS_STATUS_PARTIAL     AnalysisStatus = 2
+	AnalysisStatus_ANALYSIS_STATUS_UNAVAILABLE AnalysisStatus = 3
+	AnalysisStatus_ANALYSIS_STATUS_FAILED      AnalysisStatus = 4
+	AnalysisStatus_ANALYSIS_STATUS_INVALID     AnalysisStatus = 5
+	AnalysisStatus_ANALYSIS_STATUS_UNTRUSTED   AnalysisStatus = 6
+)
+
+// Enum value maps for AnalysisStatus.
+var (
+	AnalysisStatus_name = map[int32]string{
+		0: "ANALYSIS_STATUS_UNSPECIFIED",
+		1: "ANALYSIS_STATUS_COMPLETE",
+		2: "ANALYSIS_STATUS_PARTIAL",
+		3: "ANALYSIS_STATUS_UNAVAILABLE",
+		4: "ANALYSIS_STATUS_FAILED",
+		5: "ANALYSIS_STATUS_INVALID",
+		6: "ANALYSIS_STATUS_UNTRUSTED",
+	}
+	AnalysisStatus_value = map[string]int32{
+		"ANALYSIS_STATUS_UNSPECIFIED": 0,
+		"ANALYSIS_STATUS_COMPLETE":    1,
+		"ANALYSIS_STATUS_PARTIAL":     2,
+		"ANALYSIS_STATUS_UNAVAILABLE": 3,
+		"ANALYSIS_STATUS_FAILED":      4,
+		"ANALYSIS_STATUS_INVALID":     5,
+		"ANALYSIS_STATUS_UNTRUSTED":   6,
+	}
+)
+
+func (x AnalysisStatus) Enum() *AnalysisStatus {
+	p := new(AnalysisStatus)
+	*p = x
+	return p
+}
+
+func (x AnalysisStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AnalysisStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_room_v1_rules_proto_enumTypes[4].Descriptor()
+}
+
+func (AnalysisStatus) Type() protoreflect.EnumType {
+	return &file_room_v1_rules_proto_enumTypes[4]
+}
+
+func (x AnalysisStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AnalysisStatus.Descriptor instead.
+func (AnalysisStatus) EnumDescriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{4}
+}
+
+type SignalKind int32
+
+const (
+	SignalKind_SIGNAL_KIND_UNSPECIFIED                               SignalKind = 0
+	SignalKind_SIGNAL_KIND_TENANT_ACCESS_WITHOUT_TRUSTED_SCOPE       SignalKind = 1
+	SignalKind_SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT     SignalKind = 2
+	SignalKind_SIGNAL_KIND_SECRET_LITERAL                            SignalKind = 3
+	SignalKind_SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT          SignalKind = 4
+	SignalKind_SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION            SignalKind = 5
+	SignalKind_SIGNAL_KIND_PRIVILEGE_MUTATION_WITHOUT_AUDIT          SignalKind = 6
+	SignalKind_SIGNAL_KIND_UNSIGNED_WEBHOOK                          SignalKind = 7
+	SignalKind_SIGNAL_KIND_PASSWORD_PERSISTENCE_WITHOUT_KDF          SignalKind = 8
+	SignalKind_SIGNAL_KIND_PUBLIC_CREDENTIAL_FLOW_WITHOUT_RATE_LIMIT SignalKind = 9
+	SignalKind_SIGNAL_KIND_DESTRUCTIVE_OPERATION                     SignalKind = 10
+	SignalKind_SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT       SignalKind = 11
+	SignalKind_SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH                SignalKind = 12
+	SignalKind_SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT      SignalKind = 13
+	SignalKind_SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET                  SignalKind = 14
+	SignalKind_SIGNAL_KIND_RUST_UNTRUSTED_PATH                       SignalKind = 15
+	SignalKind_SIGNAL_KIND_RUST_PANIC_IN_LIBRARY_API                 SignalKind = 16
+	SignalKind_SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT           SignalKind = 17
+	SignalKind_SIGNAL_KIND_RUST_UNVALIDATED_EXTERNAL_DESERIALIZATION SignalKind = 18
+)
+
+// Enum value maps for SignalKind.
+var (
+	SignalKind_name = map[int32]string{
+		0:  "SIGNAL_KIND_UNSPECIFIED",
+		1:  "SIGNAL_KIND_TENANT_ACCESS_WITHOUT_TRUSTED_SCOPE",
+		2:  "SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT",
+		3:  "SIGNAL_KIND_SECRET_LITERAL",
+		4:  "SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT",
+		5:  "SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION",
+		6:  "SIGNAL_KIND_PRIVILEGE_MUTATION_WITHOUT_AUDIT",
+		7:  "SIGNAL_KIND_UNSIGNED_WEBHOOK",
+		8:  "SIGNAL_KIND_PASSWORD_PERSISTENCE_WITHOUT_KDF",
+		9:  "SIGNAL_KIND_PUBLIC_CREDENTIAL_FLOW_WITHOUT_RATE_LIMIT",
+		10: "SIGNAL_KIND_DESTRUCTIVE_OPERATION",
+		11: "SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT",
+		12: "SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH",
+		13: "SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
+		14: "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+		15: "SIGNAL_KIND_RUST_UNTRUSTED_PATH",
+		16: "SIGNAL_KIND_RUST_PANIC_IN_LIBRARY_API",
+		17: "SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT",
+		18: "SIGNAL_KIND_RUST_UNVALIDATED_EXTERNAL_DESERIALIZATION",
+	}
+	SignalKind_value = map[string]int32{
+		"SIGNAL_KIND_UNSPECIFIED":                               0,
+		"SIGNAL_KIND_TENANT_ACCESS_WITHOUT_TRUSTED_SCOPE":       1,
+		"SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT":     2,
+		"SIGNAL_KIND_SECRET_LITERAL":                            3,
+		"SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT":          4,
+		"SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION":            5,
+		"SIGNAL_KIND_PRIVILEGE_MUTATION_WITHOUT_AUDIT":          6,
+		"SIGNAL_KIND_UNSIGNED_WEBHOOK":                          7,
+		"SIGNAL_KIND_PASSWORD_PERSISTENCE_WITHOUT_KDF":          8,
+		"SIGNAL_KIND_PUBLIC_CREDENTIAL_FLOW_WITHOUT_RATE_LIMIT": 9,
+		"SIGNAL_KIND_DESTRUCTIVE_OPERATION":                     10,
+		"SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT":       11,
+		"SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH":                12,
+		"SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT":      13,
+		"SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET":                  14,
+		"SIGNAL_KIND_RUST_UNTRUSTED_PATH":                       15,
+		"SIGNAL_KIND_RUST_PANIC_IN_LIBRARY_API":                 16,
+		"SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT":           17,
+		"SIGNAL_KIND_RUST_UNVALIDATED_EXTERNAL_DESERIALIZATION": 18,
+	}
+)
+
+func (x SignalKind) Enum() *SignalKind {
+	p := new(SignalKind)
+	*p = x
+	return p
+}
+
+func (x SignalKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SignalKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_room_v1_rules_proto_enumTypes[5].Descriptor()
+}
+
+func (SignalKind) Type() protoreflect.EnumType {
+	return &file_room_v1_rules_proto_enumTypes[5]
+}
+
+func (x SignalKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SignalKind.Descriptor instead.
+func (SignalKind) EnumDescriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{5}
+}
+
+type McpComplianceMode int32
+
+const (
+	McpComplianceMode_MCP_COMPLIANCE_MODE_UNSPECIFIED McpComplianceMode = 0
+	McpComplianceMode_MCP_COMPLIANCE_MODE_DISABLED    McpComplianceMode = 1
+	McpComplianceMode_MCP_COMPLIANCE_MODE_ALLOWLIST   McpComplianceMode = 2
+	McpComplianceMode_MCP_COMPLIANCE_MODE_BLOCKLIST   McpComplianceMode = 3
+)
+
+// Enum value maps for McpComplianceMode.
+var (
+	McpComplianceMode_name = map[int32]string{
+		0: "MCP_COMPLIANCE_MODE_UNSPECIFIED",
+		1: "MCP_COMPLIANCE_MODE_DISABLED",
+		2: "MCP_COMPLIANCE_MODE_ALLOWLIST",
+		3: "MCP_COMPLIANCE_MODE_BLOCKLIST",
+	}
+	McpComplianceMode_value = map[string]int32{
+		"MCP_COMPLIANCE_MODE_UNSPECIFIED": 0,
+		"MCP_COMPLIANCE_MODE_DISABLED":    1,
+		"MCP_COMPLIANCE_MODE_ALLOWLIST":   2,
+		"MCP_COMPLIANCE_MODE_BLOCKLIST":   3,
+	}
+)
+
+func (x McpComplianceMode) Enum() *McpComplianceMode {
+	p := new(McpComplianceMode)
+	*p = x
+	return p
+}
+
+func (x McpComplianceMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (McpComplianceMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_room_v1_rules_proto_enumTypes[6].Descriptor()
+}
+
+func (McpComplianceMode) Type() protoreflect.EnumType {
+	return &file_room_v1_rules_proto_enumTypes[6]
+}
+
+func (x McpComplianceMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use McpComplianceMode.Descriptor instead.
+func (McpComplianceMode) EnumDescriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{6}
+}
+
+type AuditEventKind int32
+
+const (
+	AuditEventKind_AUDIT_EVENT_KIND_UNSPECIFIED         AuditEventKind = 0
+	AuditEventKind_AUDIT_EVENT_KIND_EVALUATION          AuditEventKind = 1
+	AuditEventKind_AUDIT_EVENT_KIND_MCP_INVOCATION      AuditEventKind = 2
+	AuditEventKind_AUDIT_EVENT_KIND_RULESET_PUBLISHED   AuditEventKind = 3
+	AuditEventKind_AUDIT_EVENT_KIND_RULESET_ROLLED_BACK AuditEventKind = 4
+	AuditEventKind_AUDIT_EVENT_KIND_POLICY_UPDATED      AuditEventKind = 5
+	AuditEventKind_AUDIT_EVENT_KIND_AUTH_DENIED         AuditEventKind = 6
+)
+
+// Enum value maps for AuditEventKind.
+var (
+	AuditEventKind_name = map[int32]string{
+		0: "AUDIT_EVENT_KIND_UNSPECIFIED",
+		1: "AUDIT_EVENT_KIND_EVALUATION",
+		2: "AUDIT_EVENT_KIND_MCP_INVOCATION",
+		3: "AUDIT_EVENT_KIND_RULESET_PUBLISHED",
+		4: "AUDIT_EVENT_KIND_RULESET_ROLLED_BACK",
+		5: "AUDIT_EVENT_KIND_POLICY_UPDATED",
+		6: "AUDIT_EVENT_KIND_AUTH_DENIED",
+	}
+	AuditEventKind_value = map[string]int32{
+		"AUDIT_EVENT_KIND_UNSPECIFIED":         0,
+		"AUDIT_EVENT_KIND_EVALUATION":          1,
+		"AUDIT_EVENT_KIND_MCP_INVOCATION":      2,
+		"AUDIT_EVENT_KIND_RULESET_PUBLISHED":   3,
+		"AUDIT_EVENT_KIND_RULESET_ROLLED_BACK": 4,
+		"AUDIT_EVENT_KIND_POLICY_UPDATED":      5,
+		"AUDIT_EVENT_KIND_AUTH_DENIED":         6,
+	}
+)
+
+func (x AuditEventKind) Enum() *AuditEventKind {
+	p := new(AuditEventKind)
+	*p = x
+	return p
+}
+
+func (x AuditEventKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AuditEventKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_room_v1_rules_proto_enumTypes[7].Descriptor()
+}
+
+func (AuditEventKind) Type() protoreflect.EnumType {
+	return &file_room_v1_rules_proto_enumTypes[7]
+}
+
+func (x AuditEventKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AuditEventKind.Descriptor instead.
+func (AuditEventKind) EnumDescriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{7}
+}
+
+type HookProvider int32
+
+const (
+	HookProvider_HOOK_PROVIDER_UNSPECIFIED HookProvider = 0
+	HookProvider_HOOK_PROVIDER_CLAUDE_CODE HookProvider = 1
+	HookProvider_HOOK_PROVIDER_CODEX       HookProvider = 2
+	HookProvider_HOOK_PROVIDER_CURSOR      HookProvider = 3
+	HookProvider_HOOK_PROVIDER_MCP_PROXY   HookProvider = 4
+)
+
+// Enum value maps for HookProvider.
+var (
+	HookProvider_name = map[int32]string{
+		0: "HOOK_PROVIDER_UNSPECIFIED",
+		1: "HOOK_PROVIDER_CLAUDE_CODE",
+		2: "HOOK_PROVIDER_CODEX",
+		3: "HOOK_PROVIDER_CURSOR",
+		4: "HOOK_PROVIDER_MCP_PROXY",
+	}
+	HookProvider_value = map[string]int32{
+		"HOOK_PROVIDER_UNSPECIFIED": 0,
+		"HOOK_PROVIDER_CLAUDE_CODE": 1,
+		"HOOK_PROVIDER_CODEX":       2,
+		"HOOK_PROVIDER_CURSOR":      3,
+		"HOOK_PROVIDER_MCP_PROXY":   4,
+	}
+)
+
+func (x HookProvider) Enum() *HookProvider {
+	p := new(HookProvider)
+	*p = x
+	return p
+}
+
+func (x HookProvider) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (HookProvider) Descriptor() protoreflect.EnumDescriptor {
+	return file_room_v1_rules_proto_enumTypes[8].Descriptor()
+}
+
+func (HookProvider) Type() protoreflect.EnumType {
+	return &file_room_v1_rules_proto_enumTypes[8]
+}
+
+func (x HookProvider) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use HookProvider.Descriptor instead.
+func (HookProvider) EnumDescriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{8}
+}
+
+type IdentityAssurance int32
+
+const (
+	IdentityAssurance_IDENTITY_ASSURANCE_UNSPECIFIED        IdentityAssurance = 0
+	IdentityAssurance_IDENTITY_ASSURANCE_UNVERIFIED         IdentityAssurance = 1
+	IdentityAssurance_IDENTITY_ASSURANCE_CONFIG_BOUND       IdentityAssurance = 2
+	IdentityAssurance_IDENTITY_ASSURANCE_TRANSPORT_VERIFIED IdentityAssurance = 3
+)
+
+// Enum value maps for IdentityAssurance.
+var (
+	IdentityAssurance_name = map[int32]string{
+		0: "IDENTITY_ASSURANCE_UNSPECIFIED",
+		1: "IDENTITY_ASSURANCE_UNVERIFIED",
+		2: "IDENTITY_ASSURANCE_CONFIG_BOUND",
+		3: "IDENTITY_ASSURANCE_TRANSPORT_VERIFIED",
+	}
+	IdentityAssurance_value = map[string]int32{
+		"IDENTITY_ASSURANCE_UNSPECIFIED":        0,
+		"IDENTITY_ASSURANCE_UNVERIFIED":         1,
+		"IDENTITY_ASSURANCE_CONFIG_BOUND":       2,
+		"IDENTITY_ASSURANCE_TRANSPORT_VERIFIED": 3,
+	}
+)
+
+func (x IdentityAssurance) Enum() *IdentityAssurance {
+	p := new(IdentityAssurance)
+	*p = x
+	return p
+}
+
+func (x IdentityAssurance) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (IdentityAssurance) Descriptor() protoreflect.EnumDescriptor {
+	return file_room_v1_rules_proto_enumTypes[9].Descriptor()
+}
+
+func (IdentityAssurance) Type() protoreflect.EnumType {
+	return &file_room_v1_rules_proto_enumTypes[9]
+}
+
+func (x IdentityAssurance) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use IdentityAssurance.Descriptor instead.
+func (IdentityAssurance) EnumDescriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{9}
+}
+
 type RulesetStatus int32
 
 const (
@@ -232,11 +662,11 @@ func (x RulesetStatus) String() string {
 }
 
 func (RulesetStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_room_v1_rules_proto_enumTypes[3].Descriptor()
+	return file_room_v1_rules_proto_enumTypes[10].Descriptor()
 }
 
 func (RulesetStatus) Type() protoreflect.EnumType {
-	return &file_room_v1_rules_proto_enumTypes[3]
+	return &file_room_v1_rules_proto_enumTypes[10]
 }
 
 func (x RulesetStatus) Number() protoreflect.EnumNumber {
@@ -245,7 +675,7 @@ func (x RulesetStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RulesetStatus.Descriptor instead.
 func (RulesetStatus) EnumDescriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{3}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{10}
 }
 
 type RuleScope struct {
@@ -400,6 +830,898 @@ func (x *RuleCheck) GetMessage() string {
 	return ""
 }
 
+type SourceLocation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FilePath      string                 `protobuf:"bytes,2,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
+	StartLine     int32                  `protobuf:"varint,3,opt,name=start_line,json=startLine,proto3" json:"start_line,omitempty"`
+	EndLine       int32                  `protobuf:"varint,4,opt,name=end_line,json=endLine,proto3" json:"end_line,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SourceLocation) Reset() {
+	*x = SourceLocation{}
+	mi := &file_room_v1_rules_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SourceLocation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SourceLocation) ProtoMessage() {}
+
+func (x *SourceLocation) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SourceLocation.ProtoReflect.Descriptor instead.
+func (*SourceLocation) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SourceLocation) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
+}
+
+func (x *SourceLocation) GetStartLine() int32 {
+	if x != nil {
+		return x.StartLine
+	}
+	return 0
+}
+
+func (x *SourceLocation) GetEndLine() int32 {
+	if x != nil {
+		return x.EndLine
+	}
+	return 0
+}
+
+type ArtifactRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Phase         AnalysisPhase          `protobuf:"varint,1,opt,name=phase,proto3,enum=room.v1.AnalysisPhase" json:"phase,omitempty"`
+	Sha256        []byte                 `protobuf:"bytes,2,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	ChangedFiles  []string               `protobuf:"bytes,3,rep,name=changed_files,json=changedFiles,proto3" json:"changed_files,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArtifactRef) Reset() {
+	*x = ArtifactRef{}
+	mi := &file_room_v1_rules_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArtifactRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArtifactRef) ProtoMessage() {}
+
+func (x *ArtifactRef) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArtifactRef.ProtoReflect.Descriptor instead.
+func (*ArtifactRef) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ArtifactRef) GetPhase() AnalysisPhase {
+	if x != nil {
+		return x.Phase
+	}
+	return AnalysisPhase_ANALYSIS_PHASE_UNSPECIFIED
+}
+
+func (x *ArtifactRef) GetSha256() []byte {
+	if x != nil {
+		return x.Sha256
+	}
+	return nil
+}
+
+func (x *ArtifactRef) GetChangedFiles() []string {
+	if x != nil {
+		return x.ChangedFiles
+	}
+	return nil
+}
+
+type AnalyzerIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	ConfigSha256  []byte                 `protobuf:"bytes,3,opt,name=config_sha256,json=configSha256,proto3" json:"config_sha256,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AnalyzerIdentity) Reset() {
+	*x = AnalyzerIdentity{}
+	mi := &file_room_v1_rules_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnalyzerIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnalyzerIdentity) ProtoMessage() {}
+
+func (x *AnalyzerIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnalyzerIdentity.ProtoReflect.Descriptor instead.
+func (*AnalyzerIdentity) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AnalyzerIdentity) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AnalyzerIdentity) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *AnalyzerIdentity) GetConfigSha256() []byte {
+	if x != nil {
+		return x.ConfigSha256
+	}
+	return nil
+}
+
+type SecuritySignal struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Kind                  SignalKind             `protobuf:"varint,1,opt,name=kind,proto3,enum=room.v1.SignalKind" json:"kind,omitempty"`
+	Fingerprint           string                 `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	Analyzer              *AnalyzerIdentity      `protobuf:"bytes,3,opt,name=analyzer,proto3" json:"analyzer,omitempty"`
+	Location              *SourceLocation        `protobuf:"bytes,4,opt,name=location,proto3" json:"location,omitempty"`
+	ConfidenceBasisPoints uint32                 `protobuf:"varint,5,opt,name=confidence_basis_points,json=confidenceBasisPoints,proto3" json:"confidence_basis_points,omitempty"`
+	EvidenceSha256        []byte                 `protobuf:"bytes,6,opt,name=evidence_sha256,json=evidenceSha256,proto3" json:"evidence_sha256,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *SecuritySignal) Reset() {
+	*x = SecuritySignal{}
+	mi := &file_room_v1_rules_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SecuritySignal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SecuritySignal) ProtoMessage() {}
+
+func (x *SecuritySignal) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SecuritySignal.ProtoReflect.Descriptor instead.
+func (*SecuritySignal) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SecuritySignal) GetKind() SignalKind {
+	if x != nil {
+		return x.Kind
+	}
+	return SignalKind_SIGNAL_KIND_UNSPECIFIED
+}
+
+func (x *SecuritySignal) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *SecuritySignal) GetAnalyzer() *AnalyzerIdentity {
+	if x != nil {
+		return x.Analyzer
+	}
+	return nil
+}
+
+func (x *SecuritySignal) GetLocation() *SourceLocation {
+	if x != nil {
+		return x.Location
+	}
+	return nil
+}
+
+func (x *SecuritySignal) GetConfidenceBasisPoints() uint32 {
+	if x != nil {
+		return x.ConfidenceBasisPoints
+	}
+	return 0
+}
+
+func (x *SecuritySignal) GetEvidenceSha256() []byte {
+	if x != nil {
+		return x.EvidenceSha256
+	}
+	return nil
+}
+
+type AnalyzerReceipt struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Analyzer       *AnalyzerIdentity      `protobuf:"bytes,1,opt,name=analyzer,proto3" json:"analyzer,omitempty"`
+	Status         AnalysisStatus         `protobuf:"varint,2,opt,name=status,proto3,enum=room.v1.AnalysisStatus" json:"status,omitempty"`
+	CoveredSignals []SignalKind           `protobuf:"varint,3,rep,packed,name=covered_signals,json=coveredSignals,proto3,enum=room.v1.SignalKind" json:"covered_signals,omitempty"`
+	Signals        []*SecuritySignal      `protobuf:"bytes,4,rep,name=signals,proto3" json:"signals,omitempty"`
+	FailureCode    string                 `protobuf:"bytes,5,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`
+	InputSha256    []byte                 `protobuf:"bytes,6,opt,name=input_sha256,json=inputSha256,proto3" json:"input_sha256,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AnalyzerReceipt) Reset() {
+	*x = AnalyzerReceipt{}
+	mi := &file_room_v1_rules_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnalyzerReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnalyzerReceipt) ProtoMessage() {}
+
+func (x *AnalyzerReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnalyzerReceipt.ProtoReflect.Descriptor instead.
+func (*AnalyzerReceipt) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AnalyzerReceipt) GetAnalyzer() *AnalyzerIdentity {
+	if x != nil {
+		return x.Analyzer
+	}
+	return nil
+}
+
+func (x *AnalyzerReceipt) GetStatus() AnalysisStatus {
+	if x != nil {
+		return x.Status
+	}
+	return AnalysisStatus_ANALYSIS_STATUS_UNSPECIFIED
+}
+
+func (x *AnalyzerReceipt) GetCoveredSignals() []SignalKind {
+	if x != nil {
+		return x.CoveredSignals
+	}
+	return nil
+}
+
+func (x *AnalyzerReceipt) GetSignals() []*SecuritySignal {
+	if x != nil {
+		return x.Signals
+	}
+	return nil
+}
+
+func (x *AnalyzerReceipt) GetFailureCode() string {
+	if x != nil {
+		return x.FailureCode
+	}
+	return ""
+}
+
+func (x *AnalyzerReceipt) GetInputSha256() []byte {
+	if x != nil {
+		return x.InputSha256
+	}
+	return nil
+}
+
+type AnalysisReport struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ReportId      string                 `protobuf:"bytes,1,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
+	Artifact      *ArtifactRef           `protobuf:"bytes,2,opt,name=artifact,proto3" json:"artifact,omitempty"`
+	Status        AnalysisStatus         `protobuf:"varint,3,opt,name=status,proto3,enum=room.v1.AnalysisStatus" json:"status,omitempty"`
+	Receipts      []*AnalyzerReceipt     `protobuf:"bytes,4,rep,name=receipts,proto3" json:"receipts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AnalysisReport) Reset() {
+	*x = AnalysisReport{}
+	mi := &file_room_v1_rules_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnalysisReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnalysisReport) ProtoMessage() {}
+
+func (x *AnalysisReport) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnalysisReport.ProtoReflect.Descriptor instead.
+func (*AnalysisReport) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *AnalysisReport) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+func (x *AnalysisReport) GetArtifact() *ArtifactRef {
+	if x != nil {
+		return x.Artifact
+	}
+	return nil
+}
+
+func (x *AnalysisReport) GetStatus() AnalysisStatus {
+	if x != nil {
+		return x.Status
+	}
+	return AnalysisStatus_ANALYSIS_STATUS_UNSPECIFIED
+}
+
+func (x *AnalysisReport) GetReceipts() []*AnalyzerReceipt {
+	if x != nil {
+		return x.Receipts
+	}
+	return nil
+}
+
+type SignalSelector struct {
+	state                        protoimpl.MessageState `protogen:"open.v1"`
+	Signal                       SignalKind             `protobuf:"varint,1,opt,name=signal,proto3,enum=room.v1.SignalKind" json:"signal,omitempty"`
+	Phases                       []AnalysisPhase        `protobuf:"varint,2,rep,packed,name=phases,proto3,enum=room.v1.AnalysisPhase" json:"phases,omitempty"`
+	MinimumConfidenceBasisPoints uint32                 `protobuf:"varint,3,opt,name=minimum_confidence_basis_points,json=minimumConfidenceBasisPoints,proto3" json:"minimum_confidence_basis_points,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
+}
+
+func (x *SignalSelector) Reset() {
+	*x = SignalSelector{}
+	mi := &file_room_v1_rules_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalSelector) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalSelector) ProtoMessage() {}
+
+func (x *SignalSelector) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalSelector.ProtoReflect.Descriptor instead.
+func (*SignalSelector) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SignalSelector) GetSignal() SignalKind {
+	if x != nil {
+		return x.Signal
+	}
+	return SignalKind_SIGNAL_KIND_UNSPECIFIED
+}
+
+func (x *SignalSelector) GetPhases() []AnalysisPhase {
+	if x != nil {
+		return x.Phases
+	}
+	return nil
+}
+
+func (x *SignalSelector) GetMinimumConfidenceBasisPoints() uint32 {
+	if x != nil {
+		return x.MinimumConfidenceBasisPoints
+	}
+	return 0
+}
+
+type EvaluationGap struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RequiredSignal SignalKind             `protobuf:"varint,1,opt,name=required_signal,json=requiredSignal,proto3,enum=room.v1.SignalKind" json:"required_signal,omitempty"`
+	AnalyzerId     string                 `protobuf:"bytes,2,opt,name=analyzer_id,json=analyzerId,proto3" json:"analyzer_id,omitempty"`
+	Status         AnalysisStatus         `protobuf:"varint,3,opt,name=status,proto3,enum=room.v1.AnalysisStatus" json:"status,omitempty"`
+	ReasonCode     string                 `protobuf:"bytes,4,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *EvaluationGap) Reset() {
+	*x = EvaluationGap{}
+	mi := &file_room_v1_rules_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluationGap) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluationGap) ProtoMessage() {}
+
+func (x *EvaluationGap) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluationGap.ProtoReflect.Descriptor instead.
+func (*EvaluationGap) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *EvaluationGap) GetRequiredSignal() SignalKind {
+	if x != nil {
+		return x.RequiredSignal
+	}
+	return SignalKind_SIGNAL_KIND_UNSPECIFIED
+}
+
+func (x *EvaluationGap) GetAnalyzerId() string {
+	if x != nil {
+		return x.AnalyzerId
+	}
+	return ""
+}
+
+func (x *EvaluationGap) GetStatus() AnalysisStatus {
+	if x != nil {
+		return x.Status
+	}
+	return AnalysisStatus_ANALYSIS_STATUS_UNSPECIFIED
+}
+
+func (x *EvaluationGap) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
+type McpToolSelector struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ServerId      string                 `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	ToolName      string                 `protobuf:"bytes,2,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *McpToolSelector) Reset() {
+	*x = McpToolSelector{}
+	mi := &file_room_v1_rules_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *McpToolSelector) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*McpToolSelector) ProtoMessage() {}
+
+func (x *McpToolSelector) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use McpToolSelector.ProtoReflect.Descriptor instead.
+func (*McpToolSelector) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *McpToolSelector) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *McpToolSelector) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+type McpCompliancePolicy struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Mode                McpComplianceMode      `protobuf:"varint,1,opt,name=mode,proto3,enum=room.v1.McpComplianceMode" json:"mode,omitempty"`
+	Selectors           []*McpToolSelector     `protobuf:"bytes,2,rep,name=selectors,proto3" json:"selectors,omitempty"`
+	AuditAllowed        bool                   `protobuf:"varint,3,opt,name=audit_allowed,json=auditAllowed,proto3" json:"audit_allowed,omitempty"`
+	DenyUnknownIdentity bool                   `protobuf:"varint,4,opt,name=deny_unknown_identity,json=denyUnknownIdentity,proto3" json:"deny_unknown_identity,omitempty"`
+	ProviderBindings    []*ProviderToolBinding `protobuf:"bytes,5,rep,name=provider_bindings,json=providerBindings,proto3" json:"provider_bindings,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *McpCompliancePolicy) Reset() {
+	*x = McpCompliancePolicy{}
+	mi := &file_room_v1_rules_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *McpCompliancePolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*McpCompliancePolicy) ProtoMessage() {}
+
+func (x *McpCompliancePolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use McpCompliancePolicy.ProtoReflect.Descriptor instead.
+func (*McpCompliancePolicy) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *McpCompliancePolicy) GetMode() McpComplianceMode {
+	if x != nil {
+		return x.Mode
+	}
+	return McpComplianceMode_MCP_COMPLIANCE_MODE_UNSPECIFIED
+}
+
+func (x *McpCompliancePolicy) GetSelectors() []*McpToolSelector {
+	if x != nil {
+		return x.Selectors
+	}
+	return nil
+}
+
+func (x *McpCompliancePolicy) GetAuditAllowed() bool {
+	if x != nil {
+		return x.AuditAllowed
+	}
+	return false
+}
+
+func (x *McpCompliancePolicy) GetDenyUnknownIdentity() bool {
+	if x != nil {
+		return x.DenyUnknownIdentity
+	}
+	return false
+}
+
+func (x *McpCompliancePolicy) GetProviderBindings() []*ProviderToolBinding {
+	if x != nil {
+		return x.ProviderBindings
+	}
+	return nil
+}
+
+type ProviderToolBinding struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Provider       HookProvider           `protobuf:"varint,1,opt,name=provider,proto3,enum=room.v1.HookProvider" json:"provider,omitempty"`
+	ProviderToolId string                 `protobuf:"bytes,2,opt,name=provider_tool_id,json=providerToolId,proto3" json:"provider_tool_id,omitempty"`
+	ServerId       string                 `protobuf:"bytes,3,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	ToolName       string                 `protobuf:"bytes,4,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ProviderToolBinding) Reset() {
+	*x = ProviderToolBinding{}
+	mi := &file_room_v1_rules_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProviderToolBinding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProviderToolBinding) ProtoMessage() {}
+
+func (x *ProviderToolBinding) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProviderToolBinding.ProtoReflect.Descriptor instead.
+func (*ProviderToolBinding) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ProviderToolBinding) GetProvider() HookProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return HookProvider_HOOK_PROVIDER_UNSPECIFIED
+}
+
+func (x *ProviderToolBinding) GetProviderToolId() string {
+	if x != nil {
+		return x.ProviderToolId
+	}
+	return ""
+}
+
+func (x *ProviderToolBinding) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *ProviderToolBinding) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+type McpInvocation struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ServerId          string                 `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	ToolName          string                 `protobuf:"bytes,2,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	Transport         string                 `protobuf:"bytes,3,opt,name=transport,proto3" json:"transport,omitempty"`
+	Endpoint          string                 `protobuf:"bytes,4,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Provider          HookProvider           `protobuf:"varint,5,opt,name=provider,proto3,enum=room.v1.HookProvider" json:"provider,omitempty"`
+	ProviderToolId    string                 `protobuf:"bytes,6,opt,name=provider_tool_id,json=providerToolId,proto3" json:"provider_tool_id,omitempty"`
+	IdentityAssurance IdentityAssurance      `protobuf:"varint,7,opt,name=identity_assurance,json=identityAssurance,proto3,enum=room.v1.IdentityAssurance" json:"identity_assurance,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *McpInvocation) Reset() {
+	*x = McpInvocation{}
+	mi := &file_room_v1_rules_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *McpInvocation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*McpInvocation) ProtoMessage() {}
+
+func (x *McpInvocation) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use McpInvocation.ProtoReflect.Descriptor instead.
+func (*McpInvocation) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *McpInvocation) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *McpInvocation) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *McpInvocation) GetTransport() string {
+	if x != nil {
+		return x.Transport
+	}
+	return ""
+}
+
+func (x *McpInvocation) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *McpInvocation) GetProvider() HookProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return HookProvider_HOOK_PROVIDER_UNSPECIFIED
+}
+
+func (x *McpInvocation) GetProviderToolId() string {
+	if x != nil {
+		return x.ProviderToolId
+	}
+	return ""
+}
+
+func (x *McpInvocation) GetIdentityAssurance() IdentityAssurance {
+	if x != nil {
+		return x.IdentityAssurance
+	}
+	return IdentityAssurance_IDENTITY_ASSURANCE_UNSPECIFIED
+}
+
+type McpInvocationDecision struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Allowed         bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	ReasonCode      string                 `protobuf:"bytes,2,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	MatchedSelector *McpToolSelector       `protobuf:"bytes,3,opt,name=matched_selector,json=matchedSelector,proto3" json:"matched_selector,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *McpInvocationDecision) Reset() {
+	*x = McpInvocationDecision{}
+	mi := &file_room_v1_rules_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *McpInvocationDecision) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*McpInvocationDecision) ProtoMessage() {}
+
+func (x *McpInvocationDecision) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use McpInvocationDecision.ProtoReflect.Descriptor instead.
+func (*McpInvocationDecision) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *McpInvocationDecision) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *McpInvocationDecision) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
+func (x *McpInvocationDecision) GetMatchedSelector() *McpToolSelector {
+	if x != nil {
+		return x.MatchedSelector
+	}
+	return nil
+}
+
 type Rule struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -415,13 +1737,15 @@ type Rule struct {
 	Owner            string                 `protobuf:"bytes,11,opt,name=owner,proto3" json:"owner,omitempty"`
 	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt        *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Triggers         []*SignalSelector      `protobuf:"bytes,14,rep,name=triggers,proto3" json:"triggers,omitempty"`
+	RequiredCoverage []SignalKind           `protobuf:"varint,15,rep,packed,name=required_coverage,json=requiredCoverage,proto3,enum=room.v1.SignalKind" json:"required_coverage,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Rule) Reset() {
 	*x = Rule{}
-	mi := &file_room_v1_rules_proto_msgTypes[2]
+	mi := &file_room_v1_rules_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -433,7 +1757,7 @@ func (x *Rule) String() string {
 func (*Rule) ProtoMessage() {}
 
 func (x *Rule) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[2]
+	mi := &file_room_v1_rules_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -446,7 +1770,7 @@ func (x *Rule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rule.ProtoReflect.Descriptor instead.
 func (*Rule) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{2}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Rule) GetId() string {
@@ -540,23 +1864,40 @@ func (x *Rule) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Rule) GetTriggers() []*SignalSelector {
+	if x != nil {
+		return x.Triggers
+	}
+	return nil
+}
+
+func (x *Rule) GetRequiredCoverage() []SignalKind {
+	if x != nil {
+		return x.RequiredCoverage
+	}
+	return nil
+}
+
 type RulesetVersion struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Version       int32                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	Hash          string                 `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
-	Status        RulesetStatus          `protobuf:"varint,4,opt,name=status,proto3,enum=room.v1.RulesetStatus" json:"status,omitempty"`
-	Rules         []*Rule                `protobuf:"bytes,5,rep,name=rules,proto3" json:"rules,omitempty"`
-	Author        string                 `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"`
-	Notes         string                 `protobuf:"bytes,7,opt,name=notes,proto3" json:"notes,omitempty"`
-	PublishedAt   *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=published_at,json=publishedAt,proto3" json:"published_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version         int32                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	Hash            string                 `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
+	Status          RulesetStatus          `protobuf:"varint,4,opt,name=status,proto3,enum=room.v1.RulesetStatus" json:"status,omitempty"`
+	Rules           []*Rule                `protobuf:"bytes,5,rep,name=rules,proto3" json:"rules,omitempty"`
+	Author          string                 `protobuf:"bytes,6,opt,name=author,proto3" json:"author,omitempty"`
+	Notes           string                 `protobuf:"bytes,7,opt,name=notes,proto3" json:"notes,omitempty"`
+	PublishedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=published_at,json=publishedAt,proto3" json:"published_at,omitempty"`
+	McpPolicy       *McpCompliancePolicy   `protobuf:"bytes,9,opt,name=mcp_policy,json=mcpPolicy,proto3" json:"mcp_policy,omitempty"`
+	AuthorizedScope *AuthorizationScope    `protobuf:"bytes,10,opt,name=authorized_scope,json=authorizedScope,proto3" json:"authorized_scope,omitempty"`
+	SourceHash      string                 `protobuf:"bytes,11,opt,name=source_hash,json=sourceHash,proto3" json:"source_hash,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RulesetVersion) Reset() {
 	*x = RulesetVersion{}
-	mi := &file_room_v1_rules_proto_msgTypes[3]
+	mi := &file_room_v1_rules_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -568,7 +1909,7 @@ func (x *RulesetVersion) String() string {
 func (*RulesetVersion) ProtoMessage() {}
 
 func (x *RulesetVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[3]
+	mi := &file_room_v1_rules_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -581,7 +1922,7 @@ func (x *RulesetVersion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RulesetVersion.ProtoReflect.Descriptor instead.
 func (*RulesetVersion) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{3}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RulesetVersion) GetId() string {
@@ -640,6 +1981,103 @@ func (x *RulesetVersion) GetPublishedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *RulesetVersion) GetMcpPolicy() *McpCompliancePolicy {
+	if x != nil {
+		return x.McpPolicy
+	}
+	return nil
+}
+
+func (x *RulesetVersion) GetAuthorizedScope() *AuthorizationScope {
+	if x != nil {
+		return x.AuthorizedScope
+	}
+	return nil
+}
+
+func (x *RulesetVersion) GetSourceHash() string {
+	if x != nil {
+		return x.SourceHash
+	}
+	return ""
+}
+
+type AuthorizationScope struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CredentialId  string                 `protobuf:"bytes,1,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
+	SubjectId     string                 `protobuf:"bytes,2,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Repository    string                 `protobuf:"bytes,4,opt,name=repository,proto3" json:"repository,omitempty"`
+	AgentType     string                 `protobuf:"bytes,5,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthorizationScope) Reset() {
+	*x = AuthorizationScope{}
+	mi := &file_room_v1_rules_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizationScope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizationScope) ProtoMessage() {}
+
+func (x *AuthorizationScope) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorizationScope.ProtoReflect.Descriptor instead.
+func (*AuthorizationScope) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *AuthorizationScope) GetCredentialId() string {
+	if x != nil {
+		return x.CredentialId
+	}
+	return ""
+}
+
+func (x *AuthorizationScope) GetSubjectId() string {
+	if x != nil {
+		return x.SubjectId
+	}
+	return ""
+}
+
+func (x *AuthorizationScope) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *AuthorizationScope) GetRepository() string {
+	if x != nil {
+		return x.Repository
+	}
+	return ""
+}
+
+func (x *AuthorizationScope) GetAgentType() string {
+	if x != nil {
+		return x.AgentType
+	}
+	return ""
+}
+
 type EvaluationContext struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
@@ -649,13 +2087,14 @@ type EvaluationContext struct {
 	ChangedFiles  []string               `protobuf:"bytes,5,rep,name=changed_files,json=changedFiles,proto3" json:"changed_files,omitempty"`
 	Languages     []string               `protobuf:"bytes,6,rep,name=languages,proto3" json:"languages,omitempty"`
 	Frameworks    []string               `protobuf:"bytes,7,rep,name=frameworks,proto3" json:"frameworks,omitempty"`
+	SubjectId     string                 `protobuf:"bytes,8,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EvaluationContext) Reset() {
 	*x = EvaluationContext{}
-	mi := &file_room_v1_rules_proto_msgTypes[4]
+	mi := &file_room_v1_rules_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +2106,7 @@ func (x *EvaluationContext) String() string {
 func (*EvaluationContext) ProtoMessage() {}
 
 func (x *EvaluationContext) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[4]
+	mi := &file_room_v1_rules_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,7 +2119,7 @@ func (x *EvaluationContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationContext.ProtoReflect.Descriptor instead.
 func (*EvaluationContext) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{4}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *EvaluationContext) GetWorkspaceId() string {
@@ -732,18 +2171,26 @@ func (x *EvaluationContext) GetFrameworks() []string {
 	return nil
 }
 
+func (x *EvaluationContext) GetSubjectId() string {
+	if x != nil {
+		return x.SubjectId
+	}
+	return ""
+}
+
 type EvaluationInput struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Context       *EvaluationContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
 	Plan          string                 `protobuf:"bytes,2,opt,name=plan,proto3" json:"plan,omitempty"`
 	Diff          string                 `protobuf:"bytes,3,opt,name=diff,proto3" json:"diff,omitempty"`
+	Phase         AnalysisPhase          `protobuf:"varint,4,opt,name=phase,proto3,enum=room.v1.AnalysisPhase" json:"phase,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EvaluationInput) Reset() {
 	*x = EvaluationInput{}
-	mi := &file_room_v1_rules_proto_msgTypes[5]
+	mi := &file_room_v1_rules_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -755,7 +2202,7 @@ func (x *EvaluationInput) String() string {
 func (*EvaluationInput) ProtoMessage() {}
 
 func (x *EvaluationInput) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[5]
+	mi := &file_room_v1_rules_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -768,7 +2215,7 @@ func (x *EvaluationInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationInput.ProtoReflect.Descriptor instead.
 func (*EvaluationInput) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{5}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *EvaluationInput) GetContext() *EvaluationContext {
@@ -792,6 +2239,13 @@ func (x *EvaluationInput) GetDiff() string {
 	return ""
 }
 
+func (x *EvaluationInput) GetPhase() AnalysisPhase {
+	if x != nil {
+		return x.Phase
+	}
+	return AnalysisPhase_ANALYSIS_PHASE_UNSPECIFIED
+}
+
 type RuleMatch struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	RuleId           string                 `protobuf:"bytes,1,opt,name=rule_id,json=ruleId,proto3" json:"rule_id,omitempty"`
@@ -807,7 +2261,7 @@ type RuleMatch struct {
 
 func (x *RuleMatch) Reset() {
 	*x = RuleMatch{}
-	mi := &file_room_v1_rules_proto_msgTypes[6]
+	mi := &file_room_v1_rules_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -819,7 +2273,7 @@ func (x *RuleMatch) String() string {
 func (*RuleMatch) ProtoMessage() {}
 
 func (x *RuleMatch) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[6]
+	mi := &file_room_v1_rules_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -832,7 +2286,7 @@ func (x *RuleMatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuleMatch.ProtoReflect.Descriptor instead.
 func (*RuleMatch) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{6}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RuleMatch) GetRuleId() string {
@@ -885,21 +2339,27 @@ func (x *RuleMatch) GetRemediation() []string {
 }
 
 type EvaluationResult struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Decision        Decision               `protobuf:"varint,1,opt,name=decision,proto3,enum=room.v1.Decision" json:"decision,omitempty"`
-	HighestSeverity Severity               `protobuf:"varint,2,opt,name=highest_severity,json=highestSeverity,proto3,enum=room.v1.Severity" json:"highest_severity,omitempty"`
-	Matches         []*RuleMatch           `protobuf:"bytes,3,rep,name=matches,proto3" json:"matches,omitempty"`
-	RequiredChecks  []string               `protobuf:"bytes,4,rep,name=required_checks,json=requiredChecks,proto3" json:"required_checks,omitempty"`
-	RulesetId       string                 `protobuf:"bytes,5,opt,name=ruleset_id,json=rulesetId,proto3" json:"ruleset_id,omitempty"`
-	RulesetVersion  int32                  `protobuf:"varint,6,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
-	RulesetHash     string                 `protobuf:"bytes,7,opt,name=ruleset_hash,json=rulesetHash,proto3" json:"ruleset_hash,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Decision         Decision               `protobuf:"varint,1,opt,name=decision,proto3,enum=room.v1.Decision" json:"decision,omitempty"`
+	HighestSeverity  Severity               `protobuf:"varint,2,opt,name=highest_severity,json=highestSeverity,proto3,enum=room.v1.Severity" json:"highest_severity,omitempty"`
+	Matches          []*RuleMatch           `protobuf:"bytes,3,rep,name=matches,proto3" json:"matches,omitempty"`
+	RequiredChecks   []string               `protobuf:"bytes,4,rep,name=required_checks,json=requiredChecks,proto3" json:"required_checks,omitempty"`
+	RulesetId        string                 `protobuf:"bytes,5,opt,name=ruleset_id,json=rulesetId,proto3" json:"ruleset_id,omitempty"`
+	RulesetVersion   int32                  `protobuf:"varint,6,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
+	RulesetHash      string                 `protobuf:"bytes,7,opt,name=ruleset_hash,json=rulesetHash,proto3" json:"ruleset_hash,omitempty"`
+	AnalysisStatus   AnalysisStatus         `protobuf:"varint,8,opt,name=analysis_status,json=analysisStatus,proto3,enum=room.v1.AnalysisStatus" json:"analysis_status,omitempty"`
+	AuditEventId     string                 `protobuf:"bytes,9,opt,name=audit_event_id,json=auditEventId,proto3" json:"audit_event_id,omitempty"`
+	AnalyzerReceipts []*AnalyzerReceipt     `protobuf:"bytes,10,rep,name=analyzer_receipts,json=analyzerReceipts,proto3" json:"analyzer_receipts,omitempty"`
+	Gaps             []*EvaluationGap       `protobuf:"bytes,11,rep,name=gaps,proto3" json:"gaps,omitempty"`
+	InputSha256      []byte                 `protobuf:"bytes,12,opt,name=input_sha256,json=inputSha256,proto3" json:"input_sha256,omitempty"`
+	EvaluationId     string                 `protobuf:"bytes,13,opt,name=evaluation_id,json=evaluationId,proto3" json:"evaluation_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *EvaluationResult) Reset() {
 	*x = EvaluationResult{}
-	mi := &file_room_v1_rules_proto_msgTypes[7]
+	mi := &file_room_v1_rules_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -911,7 +2371,7 @@ func (x *EvaluationResult) String() string {
 func (*EvaluationResult) ProtoMessage() {}
 
 func (x *EvaluationResult) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[7]
+	mi := &file_room_v1_rules_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -924,7 +2384,7 @@ func (x *EvaluationResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluationResult.ProtoReflect.Descriptor instead.
 func (*EvaluationResult) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{7}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *EvaluationResult) GetDecision() Decision {
@@ -976,6 +2436,212 @@ func (x *EvaluationResult) GetRulesetHash() string {
 	return ""
 }
 
+func (x *EvaluationResult) GetAnalysisStatus() AnalysisStatus {
+	if x != nil {
+		return x.AnalysisStatus
+	}
+	return AnalysisStatus_ANALYSIS_STATUS_UNSPECIFIED
+}
+
+func (x *EvaluationResult) GetAuditEventId() string {
+	if x != nil {
+		return x.AuditEventId
+	}
+	return ""
+}
+
+func (x *EvaluationResult) GetAnalyzerReceipts() []*AnalyzerReceipt {
+	if x != nil {
+		return x.AnalyzerReceipts
+	}
+	return nil
+}
+
+func (x *EvaluationResult) GetGaps() []*EvaluationGap {
+	if x != nil {
+		return x.Gaps
+	}
+	return nil
+}
+
+func (x *EvaluationResult) GetInputSha256() []byte {
+	if x != nil {
+		return x.InputSha256
+	}
+	return nil
+}
+
+func (x *EvaluationResult) GetEvaluationId() string {
+	if x != nil {
+		return x.EvaluationId
+	}
+	return ""
+}
+
+type AuditEvent struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Kind            AuditEventKind         `protobuf:"varint,2,opt,name=kind,proto3,enum=room.v1.AuditEventKind" json:"kind,omitempty"`
+	OccurredAt      *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	SubjectId       string                 `protobuf:"bytes,4,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"`
+	WorkspaceId     string                 `protobuf:"bytes,5,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Repository      string                 `protobuf:"bytes,6,opt,name=repository,proto3" json:"repository,omitempty"`
+	AgentType       string                 `protobuf:"bytes,7,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
+	RulesetId       string                 `protobuf:"bytes,8,opt,name=ruleset_id,json=rulesetId,proto3" json:"ruleset_id,omitempty"`
+	RulesetVersion  int32                  `protobuf:"varint,9,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
+	RulesetHash     string                 `protobuf:"bytes,10,opt,name=ruleset_hash,json=rulesetHash,proto3" json:"ruleset_hash,omitempty"`
+	Decision        Decision               `protobuf:"varint,11,opt,name=decision,proto3,enum=room.v1.Decision" json:"decision,omitempty"`
+	HighestSeverity Severity               `protobuf:"varint,12,opt,name=highest_severity,json=highestSeverity,proto3,enum=room.v1.Severity" json:"highest_severity,omitempty"`
+	AnalysisStatus  AnalysisStatus         `protobuf:"varint,13,opt,name=analysis_status,json=analysisStatus,proto3,enum=room.v1.AnalysisStatus" json:"analysis_status,omitempty"`
+	McpInvocation   *McpInvocation         `protobuf:"bytes,14,opt,name=mcp_invocation,json=mcpInvocation,proto3" json:"mcp_invocation,omitempty"`
+	ReasonCode      string                 `protobuf:"bytes,15,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	MatchedRuleIds  []string               `protobuf:"bytes,16,rep,name=matched_rule_ids,json=matchedRuleIds,proto3" json:"matched_rule_ids,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AuditEvent) Reset() {
+	*x = AuditEvent{}
+	mi := &file_room_v1_rules_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditEvent) ProtoMessage() {}
+
+func (x *AuditEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuditEvent.ProtoReflect.Descriptor instead.
+func (*AuditEvent) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *AuditEvent) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetKind() AuditEventKind {
+	if x != nil {
+		return x.Kind
+	}
+	return AuditEventKind_AUDIT_EVENT_KIND_UNSPECIFIED
+}
+
+func (x *AuditEvent) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+func (x *AuditEvent) GetSubjectId() string {
+	if x != nil {
+		return x.SubjectId
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetRepository() string {
+	if x != nil {
+		return x.Repository
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetAgentType() string {
+	if x != nil {
+		return x.AgentType
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetRulesetId() string {
+	if x != nil {
+		return x.RulesetId
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetRulesetVersion() int32 {
+	if x != nil {
+		return x.RulesetVersion
+	}
+	return 0
+}
+
+func (x *AuditEvent) GetRulesetHash() string {
+	if x != nil {
+		return x.RulesetHash
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetDecision() Decision {
+	if x != nil {
+		return x.Decision
+	}
+	return Decision_DECISION_UNSPECIFIED
+}
+
+func (x *AuditEvent) GetHighestSeverity() Severity {
+	if x != nil {
+		return x.HighestSeverity
+	}
+	return Severity_SEVERITY_UNSPECIFIED
+}
+
+func (x *AuditEvent) GetAnalysisStatus() AnalysisStatus {
+	if x != nil {
+		return x.AnalysisStatus
+	}
+	return AnalysisStatus_ANALYSIS_STATUS_UNSPECIFIED
+}
+
+func (x *AuditEvent) GetMcpInvocation() *McpInvocation {
+	if x != nil {
+		return x.McpInvocation
+	}
+	return nil
+}
+
+func (x *AuditEvent) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetMatchedRuleIds() []string {
+	if x != nil {
+		return x.MatchedRuleIds
+	}
+	return nil
+}
+
 type CreateRuleRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Rule          *Rule                  `protobuf:"bytes,1,opt,name=rule,proto3" json:"rule,omitempty"`
@@ -985,7 +2651,7 @@ type CreateRuleRequest struct {
 
 func (x *CreateRuleRequest) Reset() {
 	*x = CreateRuleRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[8]
+	mi := &file_room_v1_rules_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -997,7 +2663,7 @@ func (x *CreateRuleRequest) String() string {
 func (*CreateRuleRequest) ProtoMessage() {}
 
 func (x *CreateRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[8]
+	mi := &file_room_v1_rules_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1010,7 +2676,7 @@ func (x *CreateRuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRuleRequest.ProtoReflect.Descriptor instead.
 func (*CreateRuleRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{8}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CreateRuleRequest) GetRule() *Rule {
@@ -1029,7 +2695,7 @@ type CreateRuleResponse struct {
 
 func (x *CreateRuleResponse) Reset() {
 	*x = CreateRuleResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[9]
+	mi := &file_room_v1_rules_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1041,7 +2707,7 @@ func (x *CreateRuleResponse) String() string {
 func (*CreateRuleResponse) ProtoMessage() {}
 
 func (x *CreateRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[9]
+	mi := &file_room_v1_rules_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1054,7 +2720,7 @@ func (x *CreateRuleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRuleResponse.ProtoReflect.Descriptor instead.
 func (*CreateRuleResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{9}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CreateRuleResponse) GetRule() *Rule {
@@ -1073,7 +2739,7 @@ type UpdateRuleRequest struct {
 
 func (x *UpdateRuleRequest) Reset() {
 	*x = UpdateRuleRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[10]
+	mi := &file_room_v1_rules_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1085,7 +2751,7 @@ func (x *UpdateRuleRequest) String() string {
 func (*UpdateRuleRequest) ProtoMessage() {}
 
 func (x *UpdateRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[10]
+	mi := &file_room_v1_rules_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1098,7 +2764,7 @@ func (x *UpdateRuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRuleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRuleRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{10}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *UpdateRuleRequest) GetRule() *Rule {
@@ -1117,7 +2783,7 @@ type UpdateRuleResponse struct {
 
 func (x *UpdateRuleResponse) Reset() {
 	*x = UpdateRuleResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[11]
+	mi := &file_room_v1_rules_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1129,7 +2795,7 @@ func (x *UpdateRuleResponse) String() string {
 func (*UpdateRuleResponse) ProtoMessage() {}
 
 func (x *UpdateRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[11]
+	mi := &file_room_v1_rules_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1142,7 +2808,7 @@ func (x *UpdateRuleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRuleResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRuleResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{11}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UpdateRuleResponse) GetRule() *Rule {
@@ -1161,7 +2827,7 @@ type DeleteRuleRequest struct {
 
 func (x *DeleteRuleRequest) Reset() {
 	*x = DeleteRuleRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[12]
+	mi := &file_room_v1_rules_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1173,7 +2839,7 @@ func (x *DeleteRuleRequest) String() string {
 func (*DeleteRuleRequest) ProtoMessage() {}
 
 func (x *DeleteRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[12]
+	mi := &file_room_v1_rules_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1186,7 +2852,7 @@ func (x *DeleteRuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRuleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRuleRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{12}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *DeleteRuleRequest) GetRuleId() string {
@@ -1205,7 +2871,7 @@ type DeleteRuleResponse struct {
 
 func (x *DeleteRuleResponse) Reset() {
 	*x = DeleteRuleResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[13]
+	mi := &file_room_v1_rules_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1217,7 +2883,7 @@ func (x *DeleteRuleResponse) String() string {
 func (*DeleteRuleResponse) ProtoMessage() {}
 
 func (x *DeleteRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[13]
+	mi := &file_room_v1_rules_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1230,7 +2896,7 @@ func (x *DeleteRuleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRuleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRuleResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{13}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *DeleteRuleResponse) GetDeleted() bool {
@@ -1250,7 +2916,7 @@ type ListRulesRequest struct {
 
 func (x *ListRulesRequest) Reset() {
 	*x = ListRulesRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[14]
+	mi := &file_room_v1_rules_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1262,7 +2928,7 @@ func (x *ListRulesRequest) String() string {
 func (*ListRulesRequest) ProtoMessage() {}
 
 func (x *ListRulesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[14]
+	mi := &file_room_v1_rules_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1275,7 +2941,7 @@ func (x *ListRulesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRulesRequest.ProtoReflect.Descriptor instead.
 func (*ListRulesRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{14}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListRulesRequest) GetContext() *EvaluationContext {
@@ -1301,7 +2967,7 @@ type ListRulesResponse struct {
 
 func (x *ListRulesResponse) Reset() {
 	*x = ListRulesResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[15]
+	mi := &file_room_v1_rules_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1313,7 +2979,7 @@ func (x *ListRulesResponse) String() string {
 func (*ListRulesResponse) ProtoMessage() {}
 
 func (x *ListRulesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[15]
+	mi := &file_room_v1_rules_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1326,7 +2992,7 @@ func (x *ListRulesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRulesResponse.ProtoReflect.Descriptor instead.
 func (*ListRulesResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{15}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListRulesResponse) GetRules() []*Rule {
@@ -1346,7 +3012,7 @@ type PreviewRulesetRequest struct {
 
 func (x *PreviewRulesetRequest) Reset() {
 	*x = PreviewRulesetRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[16]
+	mi := &file_room_v1_rules_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1358,7 +3024,7 @@ func (x *PreviewRulesetRequest) String() string {
 func (*PreviewRulesetRequest) ProtoMessage() {}
 
 func (x *PreviewRulesetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[16]
+	mi := &file_room_v1_rules_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1371,7 +3037,7 @@ func (x *PreviewRulesetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewRulesetRequest.ProtoReflect.Descriptor instead.
 func (*PreviewRulesetRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{16}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *PreviewRulesetRequest) GetRules() []*Rule {
@@ -1397,7 +3063,7 @@ type PreviewRulesetResponse struct {
 
 func (x *PreviewRulesetResponse) Reset() {
 	*x = PreviewRulesetResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[17]
+	mi := &file_room_v1_rules_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1409,7 +3075,7 @@ func (x *PreviewRulesetResponse) String() string {
 func (*PreviewRulesetResponse) ProtoMessage() {}
 
 func (x *PreviewRulesetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[17]
+	mi := &file_room_v1_rules_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1422,7 +3088,7 @@ func (x *PreviewRulesetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewRulesetResponse.ProtoReflect.Descriptor instead.
 func (*PreviewRulesetResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{17}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *PreviewRulesetResponse) GetResult() *EvaluationResult {
@@ -1442,7 +3108,7 @@ type PublishRulesetRequest struct {
 
 func (x *PublishRulesetRequest) Reset() {
 	*x = PublishRulesetRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[18]
+	mi := &file_room_v1_rules_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1454,7 +3120,7 @@ func (x *PublishRulesetRequest) String() string {
 func (*PublishRulesetRequest) ProtoMessage() {}
 
 func (x *PublishRulesetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[18]
+	mi := &file_room_v1_rules_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1467,7 +3133,7 @@ func (x *PublishRulesetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishRulesetRequest.ProtoReflect.Descriptor instead.
 func (*PublishRulesetRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{18}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *PublishRulesetRequest) GetAuthor() string {
@@ -1493,7 +3159,7 @@ type PublishRulesetResponse struct {
 
 func (x *PublishRulesetResponse) Reset() {
 	*x = PublishRulesetResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[19]
+	mi := &file_room_v1_rules_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1505,7 +3171,7 @@ func (x *PublishRulesetResponse) String() string {
 func (*PublishRulesetResponse) ProtoMessage() {}
 
 func (x *PublishRulesetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[19]
+	mi := &file_room_v1_rules_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1518,7 +3184,7 @@ func (x *PublishRulesetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishRulesetResponse.ProtoReflect.Descriptor instead.
 func (*PublishRulesetResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{19}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *PublishRulesetResponse) GetRuleset() *RulesetVersion {
@@ -1537,7 +3203,7 @@ type RollbackRulesetRequest struct {
 
 func (x *RollbackRulesetRequest) Reset() {
 	*x = RollbackRulesetRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[20]
+	mi := &file_room_v1_rules_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1549,7 +3215,7 @@ func (x *RollbackRulesetRequest) String() string {
 func (*RollbackRulesetRequest) ProtoMessage() {}
 
 func (x *RollbackRulesetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[20]
+	mi := &file_room_v1_rules_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1562,7 +3228,7 @@ func (x *RollbackRulesetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackRulesetRequest.ProtoReflect.Descriptor instead.
 func (*RollbackRulesetRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{20}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *RollbackRulesetRequest) GetVersion() int32 {
@@ -1581,7 +3247,7 @@ type RollbackRulesetResponse struct {
 
 func (x *RollbackRulesetResponse) Reset() {
 	*x = RollbackRulesetResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[21]
+	mi := &file_room_v1_rules_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1593,7 +3259,7 @@ func (x *RollbackRulesetResponse) String() string {
 func (*RollbackRulesetResponse) ProtoMessage() {}
 
 func (x *RollbackRulesetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[21]
+	mi := &file_room_v1_rules_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1606,12 +3272,276 @@ func (x *RollbackRulesetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackRulesetResponse.ProtoReflect.Descriptor instead.
 func (*RollbackRulesetResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{21}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *RollbackRulesetResponse) GetRuleset() *RulesetVersion {
 	if x != nil {
 		return x.Ruleset
+	}
+	return nil
+}
+
+type GetMcpPolicyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMcpPolicyRequest) Reset() {
+	*x = GetMcpPolicyRequest{}
+	mi := &file_room_v1_rules_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMcpPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMcpPolicyRequest) ProtoMessage() {}
+
+func (x *GetMcpPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMcpPolicyRequest.ProtoReflect.Descriptor instead.
+func (*GetMcpPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{37}
+}
+
+type GetMcpPolicyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Policy        *McpCompliancePolicy   `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMcpPolicyResponse) Reset() {
+	*x = GetMcpPolicyResponse{}
+	mi := &file_room_v1_rules_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMcpPolicyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMcpPolicyResponse) ProtoMessage() {}
+
+func (x *GetMcpPolicyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMcpPolicyResponse.ProtoReflect.Descriptor instead.
+func (*GetMcpPolicyResponse) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *GetMcpPolicyResponse) GetPolicy() *McpCompliancePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+type UpdateMcpPolicyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Policy        *McpCompliancePolicy   `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateMcpPolicyRequest) Reset() {
+	*x = UpdateMcpPolicyRequest{}
+	mi := &file_room_v1_rules_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateMcpPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateMcpPolicyRequest) ProtoMessage() {}
+
+func (x *UpdateMcpPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateMcpPolicyRequest.ProtoReflect.Descriptor instead.
+func (*UpdateMcpPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *UpdateMcpPolicyRequest) GetPolicy() *McpCompliancePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+type UpdateMcpPolicyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Policy        *McpCompliancePolicy   `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateMcpPolicyResponse) Reset() {
+	*x = UpdateMcpPolicyResponse{}
+	mi := &file_room_v1_rules_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateMcpPolicyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateMcpPolicyResponse) ProtoMessage() {}
+
+func (x *UpdateMcpPolicyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateMcpPolicyResponse.ProtoReflect.Descriptor instead.
+func (*UpdateMcpPolicyResponse) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *UpdateMcpPolicyResponse) GetPolicy() *McpCompliancePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+type ListAuditEventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Kind          AuditEventKind         `protobuf:"varint,2,opt,name=kind,proto3,enum=room.v1.AuditEventKind" json:"kind,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditEventsRequest) Reset() {
+	*x = ListAuditEventsRequest{}
+	mi := &file_room_v1_rules_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditEventsRequest) ProtoMessage() {}
+
+func (x *ListAuditEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditEventsRequest.ProtoReflect.Descriptor instead.
+func (*ListAuditEventsRequest) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *ListAuditEventsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListAuditEventsRequest) GetKind() AuditEventKind {
+	if x != nil {
+		return x.Kind
+	}
+	return AuditEventKind_AUDIT_EVENT_KIND_UNSPECIFIED
+}
+
+type ListAuditEventsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*AuditEvent          `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditEventsResponse) Reset() {
+	*x = ListAuditEventsResponse{}
+	mi := &file_room_v1_rules_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditEventsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditEventsResponse) ProtoMessage() {}
+
+func (x *ListAuditEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditEventsResponse.ProtoReflect.Descriptor instead.
+func (*ListAuditEventsResponse) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ListAuditEventsResponse) GetEvents() []*AuditEvent {
+	if x != nil {
+		return x.Events
 	}
 	return nil
 }
@@ -1625,7 +3555,7 @@ type RuleAdminServiceGetActiveRulesetRequest struct {
 
 func (x *RuleAdminServiceGetActiveRulesetRequest) Reset() {
 	*x = RuleAdminServiceGetActiveRulesetRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[22]
+	mi := &file_room_v1_rules_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1637,7 +3567,7 @@ func (x *RuleAdminServiceGetActiveRulesetRequest) String() string {
 func (*RuleAdminServiceGetActiveRulesetRequest) ProtoMessage() {}
 
 func (x *RuleAdminServiceGetActiveRulesetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[22]
+	mi := &file_room_v1_rules_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1650,7 +3580,7 @@ func (x *RuleAdminServiceGetActiveRulesetRequest) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use RuleAdminServiceGetActiveRulesetRequest.ProtoReflect.Descriptor instead.
 func (*RuleAdminServiceGetActiveRulesetRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{22}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *RuleAdminServiceGetActiveRulesetRequest) GetContext() *EvaluationContext {
@@ -1669,7 +3599,7 @@ type RuleAdminServiceGetActiveRulesetResponse struct {
 
 func (x *RuleAdminServiceGetActiveRulesetResponse) Reset() {
 	*x = RuleAdminServiceGetActiveRulesetResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[23]
+	mi := &file_room_v1_rules_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1681,7 +3611,7 @@ func (x *RuleAdminServiceGetActiveRulesetResponse) String() string {
 func (*RuleAdminServiceGetActiveRulesetResponse) ProtoMessage() {}
 
 func (x *RuleAdminServiceGetActiveRulesetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[23]
+	mi := &file_room_v1_rules_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1694,7 +3624,7 @@ func (x *RuleAdminServiceGetActiveRulesetResponse) ProtoReflect() protoreflect.M
 
 // Deprecated: Use RuleAdminServiceGetActiveRulesetResponse.ProtoReflect.Descriptor instead.
 func (*RuleAdminServiceGetActiveRulesetResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{23}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *RuleAdminServiceGetActiveRulesetResponse) GetRuleset() *RulesetVersion {
@@ -1713,7 +3643,7 @@ type AgentRulesServiceGetActiveRulesetRequest struct {
 
 func (x *AgentRulesServiceGetActiveRulesetRequest) Reset() {
 	*x = AgentRulesServiceGetActiveRulesetRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[24]
+	mi := &file_room_v1_rules_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1725,7 +3655,7 @@ func (x *AgentRulesServiceGetActiveRulesetRequest) String() string {
 func (*AgentRulesServiceGetActiveRulesetRequest) ProtoMessage() {}
 
 func (x *AgentRulesServiceGetActiveRulesetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[24]
+	mi := &file_room_v1_rules_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1738,7 +3668,7 @@ func (x *AgentRulesServiceGetActiveRulesetRequest) ProtoReflect() protoreflect.M
 
 // Deprecated: Use AgentRulesServiceGetActiveRulesetRequest.ProtoReflect.Descriptor instead.
 func (*AgentRulesServiceGetActiveRulesetRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{24}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *AgentRulesServiceGetActiveRulesetRequest) GetContext() *EvaluationContext {
@@ -1757,7 +3687,7 @@ type AgentRulesServiceGetActiveRulesetResponse struct {
 
 func (x *AgentRulesServiceGetActiveRulesetResponse) Reset() {
 	*x = AgentRulesServiceGetActiveRulesetResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[25]
+	mi := &file_room_v1_rules_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1769,7 +3699,7 @@ func (x *AgentRulesServiceGetActiveRulesetResponse) String() string {
 func (*AgentRulesServiceGetActiveRulesetResponse) ProtoMessage() {}
 
 func (x *AgentRulesServiceGetActiveRulesetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[25]
+	mi := &file_room_v1_rules_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1782,7 +3712,7 @@ func (x *AgentRulesServiceGetActiveRulesetResponse) ProtoReflect() protoreflect.
 
 // Deprecated: Use AgentRulesServiceGetActiveRulesetResponse.ProtoReflect.Descriptor instead.
 func (*AgentRulesServiceGetActiveRulesetResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{25}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *AgentRulesServiceGetActiveRulesetResponse) GetRuleset() *RulesetVersion {
@@ -1802,7 +3732,7 @@ type WatchRulesetRequest struct {
 
 func (x *WatchRulesetRequest) Reset() {
 	*x = WatchRulesetRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[26]
+	mi := &file_room_v1_rules_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1814,7 +3744,7 @@ func (x *WatchRulesetRequest) String() string {
 func (*WatchRulesetRequest) ProtoMessage() {}
 
 func (x *WatchRulesetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[26]
+	mi := &file_room_v1_rules_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1827,7 +3757,7 @@ func (x *WatchRulesetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRulesetRequest.ProtoReflect.Descriptor instead.
 func (*WatchRulesetRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{26}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *WatchRulesetRequest) GetContext() *EvaluationContext {
@@ -1853,7 +3783,7 @@ type WatchRulesetResponse struct {
 
 func (x *WatchRulesetResponse) Reset() {
 	*x = WatchRulesetResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[27]
+	mi := &file_room_v1_rules_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1865,7 +3795,7 @@ func (x *WatchRulesetResponse) String() string {
 func (*WatchRulesetResponse) ProtoMessage() {}
 
 func (x *WatchRulesetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[27]
+	mi := &file_room_v1_rules_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1878,7 +3808,7 @@ func (x *WatchRulesetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRulesetResponse.ProtoReflect.Descriptor instead.
 func (*WatchRulesetResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{27}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *WatchRulesetResponse) GetRuleset() *RulesetVersion {
@@ -1897,7 +3827,7 @@ type EvaluatePlanRequest struct {
 
 func (x *EvaluatePlanRequest) Reset() {
 	*x = EvaluatePlanRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[28]
+	mi := &file_room_v1_rules_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1909,7 +3839,7 @@ func (x *EvaluatePlanRequest) String() string {
 func (*EvaluatePlanRequest) ProtoMessage() {}
 
 func (x *EvaluatePlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[28]
+	mi := &file_room_v1_rules_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1922,7 +3852,7 @@ func (x *EvaluatePlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluatePlanRequest.ProtoReflect.Descriptor instead.
 func (*EvaluatePlanRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{28}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *EvaluatePlanRequest) GetInput() *EvaluationInput {
@@ -1941,7 +3871,7 @@ type EvaluatePlanResponse struct {
 
 func (x *EvaluatePlanResponse) Reset() {
 	*x = EvaluatePlanResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[29]
+	mi := &file_room_v1_rules_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1953,7 +3883,7 @@ func (x *EvaluatePlanResponse) String() string {
 func (*EvaluatePlanResponse) ProtoMessage() {}
 
 func (x *EvaluatePlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[29]
+	mi := &file_room_v1_rules_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1966,7 +3896,7 @@ func (x *EvaluatePlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluatePlanResponse.ProtoReflect.Descriptor instead.
 func (*EvaluatePlanResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{29}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *EvaluatePlanResponse) GetResult() *EvaluationResult {
@@ -1985,7 +3915,7 @@ type EvaluateDiffRequest struct {
 
 func (x *EvaluateDiffRequest) Reset() {
 	*x = EvaluateDiffRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[30]
+	mi := &file_room_v1_rules_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1997,7 +3927,7 @@ func (x *EvaluateDiffRequest) String() string {
 func (*EvaluateDiffRequest) ProtoMessage() {}
 
 func (x *EvaluateDiffRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[30]
+	mi := &file_room_v1_rules_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2010,7 +3940,7 @@ func (x *EvaluateDiffRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateDiffRequest.ProtoReflect.Descriptor instead.
 func (*EvaluateDiffRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{30}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *EvaluateDiffRequest) GetInput() *EvaluationInput {
@@ -2029,7 +3959,7 @@ type EvaluateDiffResponse struct {
 
 func (x *EvaluateDiffResponse) Reset() {
 	*x = EvaluateDiffResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[31]
+	mi := &file_room_v1_rules_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2041,7 +3971,7 @@ func (x *EvaluateDiffResponse) String() string {
 func (*EvaluateDiffResponse) ProtoMessage() {}
 
 func (x *EvaluateDiffResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[31]
+	mi := &file_room_v1_rules_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2054,7 +3984,7 @@ func (x *EvaluateDiffResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateDiffResponse.ProtoReflect.Descriptor instead.
 func (*EvaluateDiffResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{31}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *EvaluateDiffResponse) GetResult() *EvaluationResult {
@@ -2062,6 +3992,110 @@ func (x *EvaluateDiffResponse) GetResult() *EvaluationResult {
 		return x.Result
 	}
 	return nil
+}
+
+type EvaluateMcpInvocationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Context       *EvaluationContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
+	Invocation    *McpInvocation         `protobuf:"bytes,2,opt,name=invocation,proto3" json:"invocation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EvaluateMcpInvocationRequest) Reset() {
+	*x = EvaluateMcpInvocationRequest{}
+	mi := &file_room_v1_rules_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluateMcpInvocationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluateMcpInvocationRequest) ProtoMessage() {}
+
+func (x *EvaluateMcpInvocationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluateMcpInvocationRequest.ProtoReflect.Descriptor instead.
+func (*EvaluateMcpInvocationRequest) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *EvaluateMcpInvocationRequest) GetContext() *EvaluationContext {
+	if x != nil {
+		return x.Context
+	}
+	return nil
+}
+
+func (x *EvaluateMcpInvocationRequest) GetInvocation() *McpInvocation {
+	if x != nil {
+		return x.Invocation
+	}
+	return nil
+}
+
+type EvaluateMcpInvocationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Decision      *McpInvocationDecision `protobuf:"bytes,1,opt,name=decision,proto3" json:"decision,omitempty"`
+	AuditEventId  string                 `protobuf:"bytes,2,opt,name=audit_event_id,json=auditEventId,proto3" json:"audit_event_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EvaluateMcpInvocationResponse) Reset() {
+	*x = EvaluateMcpInvocationResponse{}
+	mi := &file_room_v1_rules_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluateMcpInvocationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluateMcpInvocationResponse) ProtoMessage() {}
+
+func (x *EvaluateMcpInvocationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_room_v1_rules_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluateMcpInvocationResponse.ProtoReflect.Descriptor instead.
+func (*EvaluateMcpInvocationResponse) Descriptor() ([]byte, []int) {
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *EvaluateMcpInvocationResponse) GetDecision() *McpInvocationDecision {
+	if x != nil {
+		return x.Decision
+	}
+	return nil
+}
+
+func (x *EvaluateMcpInvocationResponse) GetAuditEventId() string {
+	if x != nil {
+		return x.AuditEventId
+	}
+	return ""
 }
 
 type ReportEvaluationRequest struct {
@@ -2075,7 +4109,7 @@ type ReportEvaluationRequest struct {
 
 func (x *ReportEvaluationRequest) Reset() {
 	*x = ReportEvaluationRequest{}
-	mi := &file_room_v1_rules_proto_msgTypes[32]
+	mi := &file_room_v1_rules_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2087,7 +4121,7 @@ func (x *ReportEvaluationRequest) String() string {
 func (*ReportEvaluationRequest) ProtoMessage() {}
 
 func (x *ReportEvaluationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[32]
+	mi := &file_room_v1_rules_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2100,7 +4134,7 @@ func (x *ReportEvaluationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportEvaluationRequest.ProtoReflect.Descriptor instead.
 func (*ReportEvaluationRequest) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{32}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *ReportEvaluationRequest) GetResult() *EvaluationResult {
@@ -2133,7 +4167,7 @@ type ReportEvaluationResponse struct {
 
 func (x *ReportEvaluationResponse) Reset() {
 	*x = ReportEvaluationResponse{}
-	mi := &file_room_v1_rules_proto_msgTypes[33]
+	mi := &file_room_v1_rules_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2145,7 +4179,7 @@ func (x *ReportEvaluationResponse) String() string {
 func (*ReportEvaluationResponse) ProtoMessage() {}
 
 func (x *ReportEvaluationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[33]
+	mi := &file_room_v1_rules_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2158,7 +4192,7 @@ func (x *ReportEvaluationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportEvaluationResponse.ProtoReflect.Descriptor instead.
 func (*ReportEvaluationResponse) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{33}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *ReportEvaluationResponse) GetAccepted() bool {
@@ -2169,18 +4203,19 @@ func (x *ReportEvaluationResponse) GetAccepted() bool {
 }
 
 type StoreSnapshot struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DraftRules    []*Rule                `protobuf:"bytes,1,rep,name=draft_rules,json=draftRules,proto3" json:"draft_rules,omitempty"`
-	Versions      []*RulesetVersion      `protobuf:"bytes,2,rep,name=versions,proto3" json:"versions,omitempty"`
-	ActiveVersion int32                  `protobuf:"varint,3,opt,name=active_version,json=activeVersion,proto3" json:"active_version,omitempty"`
-	NextVersion   int32                  `protobuf:"varint,4,opt,name=next_version,json=nextVersion,proto3" json:"next_version,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	DraftRules     []*Rule                `protobuf:"bytes,1,rep,name=draft_rules,json=draftRules,proto3" json:"draft_rules,omitempty"`
+	Versions       []*RulesetVersion      `protobuf:"bytes,2,rep,name=versions,proto3" json:"versions,omitempty"`
+	ActiveVersion  int32                  `protobuf:"varint,3,opt,name=active_version,json=activeVersion,proto3" json:"active_version,omitempty"`
+	NextVersion    int32                  `protobuf:"varint,4,opt,name=next_version,json=nextVersion,proto3" json:"next_version,omitempty"`
+	DraftMcpPolicy *McpCompliancePolicy   `protobuf:"bytes,5,opt,name=draft_mcp_policy,json=draftMcpPolicy,proto3" json:"draft_mcp_policy,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *StoreSnapshot) Reset() {
 	*x = StoreSnapshot{}
-	mi := &file_room_v1_rules_proto_msgTypes[34]
+	mi := &file_room_v1_rules_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2192,7 +4227,7 @@ func (x *StoreSnapshot) String() string {
 func (*StoreSnapshot) ProtoMessage() {}
 
 func (x *StoreSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_room_v1_rules_proto_msgTypes[34]
+	mi := &file_room_v1_rules_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2205,7 +4240,7 @@ func (x *StoreSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoreSnapshot.ProtoReflect.Descriptor instead.
 func (*StoreSnapshot) Descriptor() ([]byte, []int) {
-	return file_room_v1_rules_proto_rawDescGZIP(), []int{34}
+	return file_room_v1_rules_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *StoreSnapshot) GetDraftRules() []*Rule {
@@ -2236,6 +4271,13 @@ func (x *StoreSnapshot) GetNextVersion() int32 {
 	return 0
 }
 
+func (x *StoreSnapshot) GetDraftMcpPolicy() *McpCompliancePolicy {
+	if x != nil {
+		return x.DraftMcpPolicy
+	}
+	return nil
+}
+
 var File_room_v1_rules_proto protoreflect.FileDescriptor
 
 const file_room_v1_rules_proto_rawDesc = "" +
@@ -2260,7 +4302,77 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"expression\x12\x1d\n" +
 	"\n" +
 	"file_globs\x18\x03 \x03(\tR\tfileGlobs\x12\x18\n" +
-	"\amessage\x18\x04 \x01(\tR\amessage\"\xdc\x03\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"g\n" +
+	"\x0eSourceLocation\x12\x1b\n" +
+	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x1d\n" +
+	"\n" +
+	"start_line\x18\x03 \x01(\x05R\tstartLine\x12\x19\n" +
+	"\bend_line\x18\x04 \x01(\x05R\aendLine\"x\n" +
+	"\vArtifactRef\x12,\n" +
+	"\x05phase\x18\x01 \x01(\x0e2\x16.room.v1.AnalysisPhaseR\x05phase\x12\x16\n" +
+	"\x06sha256\x18\x02 \x01(\fR\x06sha256\x12#\n" +
+	"\rchanged_files\x18\x03 \x03(\tR\fchangedFiles\"a\n" +
+	"\x10AnalyzerIdentity\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12#\n" +
+	"\rconfig_sha256\x18\x03 \x01(\fR\fconfigSha256\"\xa8\x02\n" +
+	"\x0eSecuritySignal\x12'\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\x13.room.v1.SignalKindR\x04kind\x12 \n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\x125\n" +
+	"\banalyzer\x18\x03 \x01(\v2\x19.room.v1.AnalyzerIdentityR\banalyzer\x123\n" +
+	"\blocation\x18\x04 \x01(\v2\x17.room.v1.SourceLocationR\blocation\x126\n" +
+	"\x17confidence_basis_points\x18\x05 \x01(\rR\x15confidenceBasisPoints\x12'\n" +
+	"\x0fevidence_sha256\x18\x06 \x01(\fR\x0eevidenceSha256\"\xb0\x02\n" +
+	"\x0fAnalyzerReceipt\x125\n" +
+	"\banalyzer\x18\x01 \x01(\v2\x19.room.v1.AnalyzerIdentityR\banalyzer\x12/\n" +
+	"\x06status\x18\x02 \x01(\x0e2\x17.room.v1.AnalysisStatusR\x06status\x12<\n" +
+	"\x0fcovered_signals\x18\x03 \x03(\x0e2\x13.room.v1.SignalKindR\x0ecoveredSignals\x121\n" +
+	"\asignals\x18\x04 \x03(\v2\x17.room.v1.SecuritySignalR\asignals\x12!\n" +
+	"\ffailure_code\x18\x05 \x01(\tR\vfailureCode\x12!\n" +
+	"\finput_sha256\x18\x06 \x01(\fR\vinputSha256\"\xc6\x01\n" +
+	"\x0eAnalysisReport\x12\x1b\n" +
+	"\treport_id\x18\x01 \x01(\tR\breportId\x120\n" +
+	"\bartifact\x18\x02 \x01(\v2\x14.room.v1.ArtifactRefR\bartifact\x12/\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x17.room.v1.AnalysisStatusR\x06status\x124\n" +
+	"\breceipts\x18\x04 \x03(\v2\x18.room.v1.AnalyzerReceiptR\breceipts\"\xb4\x01\n" +
+	"\x0eSignalSelector\x12+\n" +
+	"\x06signal\x18\x01 \x01(\x0e2\x13.room.v1.SignalKindR\x06signal\x12.\n" +
+	"\x06phases\x18\x02 \x03(\x0e2\x16.room.v1.AnalysisPhaseR\x06phases\x12E\n" +
+	"\x1fminimum_confidence_basis_points\x18\x03 \x01(\rR\x1cminimumConfidenceBasisPoints\"\xc0\x01\n" +
+	"\rEvaluationGap\x12<\n" +
+	"\x0frequired_signal\x18\x01 \x01(\x0e2\x13.room.v1.SignalKindR\x0erequiredSignal\x12\x1f\n" +
+	"\vanalyzer_id\x18\x02 \x01(\tR\n" +
+	"analyzerId\x12/\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x17.room.v1.AnalysisStatusR\x06status\x12\x1f\n" +
+	"\vreason_code\x18\x04 \x01(\tR\n" +
+	"reasonCode\"K\n" +
+	"\x0fMcpToolSelector\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x1b\n" +
+	"\ttool_name\x18\x02 \x01(\tR\btoolName\"\xa1\x02\n" +
+	"\x13McpCompliancePolicy\x12.\n" +
+	"\x04mode\x18\x01 \x01(\x0e2\x1a.room.v1.McpComplianceModeR\x04mode\x126\n" +
+	"\tselectors\x18\x02 \x03(\v2\x18.room.v1.McpToolSelectorR\tselectors\x12#\n" +
+	"\raudit_allowed\x18\x03 \x01(\bR\fauditAllowed\x122\n" +
+	"\x15deny_unknown_identity\x18\x04 \x01(\bR\x13denyUnknownIdentity\x12I\n" +
+	"\x11provider_bindings\x18\x05 \x03(\v2\x1c.room.v1.ProviderToolBindingR\x10providerBindings\"\xac\x01\n" +
+	"\x13ProviderToolBinding\x121\n" +
+	"\bprovider\x18\x01 \x01(\x0e2\x15.room.v1.HookProviderR\bprovider\x12(\n" +
+	"\x10provider_tool_id\x18\x02 \x01(\tR\x0eproviderToolId\x12\x1b\n" +
+	"\tserver_id\x18\x03 \x01(\tR\bserverId\x12\x1b\n" +
+	"\ttool_name\x18\x04 \x01(\tR\btoolName\"\xab\x02\n" +
+	"\rMcpInvocation\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x1b\n" +
+	"\ttool_name\x18\x02 \x01(\tR\btoolName\x12\x1c\n" +
+	"\ttransport\x18\x03 \x01(\tR\ttransport\x12\x1a\n" +
+	"\bendpoint\x18\x04 \x01(\tR\bendpoint\x121\n" +
+	"\bprovider\x18\x05 \x01(\x0e2\x15.room.v1.HookProviderR\bprovider\x12(\n" +
+	"\x10provider_tool_id\x18\x06 \x01(\tR\x0eproviderToolId\x12I\n" +
+	"\x12identity_assurance\x18\a \x01(\x0e2\x1a.room.v1.IdentityAssuranceR\x11identityAssurance\"\x97\x01\n" +
+	"\x15McpInvocationDecision\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\x12\x1f\n" +
+	"\vreason_code\x18\x02 \x01(\tR\n" +
+	"reasonCode\x12C\n" +
+	"\x10matched_selector\x18\x03 \x01(\v2\x18.room.v1.McpToolSelectorR\x0fmatchedSelector\"\xd3\x04\n" +
 	"\x04Rule\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -2277,7 +4389,9 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x90\x02\n" +
+	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
+	"\btriggers\x18\x0e \x03(\v2\x17.room.v1.SignalSelectorR\btriggers\x12@\n" +
+	"\x11required_coverage\x18\x0f \x03(\x0e2\x13.room.v1.SignalKindR\x10requiredCoverage\"\xb6\x03\n" +
 	"\x0eRulesetVersion\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x05R\aversion\x12\x12\n" +
@@ -2286,7 +4400,23 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x05rules\x18\x05 \x03(\v2\r.room.v1.RuleR\x05rules\x12\x16\n" +
 	"\x06author\x18\x06 \x01(\tR\x06author\x12\x14\n" +
 	"\x05notes\x18\a \x01(\tR\x05notes\x12=\n" +
-	"\fpublished_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vpublishedAt\"\xea\x01\n" +
+	"\fpublished_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vpublishedAt\x12;\n" +
+	"\n" +
+	"mcp_policy\x18\t \x01(\v2\x1c.room.v1.McpCompliancePolicyR\tmcpPolicy\x12F\n" +
+	"\x10authorized_scope\x18\n" +
+	" \x01(\v2\x1b.room.v1.AuthorizationScopeR\x0fauthorizedScope\x12\x1f\n" +
+	"\vsource_hash\x18\v \x01(\tR\n" +
+	"sourceHash\"\xba\x01\n" +
+	"\x12AuthorizationScope\x12#\n" +
+	"\rcredential_id\x18\x01 \x01(\tR\fcredentialId\x12\x1d\n" +
+	"\n" +
+	"subject_id\x18\x02 \x01(\tR\tsubjectId\x12!\n" +
+	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\x12\x1e\n" +
+	"\n" +
+	"repository\x18\x04 \x01(\tR\n" +
+	"repository\x12\x1d\n" +
+	"\n" +
+	"agent_type\x18\x05 \x01(\tR\tagentType\"\x89\x02\n" +
 	"\x11EvaluationContext\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1e\n" +
 	"\n" +
@@ -2299,11 +4429,14 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\tlanguages\x18\x06 \x03(\tR\tlanguages\x12\x1e\n" +
 	"\n" +
 	"frameworks\x18\a \x03(\tR\n" +
-	"frameworks\"o\n" +
+	"frameworks\x12\x1d\n" +
+	"\n" +
+	"subject_id\x18\b \x01(\tR\tsubjectId\"\x9d\x01\n" +
 	"\x0fEvaluationInput\x124\n" +
 	"\acontext\x18\x01 \x01(\v2\x1a.room.v1.EvaluationContextR\acontext\x12\x12\n" +
 	"\x04plan\x18\x02 \x01(\tR\x04plan\x12\x12\n" +
-	"\x04diff\x18\x03 \x01(\tR\x04diff\"\xe6\x01\n" +
+	"\x04diff\x18\x03 \x01(\tR\x04diff\x12,\n" +
+	"\x05phase\x18\x04 \x01(\x0e2\x16.room.v1.AnalysisPhaseR\x05phase\"\xe6\x01\n" +
 	"\tRuleMatch\x12\x17\n" +
 	"\arule_id\x18\x01 \x01(\tR\x06ruleId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12-\n" +
@@ -2311,7 +4444,7 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\amessage\x18\x04 \x01(\tR\amessage\x12\x12\n" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12+\n" +
 	"\x11required_evidence\x18\x06 \x03(\tR\x10requiredEvidence\x12 \n" +
-	"\vremediation\x18\a \x03(\tR\vremediation\"\xc1\x02\n" +
+	"\vremediation\x18\a \x03(\tR\vremediation\"\xe4\x04\n" +
 	"\x10EvaluationResult\x12-\n" +
 	"\bdecision\x18\x01 \x01(\x0e2\x11.room.v1.DecisionR\bdecision\x12<\n" +
 	"\x10highest_severity\x18\x02 \x01(\x0e2\x11.room.v1.SeverityR\x0fhighestSeverity\x12,\n" +
@@ -2320,7 +4453,40 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\n" +
 	"ruleset_id\x18\x05 \x01(\tR\trulesetId\x12'\n" +
 	"\x0fruleset_version\x18\x06 \x01(\x05R\x0erulesetVersion\x12!\n" +
-	"\fruleset_hash\x18\a \x01(\tR\vrulesetHash\"6\n" +
+	"\fruleset_hash\x18\a \x01(\tR\vrulesetHash\x12@\n" +
+	"\x0fanalysis_status\x18\b \x01(\x0e2\x17.room.v1.AnalysisStatusR\x0eanalysisStatus\x12$\n" +
+	"\x0eaudit_event_id\x18\t \x01(\tR\fauditEventId\x12E\n" +
+	"\x11analyzer_receipts\x18\n" +
+	" \x03(\v2\x18.room.v1.AnalyzerReceiptR\x10analyzerReceipts\x12*\n" +
+	"\x04gaps\x18\v \x03(\v2\x16.room.v1.EvaluationGapR\x04gaps\x12!\n" +
+	"\finput_sha256\x18\f \x01(\fR\vinputSha256\x12#\n" +
+	"\revaluation_id\x18\r \x01(\tR\fevaluationId\"\xab\x05\n" +
+	"\n" +
+	"AuditEvent\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\x17.room.v1.AuditEventKindR\x04kind\x12;\n" +
+	"\voccurred_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\x12\x1d\n" +
+	"\n" +
+	"subject_id\x18\x04 \x01(\tR\tsubjectId\x12!\n" +
+	"\fworkspace_id\x18\x05 \x01(\tR\vworkspaceId\x12\x1e\n" +
+	"\n" +
+	"repository\x18\x06 \x01(\tR\n" +
+	"repository\x12\x1d\n" +
+	"\n" +
+	"agent_type\x18\a \x01(\tR\tagentType\x12\x1d\n" +
+	"\n" +
+	"ruleset_id\x18\b \x01(\tR\trulesetId\x12'\n" +
+	"\x0fruleset_version\x18\t \x01(\x05R\x0erulesetVersion\x12!\n" +
+	"\fruleset_hash\x18\n" +
+	" \x01(\tR\vrulesetHash\x12-\n" +
+	"\bdecision\x18\v \x01(\x0e2\x11.room.v1.DecisionR\bdecision\x12<\n" +
+	"\x10highest_severity\x18\f \x01(\x0e2\x11.room.v1.SeverityR\x0fhighestSeverity\x12@\n" +
+	"\x0fanalysis_status\x18\r \x01(\x0e2\x17.room.v1.AnalysisStatusR\x0eanalysisStatus\x12=\n" +
+	"\x0emcp_invocation\x18\x0e \x01(\v2\x16.room.v1.McpInvocationR\rmcpInvocation\x12\x1f\n" +
+	"\vreason_code\x18\x0f \x01(\tR\n" +
+	"reasonCode\x12(\n" +
+	"\x10matched_rule_ids\x18\x10 \x03(\tR\x0ematchedRuleIds\"6\n" +
 	"\x11CreateRuleRequest\x12!\n" +
 	"\x04rule\x18\x01 \x01(\v2\r.room.v1.RuleR\x04rule\"7\n" +
 	"\x12CreateRuleResponse\x12!\n" +
@@ -2351,7 +4517,19 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x16RollbackRulesetRequest\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\"L\n" +
 	"\x17RollbackRulesetResponse\x121\n" +
-	"\aruleset\x18\x01 \x01(\v2\x17.room.v1.RulesetVersionR\aruleset\"_\n" +
+	"\aruleset\x18\x01 \x01(\v2\x17.room.v1.RulesetVersionR\aruleset\"\x15\n" +
+	"\x13GetMcpPolicyRequest\"L\n" +
+	"\x14GetMcpPolicyResponse\x124\n" +
+	"\x06policy\x18\x01 \x01(\v2\x1c.room.v1.McpCompliancePolicyR\x06policy\"N\n" +
+	"\x16UpdateMcpPolicyRequest\x124\n" +
+	"\x06policy\x18\x01 \x01(\v2\x1c.room.v1.McpCompliancePolicyR\x06policy\"O\n" +
+	"\x17UpdateMcpPolicyResponse\x124\n" +
+	"\x06policy\x18\x01 \x01(\v2\x1c.room.v1.McpCompliancePolicyR\x06policy\"[\n" +
+	"\x16ListAuditEventsRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12+\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\x17.room.v1.AuditEventKindR\x04kind\"F\n" +
+	"\x17ListAuditEventsResponse\x12+\n" +
+	"\x06events\x18\x01 \x03(\v2\x13.room.v1.AuditEventR\x06events\"_\n" +
 	"'RuleAdminServiceGetActiveRulesetRequest\x124\n" +
 	"\acontext\x18\x01 \x01(\v2\x1a.room.v1.EvaluationContextR\acontext\"]\n" +
 	"(RuleAdminServiceGetActiveRulesetResponse\x121\n" +
@@ -2372,33 +4550,43 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x13EvaluateDiffRequest\x12.\n" +
 	"\x05input\x18\x01 \x01(\v2\x18.room.v1.EvaluationInputR\x05input\"I\n" +
 	"\x14EvaluateDiffResponse\x121\n" +
-	"\x06result\x18\x01 \x01(\v2\x19.room.v1.EvaluationResultR\x06result\"\x88\x01\n" +
+	"\x06result\x18\x01 \x01(\v2\x19.room.v1.EvaluationResultR\x06result\"\x8c\x01\n" +
+	"\x1cEvaluateMcpInvocationRequest\x124\n" +
+	"\acontext\x18\x01 \x01(\v2\x1a.room.v1.EvaluationContextR\acontext\x126\n" +
+	"\n" +
+	"invocation\x18\x02 \x01(\v2\x16.room.v1.McpInvocationR\n" +
+	"invocation\"\x81\x01\n" +
+	"\x1dEvaluateMcpInvocationResponse\x12:\n" +
+	"\bdecision\x18\x01 \x01(\v2\x1e.room.v1.McpInvocationDecisionR\bdecision\x12$\n" +
+	"\x0eaudit_event_id\x18\x02 \x01(\tR\fauditEventId\"\x88\x01\n" +
 	"\x17ReportEvaluationRequest\x121\n" +
 	"\x06result\x18\x01 \x01(\v2\x19.room.v1.EvaluationResultR\x06result\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x1b\n" +
 	"\ttool_name\x18\x03 \x01(\tR\btoolName\"6\n" +
 	"\x18ReportEvaluationResponse\x12\x1a\n" +
-	"\baccepted\x18\x01 \x01(\bR\baccepted\"\xbe\x01\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\"\x86\x02\n" +
 	"\rStoreSnapshot\x12.\n" +
 	"\vdraft_rules\x18\x01 \x03(\v2\r.room.v1.RuleR\n" +
 	"draftRules\x123\n" +
 	"\bversions\x18\x02 \x03(\v2\x17.room.v1.RulesetVersionR\bversions\x12%\n" +
 	"\x0eactive_version\x18\x03 \x01(\x05R\ractiveVersion\x12!\n" +
-	"\fnext_version\x18\x04 \x01(\x05R\vnextVersion*\x88\x01\n" +
+	"\fnext_version\x18\x04 \x01(\x05R\vnextVersion\x12F\n" +
+	"\x10draft_mcp_policy\x18\x05 \x01(\v2\x1c.room.v1.McpCompliancePolicyR\x0edraftMcpPolicy*\x88\x01\n" +
 	"\bSeverity\x12\x18\n" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rSEVERITY_INFO\x10\x01\x12\x10\n" +
 	"\fSEVERITY_LOW\x10\x02\x12\x13\n" +
 	"\x0fSEVERITY_MEDIUM\x10\x03\x12\x11\n" +
 	"\rSEVERITY_HIGH\x10\x04\x12\x15\n" +
-	"\x11SEVERITY_CRITICAL\x10\x05*z\n" +
+	"\x11SEVERITY_CRITICAL\x10\x05*\x96\x01\n" +
 	"\bDecision\x12\x18\n" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eDECISION_ALLOW\x10\x01\x12\x11\n" +
 	"\rDECISION_WARN\x10\x02\x12\x1a\n" +
 	"\x16DECISION_NEEDS_CHANGES\x10\x03\x12\x11\n" +
-	"\rDECISION_DENY\x10\x04*\xc3\x01\n" +
+	"\rDECISION_DENY\x10\x04\x12\x1a\n" +
+	"\x16DECISION_INDETERMINATE\x10\x05*\xc3\x01\n" +
 	"\tCheckKind\x12\x1a\n" +
 	"\x16CHECK_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14CHECK_KIND_PLAN_TEXT\x10\x01\x12\x18\n" +
@@ -2406,12 +4594,70 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x14CHECK_KIND_FILE_PATH\x10\x03\x12\x1a\n" +
 	"\x16CHECK_KIND_AST_PATTERN\x10\x04\x12\x16\n" +
 	"\x12CHECK_KIND_SEMGREP\x10\x05\x12\x18\n" +
-	"\x14CHECK_KIND_HEURISTIC\x10\x06*\x81\x01\n" +
+	"\x14CHECK_KIND_HEURISTIC\x10\x06*a\n" +
+	"\rAnalysisPhase\x12\x1e\n" +
+	"\x1aANALYSIS_PHASE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13ANALYSIS_PHASE_PLAN\x10\x01\x12\x17\n" +
+	"\x13ANALYSIS_PHASE_DIFF\x10\x02*\xe5\x01\n" +
+	"\x0eAnalysisStatus\x12\x1f\n" +
+	"\x1bANALYSIS_STATUS_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18ANALYSIS_STATUS_COMPLETE\x10\x01\x12\x1b\n" +
+	"\x17ANALYSIS_STATUS_PARTIAL\x10\x02\x12\x1f\n" +
+	"\x1bANALYSIS_STATUS_UNAVAILABLE\x10\x03\x12\x1a\n" +
+	"\x16ANALYSIS_STATUS_FAILED\x10\x04\x12\x1b\n" +
+	"\x17ANALYSIS_STATUS_INVALID\x10\x05\x12\x1d\n" +
+	"\x19ANALYSIS_STATUS_UNTRUSTED\x10\x06*\xfc\x06\n" +
+	"\n" +
+	"SignalKind\x12\x1b\n" +
+	"\x17SIGNAL_KIND_UNSPECIFIED\x10\x00\x123\n" +
+	"/SIGNAL_KIND_TENANT_ACCESS_WITHOUT_TRUSTED_SCOPE\x10\x01\x125\n" +
+	"1SIGNAL_KIND_PROTECTED_ACCESS_WITHOUT_AUTH_CONTEXT\x10\x02\x12\x1e\n" +
+	"\x1aSIGNAL_KIND_SECRET_LITERAL\x10\x03\x120\n" +
+	",SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT\x10\x04\x12.\n" +
+	"*SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION\x10\x05\x120\n" +
+	",SIGNAL_KIND_PRIVILEGE_MUTATION_WITHOUT_AUDIT\x10\x06\x12 \n" +
+	"\x1cSIGNAL_KIND_UNSIGNED_WEBHOOK\x10\a\x120\n" +
+	",SIGNAL_KIND_PASSWORD_PERSISTENCE_WITHOUT_KDF\x10\b\x129\n" +
+	"5SIGNAL_KIND_PUBLIC_CREDENTIAL_FLOW_WITHOUT_RATE_LIMIT\x10\t\x12%\n" +
+	"!SIGNAL_KIND_DESTRUCTIVE_OPERATION\x10\n" +
+	"\x123\n" +
+	"/SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT\x10\v\x12*\n" +
+	"&SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH\x10\f\x124\n" +
+	"0SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT\x10\r\x12(\n" +
+	"$SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET\x10\x0e\x12#\n" +
+	"\x1fSIGNAL_KIND_RUST_UNTRUSTED_PATH\x10\x0f\x12)\n" +
+	"%SIGNAL_KIND_RUST_PANIC_IN_LIBRARY_API\x10\x10\x12/\n" +
+	"+SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT\x10\x11\x129\n" +
+	"5SIGNAL_KIND_RUST_UNVALIDATED_EXTERNAL_DESERIALIZATION\x10\x12*\xa0\x01\n" +
+	"\x11McpComplianceMode\x12#\n" +
+	"\x1fMCP_COMPLIANCE_MODE_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cMCP_COMPLIANCE_MODE_DISABLED\x10\x01\x12!\n" +
+	"\x1dMCP_COMPLIANCE_MODE_ALLOWLIST\x10\x02\x12!\n" +
+	"\x1dMCP_COMPLIANCE_MODE_BLOCKLIST\x10\x03*\x91\x02\n" +
+	"\x0eAuditEventKind\x12 \n" +
+	"\x1cAUDIT_EVENT_KIND_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bAUDIT_EVENT_KIND_EVALUATION\x10\x01\x12#\n" +
+	"\x1fAUDIT_EVENT_KIND_MCP_INVOCATION\x10\x02\x12&\n" +
+	"\"AUDIT_EVENT_KIND_RULESET_PUBLISHED\x10\x03\x12(\n" +
+	"$AUDIT_EVENT_KIND_RULESET_ROLLED_BACK\x10\x04\x12#\n" +
+	"\x1fAUDIT_EVENT_KIND_POLICY_UPDATED\x10\x05\x12 \n" +
+	"\x1cAUDIT_EVENT_KIND_AUTH_DENIED\x10\x06*\x9c\x01\n" +
+	"\fHookProvider\x12\x1d\n" +
+	"\x19HOOK_PROVIDER_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19HOOK_PROVIDER_CLAUDE_CODE\x10\x01\x12\x17\n" +
+	"\x13HOOK_PROVIDER_CODEX\x10\x02\x12\x18\n" +
+	"\x14HOOK_PROVIDER_CURSOR\x10\x03\x12\x1b\n" +
+	"\x17HOOK_PROVIDER_MCP_PROXY\x10\x04*\xaa\x01\n" +
+	"\x11IdentityAssurance\x12\"\n" +
+	"\x1eIDENTITY_ASSURANCE_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dIDENTITY_ASSURANCE_UNVERIFIED\x10\x01\x12#\n" +
+	"\x1fIDENTITY_ASSURANCE_CONFIG_BOUND\x10\x02\x12)\n" +
+	"%IDENTITY_ASSURANCE_TRANSPORT_VERIFIED\x10\x03*\x81\x01\n" +
 	"\rRulesetStatus\x12\x1e\n" +
 	"\x1aRULESET_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14RULESET_STATUS_DRAFT\x10\x01\x12\x19\n" +
 	"\x15RULESET_STATUS_ACTIVE\x10\x02\x12\x1b\n" +
-	"\x17RULESET_STATUS_ARCHIVED\x10\x032\xa0\x05\n" +
+	"\x17RULESET_STATUS_ARCHIVED\x10\x032\x99\a\n" +
 	"\x10RuleAdminService\x12E\n" +
 	"\n" +
 	"CreateRule\x12\x1a.room.v1.CreateRuleRequest\x1a\x1b.room.v1.CreateRuleResponse\x12E\n" +
@@ -2423,12 +4669,16 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x0ePreviewRuleset\x12\x1e.room.v1.PreviewRulesetRequest\x1a\x1f.room.v1.PreviewRulesetResponse\x12Q\n" +
 	"\x0ePublishRuleset\x12\x1e.room.v1.PublishRulesetRequest\x1a\x1f.room.v1.PublishRulesetResponse\x12T\n" +
 	"\x0fRollbackRuleset\x12\x1f.room.v1.RollbackRulesetRequest\x1a .room.v1.RollbackRulesetResponse\x12w\n" +
-	"\x10GetActiveRuleset\x120.room.v1.RuleAdminServiceGetActiveRulesetRequest\x1a1.room.v1.RuleAdminServiceGetActiveRulesetResponse2\xd0\x03\n" +
+	"\x10GetActiveRuleset\x120.room.v1.RuleAdminServiceGetActiveRulesetRequest\x1a1.room.v1.RuleAdminServiceGetActiveRulesetResponse\x12K\n" +
+	"\fGetMcpPolicy\x12\x1c.room.v1.GetMcpPolicyRequest\x1a\x1d.room.v1.GetMcpPolicyResponse\x12T\n" +
+	"\x0fUpdateMcpPolicy\x12\x1f.room.v1.UpdateMcpPolicyRequest\x1a .room.v1.UpdateMcpPolicyResponse\x12T\n" +
+	"\x0fListAuditEvents\x12\x1f.room.v1.ListAuditEventsRequest\x1a .room.v1.ListAuditEventsResponse2\xb8\x04\n" +
 	"\x11AgentRulesService\x12y\n" +
 	"\x10GetActiveRuleset\x121.room.v1.AgentRulesServiceGetActiveRulesetRequest\x1a2.room.v1.AgentRulesServiceGetActiveRulesetResponse\x12M\n" +
 	"\fWatchRuleset\x12\x1c.room.v1.WatchRulesetRequest\x1a\x1d.room.v1.WatchRulesetResponse0\x01\x12K\n" +
 	"\fEvaluatePlan\x12\x1c.room.v1.EvaluatePlanRequest\x1a\x1d.room.v1.EvaluatePlanResponse\x12K\n" +
-	"\fEvaluateDiff\x12\x1c.room.v1.EvaluateDiffRequest\x1a\x1d.room.v1.EvaluateDiffResponse\x12W\n" +
+	"\fEvaluateDiff\x12\x1c.room.v1.EvaluateDiffRequest\x1a\x1d.room.v1.EvaluateDiffResponse\x12f\n" +
+	"\x15EvaluateMcpInvocation\x12%.room.v1.EvaluateMcpInvocationRequest\x1a&.room.v1.EvaluateMcpInvocationResponse\x12W\n" +
 	"\x10ReportEvaluation\x12 .room.v1.ReportEvaluationRequest\x1a!.room.v1.ReportEvaluationResponseB2Z0github.com/haasonsaas/room/gen/go/room/v1;roomv1b\x06proto3"
 
 var (
@@ -2443,120 +4693,203 @@ func file_room_v1_rules_proto_rawDescGZIP() []byte {
 	return file_room_v1_rules_proto_rawDescData
 }
 
-var file_room_v1_rules_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_room_v1_rules_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_room_v1_rules_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
+var file_room_v1_rules_proto_msgTypes = make([]protoimpl.MessageInfo, 58)
 var file_room_v1_rules_proto_goTypes = []any{
 	(Severity)(0),                                     // 0: room.v1.Severity
 	(Decision)(0),                                     // 1: room.v1.Decision
 	(CheckKind)(0),                                    // 2: room.v1.CheckKind
-	(RulesetStatus)(0),                                // 3: room.v1.RulesetStatus
-	(*RuleScope)(nil),                                 // 4: room.v1.RuleScope
-	(*RuleCheck)(nil),                                 // 5: room.v1.RuleCheck
-	(*Rule)(nil),                                      // 6: room.v1.Rule
-	(*RulesetVersion)(nil),                            // 7: room.v1.RulesetVersion
-	(*EvaluationContext)(nil),                         // 8: room.v1.EvaluationContext
-	(*EvaluationInput)(nil),                           // 9: room.v1.EvaluationInput
-	(*RuleMatch)(nil),                                 // 10: room.v1.RuleMatch
-	(*EvaluationResult)(nil),                          // 11: room.v1.EvaluationResult
-	(*CreateRuleRequest)(nil),                         // 12: room.v1.CreateRuleRequest
-	(*CreateRuleResponse)(nil),                        // 13: room.v1.CreateRuleResponse
-	(*UpdateRuleRequest)(nil),                         // 14: room.v1.UpdateRuleRequest
-	(*UpdateRuleResponse)(nil),                        // 15: room.v1.UpdateRuleResponse
-	(*DeleteRuleRequest)(nil),                         // 16: room.v1.DeleteRuleRequest
-	(*DeleteRuleResponse)(nil),                        // 17: room.v1.DeleteRuleResponse
-	(*ListRulesRequest)(nil),                          // 18: room.v1.ListRulesRequest
-	(*ListRulesResponse)(nil),                         // 19: room.v1.ListRulesResponse
-	(*PreviewRulesetRequest)(nil),                     // 20: room.v1.PreviewRulesetRequest
-	(*PreviewRulesetResponse)(nil),                    // 21: room.v1.PreviewRulesetResponse
-	(*PublishRulesetRequest)(nil),                     // 22: room.v1.PublishRulesetRequest
-	(*PublishRulesetResponse)(nil),                    // 23: room.v1.PublishRulesetResponse
-	(*RollbackRulesetRequest)(nil),                    // 24: room.v1.RollbackRulesetRequest
-	(*RollbackRulesetResponse)(nil),                   // 25: room.v1.RollbackRulesetResponse
-	(*RuleAdminServiceGetActiveRulesetRequest)(nil),   // 26: room.v1.RuleAdminServiceGetActiveRulesetRequest
-	(*RuleAdminServiceGetActiveRulesetResponse)(nil),  // 27: room.v1.RuleAdminServiceGetActiveRulesetResponse
-	(*AgentRulesServiceGetActiveRulesetRequest)(nil),  // 28: room.v1.AgentRulesServiceGetActiveRulesetRequest
-	(*AgentRulesServiceGetActiveRulesetResponse)(nil), // 29: room.v1.AgentRulesServiceGetActiveRulesetResponse
-	(*WatchRulesetRequest)(nil),                       // 30: room.v1.WatchRulesetRequest
-	(*WatchRulesetResponse)(nil),                      // 31: room.v1.WatchRulesetResponse
-	(*EvaluatePlanRequest)(nil),                       // 32: room.v1.EvaluatePlanRequest
-	(*EvaluatePlanResponse)(nil),                      // 33: room.v1.EvaluatePlanResponse
-	(*EvaluateDiffRequest)(nil),                       // 34: room.v1.EvaluateDiffRequest
-	(*EvaluateDiffResponse)(nil),                      // 35: room.v1.EvaluateDiffResponse
-	(*ReportEvaluationRequest)(nil),                   // 36: room.v1.ReportEvaluationRequest
-	(*ReportEvaluationResponse)(nil),                  // 37: room.v1.ReportEvaluationResponse
-	(*StoreSnapshot)(nil),                             // 38: room.v1.StoreSnapshot
-	(*timestamppb.Timestamp)(nil),                     // 39: google.protobuf.Timestamp
+	(AnalysisPhase)(0),                                // 3: room.v1.AnalysisPhase
+	(AnalysisStatus)(0),                               // 4: room.v1.AnalysisStatus
+	(SignalKind)(0),                                   // 5: room.v1.SignalKind
+	(McpComplianceMode)(0),                            // 6: room.v1.McpComplianceMode
+	(AuditEventKind)(0),                               // 7: room.v1.AuditEventKind
+	(HookProvider)(0),                                 // 8: room.v1.HookProvider
+	(IdentityAssurance)(0),                            // 9: room.v1.IdentityAssurance
+	(RulesetStatus)(0),                                // 10: room.v1.RulesetStatus
+	(*RuleScope)(nil),                                 // 11: room.v1.RuleScope
+	(*RuleCheck)(nil),                                 // 12: room.v1.RuleCheck
+	(*SourceLocation)(nil),                            // 13: room.v1.SourceLocation
+	(*ArtifactRef)(nil),                               // 14: room.v1.ArtifactRef
+	(*AnalyzerIdentity)(nil),                          // 15: room.v1.AnalyzerIdentity
+	(*SecuritySignal)(nil),                            // 16: room.v1.SecuritySignal
+	(*AnalyzerReceipt)(nil),                           // 17: room.v1.AnalyzerReceipt
+	(*AnalysisReport)(nil),                            // 18: room.v1.AnalysisReport
+	(*SignalSelector)(nil),                            // 19: room.v1.SignalSelector
+	(*EvaluationGap)(nil),                             // 20: room.v1.EvaluationGap
+	(*McpToolSelector)(nil),                           // 21: room.v1.McpToolSelector
+	(*McpCompliancePolicy)(nil),                       // 22: room.v1.McpCompliancePolicy
+	(*ProviderToolBinding)(nil),                       // 23: room.v1.ProviderToolBinding
+	(*McpInvocation)(nil),                             // 24: room.v1.McpInvocation
+	(*McpInvocationDecision)(nil),                     // 25: room.v1.McpInvocationDecision
+	(*Rule)(nil),                                      // 26: room.v1.Rule
+	(*RulesetVersion)(nil),                            // 27: room.v1.RulesetVersion
+	(*AuthorizationScope)(nil),                        // 28: room.v1.AuthorizationScope
+	(*EvaluationContext)(nil),                         // 29: room.v1.EvaluationContext
+	(*EvaluationInput)(nil),                           // 30: room.v1.EvaluationInput
+	(*RuleMatch)(nil),                                 // 31: room.v1.RuleMatch
+	(*EvaluationResult)(nil),                          // 32: room.v1.EvaluationResult
+	(*AuditEvent)(nil),                                // 33: room.v1.AuditEvent
+	(*CreateRuleRequest)(nil),                         // 34: room.v1.CreateRuleRequest
+	(*CreateRuleResponse)(nil),                        // 35: room.v1.CreateRuleResponse
+	(*UpdateRuleRequest)(nil),                         // 36: room.v1.UpdateRuleRequest
+	(*UpdateRuleResponse)(nil),                        // 37: room.v1.UpdateRuleResponse
+	(*DeleteRuleRequest)(nil),                         // 38: room.v1.DeleteRuleRequest
+	(*DeleteRuleResponse)(nil),                        // 39: room.v1.DeleteRuleResponse
+	(*ListRulesRequest)(nil),                          // 40: room.v1.ListRulesRequest
+	(*ListRulesResponse)(nil),                         // 41: room.v1.ListRulesResponse
+	(*PreviewRulesetRequest)(nil),                     // 42: room.v1.PreviewRulesetRequest
+	(*PreviewRulesetResponse)(nil),                    // 43: room.v1.PreviewRulesetResponse
+	(*PublishRulesetRequest)(nil),                     // 44: room.v1.PublishRulesetRequest
+	(*PublishRulesetResponse)(nil),                    // 45: room.v1.PublishRulesetResponse
+	(*RollbackRulesetRequest)(nil),                    // 46: room.v1.RollbackRulesetRequest
+	(*RollbackRulesetResponse)(nil),                   // 47: room.v1.RollbackRulesetResponse
+	(*GetMcpPolicyRequest)(nil),                       // 48: room.v1.GetMcpPolicyRequest
+	(*GetMcpPolicyResponse)(nil),                      // 49: room.v1.GetMcpPolicyResponse
+	(*UpdateMcpPolicyRequest)(nil),                    // 50: room.v1.UpdateMcpPolicyRequest
+	(*UpdateMcpPolicyResponse)(nil),                   // 51: room.v1.UpdateMcpPolicyResponse
+	(*ListAuditEventsRequest)(nil),                    // 52: room.v1.ListAuditEventsRequest
+	(*ListAuditEventsResponse)(nil),                   // 53: room.v1.ListAuditEventsResponse
+	(*RuleAdminServiceGetActiveRulesetRequest)(nil),   // 54: room.v1.RuleAdminServiceGetActiveRulesetRequest
+	(*RuleAdminServiceGetActiveRulesetResponse)(nil),  // 55: room.v1.RuleAdminServiceGetActiveRulesetResponse
+	(*AgentRulesServiceGetActiveRulesetRequest)(nil),  // 56: room.v1.AgentRulesServiceGetActiveRulesetRequest
+	(*AgentRulesServiceGetActiveRulesetResponse)(nil), // 57: room.v1.AgentRulesServiceGetActiveRulesetResponse
+	(*WatchRulesetRequest)(nil),                       // 58: room.v1.WatchRulesetRequest
+	(*WatchRulesetResponse)(nil),                      // 59: room.v1.WatchRulesetResponse
+	(*EvaluatePlanRequest)(nil),                       // 60: room.v1.EvaluatePlanRequest
+	(*EvaluatePlanResponse)(nil),                      // 61: room.v1.EvaluatePlanResponse
+	(*EvaluateDiffRequest)(nil),                       // 62: room.v1.EvaluateDiffRequest
+	(*EvaluateDiffResponse)(nil),                      // 63: room.v1.EvaluateDiffResponse
+	(*EvaluateMcpInvocationRequest)(nil),              // 64: room.v1.EvaluateMcpInvocationRequest
+	(*EvaluateMcpInvocationResponse)(nil),             // 65: room.v1.EvaluateMcpInvocationResponse
+	(*ReportEvaluationRequest)(nil),                   // 66: room.v1.ReportEvaluationRequest
+	(*ReportEvaluationResponse)(nil),                  // 67: room.v1.ReportEvaluationResponse
+	(*StoreSnapshot)(nil),                             // 68: room.v1.StoreSnapshot
+	(*timestamppb.Timestamp)(nil),                     // 69: google.protobuf.Timestamp
 }
 var file_room_v1_rules_proto_depIdxs = []int32{
-	2,  // 0: room.v1.RuleCheck.kind:type_name -> room.v1.CheckKind
-	0,  // 1: room.v1.Rule.severity:type_name -> room.v1.Severity
-	4,  // 2: room.v1.Rule.scope:type_name -> room.v1.RuleScope
-	5,  // 3: room.v1.Rule.checks:type_name -> room.v1.RuleCheck
-	39, // 4: room.v1.Rule.created_at:type_name -> google.protobuf.Timestamp
-	39, // 5: room.v1.Rule.updated_at:type_name -> google.protobuf.Timestamp
-	3,  // 6: room.v1.RulesetVersion.status:type_name -> room.v1.RulesetStatus
-	6,  // 7: room.v1.RulesetVersion.rules:type_name -> room.v1.Rule
-	39, // 8: room.v1.RulesetVersion.published_at:type_name -> google.protobuf.Timestamp
-	8,  // 9: room.v1.EvaluationInput.context:type_name -> room.v1.EvaluationContext
-	0,  // 10: room.v1.RuleMatch.severity:type_name -> room.v1.Severity
-	1,  // 11: room.v1.EvaluationResult.decision:type_name -> room.v1.Decision
-	0,  // 12: room.v1.EvaluationResult.highest_severity:type_name -> room.v1.Severity
-	10, // 13: room.v1.EvaluationResult.matches:type_name -> room.v1.RuleMatch
-	6,  // 14: room.v1.CreateRuleRequest.rule:type_name -> room.v1.Rule
-	6,  // 15: room.v1.CreateRuleResponse.rule:type_name -> room.v1.Rule
-	6,  // 16: room.v1.UpdateRuleRequest.rule:type_name -> room.v1.Rule
-	6,  // 17: room.v1.UpdateRuleResponse.rule:type_name -> room.v1.Rule
-	8,  // 18: room.v1.ListRulesRequest.context:type_name -> room.v1.EvaluationContext
-	6,  // 19: room.v1.ListRulesResponse.rules:type_name -> room.v1.Rule
-	6,  // 20: room.v1.PreviewRulesetRequest.rules:type_name -> room.v1.Rule
-	9,  // 21: room.v1.PreviewRulesetRequest.input:type_name -> room.v1.EvaluationInput
-	11, // 22: room.v1.PreviewRulesetResponse.result:type_name -> room.v1.EvaluationResult
-	7,  // 23: room.v1.PublishRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
-	7,  // 24: room.v1.RollbackRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
-	8,  // 25: room.v1.RuleAdminServiceGetActiveRulesetRequest.context:type_name -> room.v1.EvaluationContext
-	7,  // 26: room.v1.RuleAdminServiceGetActiveRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
-	8,  // 27: room.v1.AgentRulesServiceGetActiveRulesetRequest.context:type_name -> room.v1.EvaluationContext
-	7,  // 28: room.v1.AgentRulesServiceGetActiveRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
-	8,  // 29: room.v1.WatchRulesetRequest.context:type_name -> room.v1.EvaluationContext
-	7,  // 30: room.v1.WatchRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
-	9,  // 31: room.v1.EvaluatePlanRequest.input:type_name -> room.v1.EvaluationInput
-	11, // 32: room.v1.EvaluatePlanResponse.result:type_name -> room.v1.EvaluationResult
-	9,  // 33: room.v1.EvaluateDiffRequest.input:type_name -> room.v1.EvaluationInput
-	11, // 34: room.v1.EvaluateDiffResponse.result:type_name -> room.v1.EvaluationResult
-	11, // 35: room.v1.ReportEvaluationRequest.result:type_name -> room.v1.EvaluationResult
-	6,  // 36: room.v1.StoreSnapshot.draft_rules:type_name -> room.v1.Rule
-	7,  // 37: room.v1.StoreSnapshot.versions:type_name -> room.v1.RulesetVersion
-	12, // 38: room.v1.RuleAdminService.CreateRule:input_type -> room.v1.CreateRuleRequest
-	14, // 39: room.v1.RuleAdminService.UpdateRule:input_type -> room.v1.UpdateRuleRequest
-	16, // 40: room.v1.RuleAdminService.DeleteRule:input_type -> room.v1.DeleteRuleRequest
-	18, // 41: room.v1.RuleAdminService.ListRules:input_type -> room.v1.ListRulesRequest
-	20, // 42: room.v1.RuleAdminService.PreviewRuleset:input_type -> room.v1.PreviewRulesetRequest
-	22, // 43: room.v1.RuleAdminService.PublishRuleset:input_type -> room.v1.PublishRulesetRequest
-	24, // 44: room.v1.RuleAdminService.RollbackRuleset:input_type -> room.v1.RollbackRulesetRequest
-	26, // 45: room.v1.RuleAdminService.GetActiveRuleset:input_type -> room.v1.RuleAdminServiceGetActiveRulesetRequest
-	28, // 46: room.v1.AgentRulesService.GetActiveRuleset:input_type -> room.v1.AgentRulesServiceGetActiveRulesetRequest
-	30, // 47: room.v1.AgentRulesService.WatchRuleset:input_type -> room.v1.WatchRulesetRequest
-	32, // 48: room.v1.AgentRulesService.EvaluatePlan:input_type -> room.v1.EvaluatePlanRequest
-	34, // 49: room.v1.AgentRulesService.EvaluateDiff:input_type -> room.v1.EvaluateDiffRequest
-	36, // 50: room.v1.AgentRulesService.ReportEvaluation:input_type -> room.v1.ReportEvaluationRequest
-	13, // 51: room.v1.RuleAdminService.CreateRule:output_type -> room.v1.CreateRuleResponse
-	15, // 52: room.v1.RuleAdminService.UpdateRule:output_type -> room.v1.UpdateRuleResponse
-	17, // 53: room.v1.RuleAdminService.DeleteRule:output_type -> room.v1.DeleteRuleResponse
-	19, // 54: room.v1.RuleAdminService.ListRules:output_type -> room.v1.ListRulesResponse
-	21, // 55: room.v1.RuleAdminService.PreviewRuleset:output_type -> room.v1.PreviewRulesetResponse
-	23, // 56: room.v1.RuleAdminService.PublishRuleset:output_type -> room.v1.PublishRulesetResponse
-	25, // 57: room.v1.RuleAdminService.RollbackRuleset:output_type -> room.v1.RollbackRulesetResponse
-	27, // 58: room.v1.RuleAdminService.GetActiveRuleset:output_type -> room.v1.RuleAdminServiceGetActiveRulesetResponse
-	29, // 59: room.v1.AgentRulesService.GetActiveRuleset:output_type -> room.v1.AgentRulesServiceGetActiveRulesetResponse
-	31, // 60: room.v1.AgentRulesService.WatchRuleset:output_type -> room.v1.WatchRulesetResponse
-	33, // 61: room.v1.AgentRulesService.EvaluatePlan:output_type -> room.v1.EvaluatePlanResponse
-	35, // 62: room.v1.AgentRulesService.EvaluateDiff:output_type -> room.v1.EvaluateDiffResponse
-	37, // 63: room.v1.AgentRulesService.ReportEvaluation:output_type -> room.v1.ReportEvaluationResponse
-	51, // [51:64] is the sub-list for method output_type
-	38, // [38:51] is the sub-list for method input_type
-	38, // [38:38] is the sub-list for extension type_name
-	38, // [38:38] is the sub-list for extension extendee
-	0,  // [0:38] is the sub-list for field type_name
+	2,   // 0: room.v1.RuleCheck.kind:type_name -> room.v1.CheckKind
+	3,   // 1: room.v1.ArtifactRef.phase:type_name -> room.v1.AnalysisPhase
+	5,   // 2: room.v1.SecuritySignal.kind:type_name -> room.v1.SignalKind
+	15,  // 3: room.v1.SecuritySignal.analyzer:type_name -> room.v1.AnalyzerIdentity
+	13,  // 4: room.v1.SecuritySignal.location:type_name -> room.v1.SourceLocation
+	15,  // 5: room.v1.AnalyzerReceipt.analyzer:type_name -> room.v1.AnalyzerIdentity
+	4,   // 6: room.v1.AnalyzerReceipt.status:type_name -> room.v1.AnalysisStatus
+	5,   // 7: room.v1.AnalyzerReceipt.covered_signals:type_name -> room.v1.SignalKind
+	16,  // 8: room.v1.AnalyzerReceipt.signals:type_name -> room.v1.SecuritySignal
+	14,  // 9: room.v1.AnalysisReport.artifact:type_name -> room.v1.ArtifactRef
+	4,   // 10: room.v1.AnalysisReport.status:type_name -> room.v1.AnalysisStatus
+	17,  // 11: room.v1.AnalysisReport.receipts:type_name -> room.v1.AnalyzerReceipt
+	5,   // 12: room.v1.SignalSelector.signal:type_name -> room.v1.SignalKind
+	3,   // 13: room.v1.SignalSelector.phases:type_name -> room.v1.AnalysisPhase
+	5,   // 14: room.v1.EvaluationGap.required_signal:type_name -> room.v1.SignalKind
+	4,   // 15: room.v1.EvaluationGap.status:type_name -> room.v1.AnalysisStatus
+	6,   // 16: room.v1.McpCompliancePolicy.mode:type_name -> room.v1.McpComplianceMode
+	21,  // 17: room.v1.McpCompliancePolicy.selectors:type_name -> room.v1.McpToolSelector
+	23,  // 18: room.v1.McpCompliancePolicy.provider_bindings:type_name -> room.v1.ProviderToolBinding
+	8,   // 19: room.v1.ProviderToolBinding.provider:type_name -> room.v1.HookProvider
+	8,   // 20: room.v1.McpInvocation.provider:type_name -> room.v1.HookProvider
+	9,   // 21: room.v1.McpInvocation.identity_assurance:type_name -> room.v1.IdentityAssurance
+	21,  // 22: room.v1.McpInvocationDecision.matched_selector:type_name -> room.v1.McpToolSelector
+	0,   // 23: room.v1.Rule.severity:type_name -> room.v1.Severity
+	11,  // 24: room.v1.Rule.scope:type_name -> room.v1.RuleScope
+	12,  // 25: room.v1.Rule.checks:type_name -> room.v1.RuleCheck
+	69,  // 26: room.v1.Rule.created_at:type_name -> google.protobuf.Timestamp
+	69,  // 27: room.v1.Rule.updated_at:type_name -> google.protobuf.Timestamp
+	19,  // 28: room.v1.Rule.triggers:type_name -> room.v1.SignalSelector
+	5,   // 29: room.v1.Rule.required_coverage:type_name -> room.v1.SignalKind
+	10,  // 30: room.v1.RulesetVersion.status:type_name -> room.v1.RulesetStatus
+	26,  // 31: room.v1.RulesetVersion.rules:type_name -> room.v1.Rule
+	69,  // 32: room.v1.RulesetVersion.published_at:type_name -> google.protobuf.Timestamp
+	22,  // 33: room.v1.RulesetVersion.mcp_policy:type_name -> room.v1.McpCompliancePolicy
+	28,  // 34: room.v1.RulesetVersion.authorized_scope:type_name -> room.v1.AuthorizationScope
+	29,  // 35: room.v1.EvaluationInput.context:type_name -> room.v1.EvaluationContext
+	3,   // 36: room.v1.EvaluationInput.phase:type_name -> room.v1.AnalysisPhase
+	0,   // 37: room.v1.RuleMatch.severity:type_name -> room.v1.Severity
+	1,   // 38: room.v1.EvaluationResult.decision:type_name -> room.v1.Decision
+	0,   // 39: room.v1.EvaluationResult.highest_severity:type_name -> room.v1.Severity
+	31,  // 40: room.v1.EvaluationResult.matches:type_name -> room.v1.RuleMatch
+	4,   // 41: room.v1.EvaluationResult.analysis_status:type_name -> room.v1.AnalysisStatus
+	17,  // 42: room.v1.EvaluationResult.analyzer_receipts:type_name -> room.v1.AnalyzerReceipt
+	20,  // 43: room.v1.EvaluationResult.gaps:type_name -> room.v1.EvaluationGap
+	7,   // 44: room.v1.AuditEvent.kind:type_name -> room.v1.AuditEventKind
+	69,  // 45: room.v1.AuditEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	1,   // 46: room.v1.AuditEvent.decision:type_name -> room.v1.Decision
+	0,   // 47: room.v1.AuditEvent.highest_severity:type_name -> room.v1.Severity
+	4,   // 48: room.v1.AuditEvent.analysis_status:type_name -> room.v1.AnalysisStatus
+	24,  // 49: room.v1.AuditEvent.mcp_invocation:type_name -> room.v1.McpInvocation
+	26,  // 50: room.v1.CreateRuleRequest.rule:type_name -> room.v1.Rule
+	26,  // 51: room.v1.CreateRuleResponse.rule:type_name -> room.v1.Rule
+	26,  // 52: room.v1.UpdateRuleRequest.rule:type_name -> room.v1.Rule
+	26,  // 53: room.v1.UpdateRuleResponse.rule:type_name -> room.v1.Rule
+	29,  // 54: room.v1.ListRulesRequest.context:type_name -> room.v1.EvaluationContext
+	26,  // 55: room.v1.ListRulesResponse.rules:type_name -> room.v1.Rule
+	26,  // 56: room.v1.PreviewRulesetRequest.rules:type_name -> room.v1.Rule
+	30,  // 57: room.v1.PreviewRulesetRequest.input:type_name -> room.v1.EvaluationInput
+	32,  // 58: room.v1.PreviewRulesetResponse.result:type_name -> room.v1.EvaluationResult
+	27,  // 59: room.v1.PublishRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
+	27,  // 60: room.v1.RollbackRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
+	22,  // 61: room.v1.GetMcpPolicyResponse.policy:type_name -> room.v1.McpCompliancePolicy
+	22,  // 62: room.v1.UpdateMcpPolicyRequest.policy:type_name -> room.v1.McpCompliancePolicy
+	22,  // 63: room.v1.UpdateMcpPolicyResponse.policy:type_name -> room.v1.McpCompliancePolicy
+	7,   // 64: room.v1.ListAuditEventsRequest.kind:type_name -> room.v1.AuditEventKind
+	33,  // 65: room.v1.ListAuditEventsResponse.events:type_name -> room.v1.AuditEvent
+	29,  // 66: room.v1.RuleAdminServiceGetActiveRulesetRequest.context:type_name -> room.v1.EvaluationContext
+	27,  // 67: room.v1.RuleAdminServiceGetActiveRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
+	29,  // 68: room.v1.AgentRulesServiceGetActiveRulesetRequest.context:type_name -> room.v1.EvaluationContext
+	27,  // 69: room.v1.AgentRulesServiceGetActiveRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
+	29,  // 70: room.v1.WatchRulesetRequest.context:type_name -> room.v1.EvaluationContext
+	27,  // 71: room.v1.WatchRulesetResponse.ruleset:type_name -> room.v1.RulesetVersion
+	30,  // 72: room.v1.EvaluatePlanRequest.input:type_name -> room.v1.EvaluationInput
+	32,  // 73: room.v1.EvaluatePlanResponse.result:type_name -> room.v1.EvaluationResult
+	30,  // 74: room.v1.EvaluateDiffRequest.input:type_name -> room.v1.EvaluationInput
+	32,  // 75: room.v1.EvaluateDiffResponse.result:type_name -> room.v1.EvaluationResult
+	29,  // 76: room.v1.EvaluateMcpInvocationRequest.context:type_name -> room.v1.EvaluationContext
+	24,  // 77: room.v1.EvaluateMcpInvocationRequest.invocation:type_name -> room.v1.McpInvocation
+	25,  // 78: room.v1.EvaluateMcpInvocationResponse.decision:type_name -> room.v1.McpInvocationDecision
+	32,  // 79: room.v1.ReportEvaluationRequest.result:type_name -> room.v1.EvaluationResult
+	26,  // 80: room.v1.StoreSnapshot.draft_rules:type_name -> room.v1.Rule
+	27,  // 81: room.v1.StoreSnapshot.versions:type_name -> room.v1.RulesetVersion
+	22,  // 82: room.v1.StoreSnapshot.draft_mcp_policy:type_name -> room.v1.McpCompliancePolicy
+	34,  // 83: room.v1.RuleAdminService.CreateRule:input_type -> room.v1.CreateRuleRequest
+	36,  // 84: room.v1.RuleAdminService.UpdateRule:input_type -> room.v1.UpdateRuleRequest
+	38,  // 85: room.v1.RuleAdminService.DeleteRule:input_type -> room.v1.DeleteRuleRequest
+	40,  // 86: room.v1.RuleAdminService.ListRules:input_type -> room.v1.ListRulesRequest
+	42,  // 87: room.v1.RuleAdminService.PreviewRuleset:input_type -> room.v1.PreviewRulesetRequest
+	44,  // 88: room.v1.RuleAdminService.PublishRuleset:input_type -> room.v1.PublishRulesetRequest
+	46,  // 89: room.v1.RuleAdminService.RollbackRuleset:input_type -> room.v1.RollbackRulesetRequest
+	54,  // 90: room.v1.RuleAdminService.GetActiveRuleset:input_type -> room.v1.RuleAdminServiceGetActiveRulesetRequest
+	48,  // 91: room.v1.RuleAdminService.GetMcpPolicy:input_type -> room.v1.GetMcpPolicyRequest
+	50,  // 92: room.v1.RuleAdminService.UpdateMcpPolicy:input_type -> room.v1.UpdateMcpPolicyRequest
+	52,  // 93: room.v1.RuleAdminService.ListAuditEvents:input_type -> room.v1.ListAuditEventsRequest
+	56,  // 94: room.v1.AgentRulesService.GetActiveRuleset:input_type -> room.v1.AgentRulesServiceGetActiveRulesetRequest
+	58,  // 95: room.v1.AgentRulesService.WatchRuleset:input_type -> room.v1.WatchRulesetRequest
+	60,  // 96: room.v1.AgentRulesService.EvaluatePlan:input_type -> room.v1.EvaluatePlanRequest
+	62,  // 97: room.v1.AgentRulesService.EvaluateDiff:input_type -> room.v1.EvaluateDiffRequest
+	64,  // 98: room.v1.AgentRulesService.EvaluateMcpInvocation:input_type -> room.v1.EvaluateMcpInvocationRequest
+	66,  // 99: room.v1.AgentRulesService.ReportEvaluation:input_type -> room.v1.ReportEvaluationRequest
+	35,  // 100: room.v1.RuleAdminService.CreateRule:output_type -> room.v1.CreateRuleResponse
+	37,  // 101: room.v1.RuleAdminService.UpdateRule:output_type -> room.v1.UpdateRuleResponse
+	39,  // 102: room.v1.RuleAdminService.DeleteRule:output_type -> room.v1.DeleteRuleResponse
+	41,  // 103: room.v1.RuleAdminService.ListRules:output_type -> room.v1.ListRulesResponse
+	43,  // 104: room.v1.RuleAdminService.PreviewRuleset:output_type -> room.v1.PreviewRulesetResponse
+	45,  // 105: room.v1.RuleAdminService.PublishRuleset:output_type -> room.v1.PublishRulesetResponse
+	47,  // 106: room.v1.RuleAdminService.RollbackRuleset:output_type -> room.v1.RollbackRulesetResponse
+	55,  // 107: room.v1.RuleAdminService.GetActiveRuleset:output_type -> room.v1.RuleAdminServiceGetActiveRulesetResponse
+	49,  // 108: room.v1.RuleAdminService.GetMcpPolicy:output_type -> room.v1.GetMcpPolicyResponse
+	51,  // 109: room.v1.RuleAdminService.UpdateMcpPolicy:output_type -> room.v1.UpdateMcpPolicyResponse
+	53,  // 110: room.v1.RuleAdminService.ListAuditEvents:output_type -> room.v1.ListAuditEventsResponse
+	57,  // 111: room.v1.AgentRulesService.GetActiveRuleset:output_type -> room.v1.AgentRulesServiceGetActiveRulesetResponse
+	59,  // 112: room.v1.AgentRulesService.WatchRuleset:output_type -> room.v1.WatchRulesetResponse
+	61,  // 113: room.v1.AgentRulesService.EvaluatePlan:output_type -> room.v1.EvaluatePlanResponse
+	63,  // 114: room.v1.AgentRulesService.EvaluateDiff:output_type -> room.v1.EvaluateDiffResponse
+	65,  // 115: room.v1.AgentRulesService.EvaluateMcpInvocation:output_type -> room.v1.EvaluateMcpInvocationResponse
+	67,  // 116: room.v1.AgentRulesService.ReportEvaluation:output_type -> room.v1.ReportEvaluationResponse
+	100, // [100:117] is the sub-list for method output_type
+	83,  // [83:100] is the sub-list for method input_type
+	83,  // [83:83] is the sub-list for extension type_name
+	83,  // [83:83] is the sub-list for extension extendee
+	0,   // [0:83] is the sub-list for field type_name
 }
 
 func init() { file_room_v1_rules_proto_init() }
@@ -2569,8 +4902,8 @@ func file_room_v1_rules_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_room_v1_rules_proto_rawDesc), len(file_room_v1_rules_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   35,
+			NumEnums:      11,
+			NumMessages:   58,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

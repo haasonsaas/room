@@ -1,61 +1,48 @@
-# Agent Hooks
+# Agent hooks
 
-Room uses one hook runner for all agent surfaces:
+Room exposes one authenticated runner:
 
 ```bash
 roomctl hook prompt
 roomctl hook pre-tool
+roomctl hook pre-mcp
 roomctl hook post-tool
 ```
 
-The runner accepts the agent hook payload on stdin, forwards it to Room, and
-prints a hook decision shape accepted by Codex and Claude Code for blocking
-tool calls or injecting additional context.
+Set `ROOM_TOKEN_FILE` to a private agent-token file. The credential fixes the
+workspace, repository, and agent identity; hook payloads cannot change them.
+Issue hook credentials with an explicit provider binding, for example
+`roomctl token issue ... --hook-provider codex`. A direct verified MCP proxy uses
+the mutually exclusive `--mcp-proxy` capability.
 
-Run this once per machine or repository to warm the local ruleset cache:
-
-```bash
-roomctl sync-rules
-```
-
-Set `ROOM_CACHE_FILE` to control where the active ruleset is cached.
-Use `roomctl watch-rules` in a long-running sidecar when you want server-pushed
-ruleset updates to refresh that cache continuously.
-
-## Claude Code
-
-Claude Code supports `PreToolUse`, `PostToolUse`, and `UserPromptSubmit`
-hooks. Project-level hooks live in `.claude/settings.json`.
-
-Use `hooks/claude/settings.json` as a starting point.
-
-## Codex
-
-Codex supports repo-local `.codex/hooks.json` and inline `config.toml` hooks.
-Use `/hooks` in Codex to review and trust changed command hooks.
-
-Use `hooks/codex/hooks.json` as a starting point.
-
-## Cursor
-
-Cursor supports hooks and MCP. The exact hook management surface can vary by
-Cursor release and plan, so Room ships a generic command runner plus
-`hooks/cursor/README.md`. Configure Cursor to call `roomctl hook prompt`,
-`roomctl hook pre-tool`, and `roomctl hook post-tool` from the matching Cursor
-events, and register `room-mcp` as the MCP server.
-
-## Fail-open vs fail-closed
-
-Default:
+Hooks fail closed when Room or its analyzer is unavailable, or when a result is
+indeterminate. Emergency fail-open behavior requires an explicit opt-out:
 
 ```bash
-ROOM_HOOK_FAIL_CLOSED=false
+ROOM_HOOK_FAIL_OPEN=true
 ```
 
-Strict mode:
+The bundled Claude and Codex templates cover prompt and built-in edit/shell
+lifecycle events. They do not claim MCP interception: provider hooks do not
+emit Room's typed MCP envelope by themselves.
 
-```bash
-ROOM_HOOK_FAIL_CLOSED=true
-```
+## Typed MCP hook metadata
 
-Strict mode denies pre-tool calls when Room is unavailable.
+Register `pre-tool` only for non-MCP tool matchers. A trusted provider adapter or
+verified proxy may invoke `pre-mcp` for MCP events; it requires
+`room_mcp_invocation` and fails closed when the typed object is absent. The
+bundled generic hook templates cannot manufacture that identity and therefore
+do not advertise MCP governance. This explicit boundary prevents an
+unclassified pre-tool event from being mislabeled as verified MCP traffic.
+
+A pre-tool payload may include a `room_mcp_invocation` object with the typed
+fields `provider_tool_id`, `server_id`, `tool_name`, `transport`, and `endpoint`.
+Room ignores caller-supplied provider and assurance values: those come from the
+credential's `--hook-provider` or `--mcp-proxy` capability. Provider/tool
+bindings must already exist in the Room MCP policy. Provider display text and
+ordinary `tool_name` fields are not parsed to infer MCP identity.
+
+For the strongest guarantee, route MCP through a proxy that calls
+`EvaluateMcpInvocation` with transport-verified identity. Room provides the
+typed enforcement endpoint and `--mcp-proxy` credential capability; the proxy
+itself remains an integration owned by the MCP deployment.

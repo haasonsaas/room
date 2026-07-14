@@ -1,103 +1,243 @@
 package eval
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
 	roomv1 "github.com/haasonsaas/room/gen/go/room/v1"
+	"google.golang.org/protobuf/proto"
 )
 
-var secretPattern = regexp.MustCompile(`(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['"]?[a-z0-9_\-]{16,}`)
+// Policy evaluates trusted analyzer receipts. Raw prompts, plans, diffs, labels,
+// titles, summaries, and rule prose are intentionally absent from this API.
+type Policy struct {
+	trusted   map[string]*roomv1.AnalyzerIdentity
+	auditOnly bool
+}
 
-func Evaluate(rules []*roomv1.Rule, ruleset *roomv1.RulesetVersion, input *roomv1.EvaluationInput) *roomv1.EvaluationResult {
-	if input == nil {
-		input = &roomv1.EvaluationInput{}
-	}
-	context := input.GetContext()
-	matches := make([]*roomv1.RuleMatch, 0)
-	for _, rule := range rules {
-		if rule == nil || !rule.GetEnabled() || !scopeMatches(rule.GetScope(), context) {
-			continue
-		}
-		if ruleMatches(rule, input) {
-			matches = append(matches, &roomv1.RuleMatch{
-				RuleId:           rule.GetId(),
-				Title:            rule.GetTitle(),
-				Severity:         rule.GetSeverity(),
-				Message:          ruleMessage(rule),
-				Tags:             append([]string(nil), rule.GetTags()...),
-				RequiredEvidence: append([]string(nil), rule.GetRequiredEvidence()...),
-				Remediation:      append([]string(nil), rule.GetRemediation()...),
-			})
+func NewPolicy(trusted []*roomv1.AnalyzerIdentity, auditOnly bool) *Policy {
+	identities := make(map[string]*roomv1.AnalyzerIdentity, len(trusted))
+	for _, identity := range trusted {
+		if identity != nil && identity.GetId() != "" {
+			identities[identity.GetId()] = proto.Clone(identity).(*roomv1.AnalyzerIdentity)
 		}
 	}
-	sort.Slice(matches, func(i, j int) bool {
-		if matches[i].Severity == matches[j].Severity {
-			return matches[i].RuleId < matches[j].RuleId
-		}
-		return matches[i].Severity > matches[j].Severity
-	})
+	return &Policy{trusted: identities, auditOnly: auditOnly}
+}
 
-	highest := roomv1.Severity_SEVERITY_UNSPECIFIED
-	required := make([]string, 0)
-	for _, match := range matches {
-		if match.GetSeverity() > highest {
-			highest = match.GetSeverity()
-		}
-		for _, evidence := range match.GetRequiredEvidence() {
-			required = append(required, fmt.Sprintf("%s: %s", match.GetRuleId(), evidence))
-		}
-	}
-
-	decision := roomv1.Decision_DECISION_ALLOW
-	switch highest {
-	case roomv1.Severity_SEVERITY_CRITICAL:
-		decision = roomv1.Decision_DECISION_DENY
-	case roomv1.Severity_SEVERITY_HIGH:
-		decision = roomv1.Decision_DECISION_NEEDS_CHANGES
-	case roomv1.Severity_SEVERITY_MEDIUM:
-		decision = roomv1.Decision_DECISION_WARN
-	case roomv1.Severity_SEVERITY_LOW, roomv1.Severity_SEVERITY_INFO:
-		decision = roomv1.Decision_DECISION_WARN
-	}
-
-	result := &roomv1.EvaluationResult{
-		Decision:        decision,
-		HighestSeverity: highest,
-		Matches:         matches,
-		RequiredChecks:  dedupe(required),
-	}
+func (p *Policy) Evaluate(ruleset *roomv1.RulesetVersion, context *roomv1.EvaluationContext, report *roomv1.AnalysisReport) *roomv1.EvaluationResult {
+	result := &roomv1.EvaluationResult{EvaluationId: newID(), Decision: roomv1.Decision_DECISION_INDETERMINATE}
 	if ruleset != nil {
 		result.RulesetId = ruleset.GetId()
 		result.RulesetVersion = ruleset.GetVersion()
 		result.RulesetHash = ruleset.GetHash()
 	}
+	if report != nil {
+		result.AnalysisStatus = report.GetStatus()
+		if report.GetArtifact() != nil {
+			result.InputSha256 = bytes.Clone(report.GetArtifact().GetSha256())
+		}
+		for _, receipt := range report.GetReceipts() {
+			if receipt != nil {
+				result.AnalyzerReceipts = append(result.AnalyzerReceipts, proto.Clone(receipt).(*roomv1.AnalyzerReceipt))
+			}
+		}
+	}
+
+	if ruleset == nil {
+		return p.withGap(result, roomv1.SignalKind_SIGNAL_KIND_UNSPECIFIED, "no_active_ruleset", roomv1.AnalysisStatus_ANALYSIS_STATUS_UNAVAILABLE)
+	}
+
+	validReceipts, validationGaps := p.validateReport(report)
+	result.Gaps = append(result.Gaps, validationGaps...)
+	coverage := make(map[roomv1.SignalKind]bool)
+	maxConfidence := make(map[roomv1.SignalKind]uint32)
+	for _, receipt := range validReceipts {
+		for _, kind := range receipt.GetCoveredSignals() {
+			if kind != roomv1.SignalKind_SIGNAL_KIND_UNSPECIFIED {
+				coverage[kind] = true
+			}
+		}
+		for _, signal := range receipt.GetSignals() {
+			if confidence := signal.GetConfidenceBasisPoints(); confidence > maxConfidence[signal.GetKind()] {
+				maxConfidence[signal.GetKind()] = confidence
+			}
+		}
+	}
+
+	verifiedContext := cloneContext(context)
+	if report != nil && report.GetArtifact() != nil {
+		verifiedContext.ChangedFiles = append([]string(nil), report.GetArtifact().GetChangedFiles()...)
+	}
+	phase := roomv1.AnalysisPhase_ANALYSIS_PHASE_UNSPECIFIED
+	if report != nil && report.GetArtifact() != nil {
+		phase = report.GetArtifact().GetPhase()
+	}
+
+	matches := make([]*roomv1.RuleMatch, 0)
+	for _, rule := range ruleset.GetRules() {
+		if rule == nil || !rule.GetEnabled() || !ScopeMatches(rule.GetScope(), verifiedContext) {
+			continue
+		}
+		if len(rule.GetTriggers()) == 0 {
+			result.Gaps = append(result.Gaps, &roomv1.EvaluationGap{Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, ReasonCode: "legacy_rule_not_executable"})
+			continue
+		}
+		required := append([]roomv1.SignalKind(nil), rule.GetRequiredCoverage()...)
+		if len(required) == 0 {
+			for _, trigger := range rule.GetTriggers() {
+				required = append(required, trigger.GetSignal())
+			}
+		}
+		for _, kind := range dedupeKinds(required) {
+			if kind != roomv1.SignalKind_SIGNAL_KIND_UNSPECIFIED && !coverage[kind] {
+				result.Gaps = append(result.Gaps, &roomv1.EvaluationGap{RequiredSignal: kind, Status: result.GetAnalysisStatus(), ReasonCode: "required_signal_not_covered"})
+			}
+		}
+		if triggered(rule.GetTriggers(), phase, maxConfidence) {
+			matches = append(matches, &roomv1.RuleMatch{
+				RuleId: rule.GetId(), Title: rule.GetTitle(), Severity: rule.GetSeverity(), Message: ruleMessage(rule),
+				Tags: append([]string(nil), rule.GetTags()...), RequiredEvidence: append([]string(nil), rule.GetRequiredEvidence()...), Remediation: append([]string(nil), rule.GetRemediation()...),
+			})
+		}
+	}
+
+	result.Gaps = dedupeGaps(result.GetGaps())
+	if len(result.GetGaps()) > 0 {
+		if p.auditOnly {
+			result.Decision = roomv1.Decision_DECISION_WARN
+		} else {
+			result.Decision = roomv1.Decision_DECISION_INDETERMINATE
+		}
+		return result
+	}
+
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].GetSeverity() == matches[j].GetSeverity() {
+			return matches[i].GetRuleId() < matches[j].GetRuleId()
+		}
+		return matches[i].GetSeverity() > matches[j].GetSeverity()
+	})
+	result.Matches = matches
+	result.Decision = roomv1.Decision_DECISION_ALLOW
+	for _, match := range matches {
+		if match.GetSeverity() > result.GetHighestSeverity() {
+			result.HighestSeverity = match.GetSeverity()
+		}
+		for _, evidence := range match.GetRequiredEvidence() {
+			result.RequiredChecks = append(result.RequiredChecks, fmt.Sprintf("%s: %s", match.GetRuleId(), evidence))
+		}
+	}
+	result.RequiredChecks = dedupeStrings(result.GetRequiredChecks())
+	switch result.GetHighestSeverity() {
+	case roomv1.Severity_SEVERITY_CRITICAL:
+		result.Decision = roomv1.Decision_DECISION_DENY
+	case roomv1.Severity_SEVERITY_HIGH:
+		result.Decision = roomv1.Decision_DECISION_NEEDS_CHANGES
+	case roomv1.Severity_SEVERITY_MEDIUM, roomv1.Severity_SEVERITY_LOW, roomv1.Severity_SEVERITY_INFO:
+		result.Decision = roomv1.Decision_DECISION_WARN
+	}
 	return result
 }
 
-func scopeMatches(scope *roomv1.RuleScope, context *roomv1.EvaluationContext) bool {
-	if scope == nil || context == nil {
+func (p *Policy) validateReport(report *roomv1.AnalysisReport) ([]*roomv1.AnalyzerReceipt, []*roomv1.EvaluationGap) {
+	if report == nil || report.GetArtifact() == nil {
+		return nil, []*roomv1.EvaluationGap{{Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_UNAVAILABLE, ReasonCode: "analysis_report_missing"}}
+	}
+	if report.GetStatus() != roomv1.AnalysisStatus_ANALYSIS_STATUS_COMPLETE {
+		return nil, []*roomv1.EvaluationGap{{Status: report.GetStatus(), ReasonCode: "analysis_not_complete"}}
+	}
+	artifact := report.GetArtifact()
+	if artifact.GetPhase() == roomv1.AnalysisPhase_ANALYSIS_PHASE_UNSPECIFIED || len(artifact.GetSha256()) != sha256Size {
+		return nil, []*roomv1.EvaluationGap{{Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, ReasonCode: "artifact_invalid"}}
+	}
+	valid := make([]*roomv1.AnalyzerReceipt, 0, len(report.GetReceipts()))
+	gaps := make([]*roomv1.EvaluationGap, 0)
+	for _, receipt := range report.GetReceipts() {
+		if receipt == nil || receipt.GetAnalyzer() == nil {
+			gaps = append(gaps, &roomv1.EvaluationGap{Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, ReasonCode: "receipt_identity_missing"})
+			continue
+		}
+		trusted, ok := p.trusted[receipt.GetAnalyzer().GetId()]
+		if !ok || !proto.Equal(trusted, receipt.GetAnalyzer()) {
+			gaps = append(gaps, &roomv1.EvaluationGap{AnalyzerId: receipt.GetAnalyzer().GetId(), Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_UNTRUSTED, ReasonCode: "analyzer_untrusted"})
+			continue
+		}
+		if receipt.GetStatus() != roomv1.AnalysisStatus_ANALYSIS_STATUS_COMPLETE || !bytes.Equal(receipt.GetInputSha256(), artifact.GetSha256()) {
+			gaps = append(gaps, &roomv1.EvaluationGap{AnalyzerId: trusted.GetId(), Status: receipt.GetStatus(), ReasonCode: "receipt_invalid_or_incomplete"})
+			continue
+		}
+		covered := make(map[roomv1.SignalKind]bool, len(receipt.GetCoveredSignals()))
+		for _, kind := range receipt.GetCoveredSignals() {
+			covered[kind] = true
+		}
+		validReceipt := true
+		for _, signal := range receipt.GetSignals() {
+			if signal == nil || signal.GetKind() == roomv1.SignalKind_SIGNAL_KIND_UNSPECIFIED || !covered[signal.GetKind()] || signal.GetConfidenceBasisPoints() > 10000 || !proto.Equal(signal.GetAnalyzer(), trusted) {
+				validReceipt = false
+				break
+			}
+		}
+		if !validReceipt {
+			gaps = append(gaps, &roomv1.EvaluationGap{AnalyzerId: trusted.GetId(), Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, ReasonCode: "signal_invalid"})
+			continue
+		}
+		valid = append(valid, receipt)
+	}
+	if len(valid) == 0 && len(gaps) == 0 {
+		gaps = append(gaps, &roomv1.EvaluationGap{Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_UNAVAILABLE, ReasonCode: "analyzer_receipt_missing"})
+	}
+	return valid, gaps
+}
+
+const sha256Size = 32
+
+func (p *Policy) withGap(result *roomv1.EvaluationResult, signal roomv1.SignalKind, reason string, status roomv1.AnalysisStatus) *roomv1.EvaluationResult {
+	result.Gaps = append(result.Gaps, &roomv1.EvaluationGap{RequiredSignal: signal, ReasonCode: reason, Status: status})
+	if p.auditOnly {
+		result.Decision = roomv1.Decision_DECISION_WARN
+	}
+	return result
+}
+
+func triggered(selectors []*roomv1.SignalSelector, phase roomv1.AnalysisPhase, maxConfidence map[roomv1.SignalKind]uint32) bool {
+	for _, selector := range selectors {
+		if selector == nil || !phaseMatches(selector.GetPhases(), phase) {
+			continue
+		}
+		if confidence, exists := maxConfidence[selector.GetSignal()]; exists && confidence >= selector.GetMinimumConfidenceBasisPoints() {
+			return true
+		}
+	}
+	return false
+}
+
+func phaseMatches(phases []roomv1.AnalysisPhase, phase roomv1.AnalysisPhase) bool {
+	if len(phases) == 0 {
 		return true
 	}
-	if !listMatches(scope.GetWorkspaces(), context.GetWorkspaceId()) {
+	for _, candidate := range phases {
+		if candidate == phase {
+			return true
+		}
+	}
+	return false
+}
+
+// ScopeMatches is the canonical matcher for identity and path rule scope.
+func ScopeMatches(scope *roomv1.RuleScope, context *roomv1.EvaluationContext) bool {
+	if scope == nil {
+		return true
+	}
+	if context == nil || !listMatches(scope.GetWorkspaces(), context.GetWorkspaceId()) || !listMatches(scope.GetRepositories(), context.GetRepository()) || !listMatches(scope.GetAgentTypes(), context.GetAgentType()) {
 		return false
 	}
-	if !listMatches(scope.GetRepositories(), context.GetRepository()) {
-		return false
-	}
-	if !listMatchesAny(scope.GetLanguages(), context.GetLanguages()) {
-		return false
-	}
-	if !listMatchesAny(scope.GetFrameworks(), context.GetFrameworks()) {
-		return false
-	}
-	if !listMatches(scope.GetAgentTypes(), context.GetAgentType()) {
-		return false
-	}
-	if len(scope.GetPaths()) == 0 {
+	if len(scope.GetPaths()) == 0 || len(context.GetChangedFiles()) == 0 {
 		return true
 	}
 	for _, changed := range context.GetChangedFiles() {
@@ -107,7 +247,7 @@ func scopeMatches(scope *roomv1.RuleScope, context *roomv1.EvaluationContext) bo
 			}
 		}
 	}
-	return len(context.GetChangedFiles()) == 0
+	return false
 }
 
 func listMatches(patterns []string, value string) bool {
@@ -122,199 +262,8 @@ func listMatches(patterns []string, value string) bool {
 	return false
 }
 
-func listMatchesAny(patterns, values []string) bool {
-	if len(patterns) == 0 {
-		return true
-	}
-	for _, value := range values {
-		if listMatches(patterns, value) {
-			return true
-		}
-	}
-	return false
-}
-
-func ruleMatches(rule *roomv1.Rule, input *roomv1.EvaluationInput) bool {
-	checks := rule.GetChecks()
-	if len(checks) == 0 {
-		return false
-	}
-	for _, check := range checks {
-		if checkMatches(check, input) {
-			return true
-		}
-	}
-	return false
-}
-
-func checkMatches(check *roomv1.RuleCheck, input *roomv1.EvaluationInput) bool {
-	if check == nil {
-		return false
-	}
-	expression := strings.TrimSpace(check.GetExpression())
-	switch check.GetKind() {
-	case roomv1.CheckKind_CHECK_KIND_PLAN_TEXT:
-		return textExpressionMatches(expression, input.GetPlan())
-	case roomv1.CheckKind_CHECK_KIND_DIFF_TEXT:
-		return textExpressionMatches(expression, input.GetDiff())
-	case roomv1.CheckKind_CHECK_KIND_FILE_PATH:
-		for _, changed := range input.GetContext().GetChangedFiles() {
-			if textExpressionMatches(expression, changed) {
-				return true
-			}
-			for _, glob := range check.GetFileGlobs() {
-				if globMatch(glob, changed) {
-					return true
-				}
-			}
-		}
-		return false
-	case roomv1.CheckKind_CHECK_KIND_HEURISTIC:
-		return heuristicMatches(expression, input)
-	default:
-		return textExpressionMatches(expression, input.GetPlan()+"\n"+input.GetDiff())
-	}
-}
-
-func textExpressionMatches(expression, text string) bool {
-	expression = strings.TrimSpace(expression)
-	textLower := strings.ToLower(text)
-	switch {
-	case expression == "", expression == "always":
-		return true
-	case strings.HasPrefix(expression, "contains_any:"):
-		for _, token := range splitCSV(strings.TrimPrefix(expression, "contains_any:")) {
-			if strings.Contains(textLower, strings.ToLower(token)) {
-				return true
-			}
-		}
-		return false
-	case strings.HasPrefix(expression, "missing_any:"):
-		for _, token := range splitCSV(strings.TrimPrefix(expression, "missing_any:")) {
-			if strings.Contains(textLower, strings.ToLower(token)) {
-				return false
-			}
-		}
-		return true
-	case strings.HasPrefix(expression, "regex:"):
-		re, err := regexp.Compile(strings.TrimPrefix(expression, "regex:"))
-		return err == nil && re.MatchString(text)
-	default:
-		return strings.Contains(textLower, strings.ToLower(expression))
-	}
-}
-
-func heuristicMatches(expression string, input *roomv1.EvaluationInput) bool {
-	text := strings.ToLower(input.GetPlan() + "\n" + input.GetDiff())
-	switch strings.TrimSpace(expression) {
-	case "touches_tenant_data_without_scope":
-		touchesTenantEntity := containsAny(text, "tenant", "organization", "workspace", "account", "customer", "project", "membership")
-		touchesTenantData := touchesTenantEntity || (containsAny(text, "user") && containsAny(text, "database", "query", "repository", "read", "write", "insert", "update", "delete"))
-		hasScope := containsAny(text, "organization_id", "workspace_id", "tenant_id", "org-scoped", "workspace-scoped", "membership", "authorize", "authorization")
-		return touchesTenantData && !hasScope
-	case "secret_literal":
-		return secretPattern.MatchString(input.GetPlan()) || secretPattern.MatchString(input.GetDiff())
-	case "destructive_shell":
-		return containsAny(text, "rm -rf", "drop database", "truncate table", "terraform destroy", "kubectl delete")
-	case "protected_handler_without_auth_context":
-		touchesProtectedPath := containsAny(text, "protected", "admin", "private", "authenticated", "handler", "endpoint", "route", "api")
-		touchesData := containsAny(text, "database", "query", "invoice", "customer", "user", "account", "project", "order", "billing")
-		hasAuthContext := containsAny(text, "auth", "session", "principal", "claims", "middleware", "authorize", "authenticated context")
-		return touchesProtectedPath && touchesData && !hasAuthContext
-	case "unsafe_sql_construction":
-		touchesSQL := containsAny(text, "select ", "insert ", "update ", "delete ", "where ", "query", "sql")
-		buildsDynamically := containsAny(text, "concatenat", "string builder", "sprintf", "fmt.sprintf", "template", "`select", "' +", "\" +")
-		hasParameterization := containsAny(text, "parameter", "prepared", "bind", "placeholder", "$1", "?", "sqlc", "gorm", "query builder")
-		return touchesSQL && buildsDynamically && !hasParameterization
-	case "external_fetch_without_allowlist":
-		fetchesExternal := containsAny(text, "http.get", "fetch(", "axios", "request(", "urlopen", "net/http", "external url", "user supplied url", "user-supplied url", "webhook")
-		hasAllowlist := containsAny(text, "allowlist", "allowed host", "allowed domain", "url validation", "dns pin", "block private", "ssrf")
-		return fetchesExternal && !hasAllowlist
-	case "privilege_change_without_audit":
-		changesPrivilege := containsAny(text, "grant", "role", "permission", "owner", "admin", "privilege", "membership", "invite")
-		hasAudit := containsAny(text, "audit", "event", "log", "activity", "security trail")
-		return changesPrivilege && !hasAudit
-	case "webhook_without_signature_verification":
-		handlesWebhook := containsAny(text, "webhook", "provider event", "callback endpoint", "stripe event", "github event")
-		hasSignatureCheck := containsAny(text, "signature", "hmac", "verify", "verification", "secret header", "signed payload")
-		return handlesWebhook && !hasSignatureCheck
-	case "password_storage_without_hashing":
-		handlesPassword := containsAny(text, "password")
-		storesPassword := containsAny(text, "store", "save", "database", "persist", "insert")
-		hasHashing := containsAny(text, "hash", "bcrypt", "argon2", "scrypt", "pbkdf2")
-		return handlesPassword && storesPassword && !hasHashing
-	case "public_sensitive_endpoint_without_rate_limit":
-		publicEndpoint := containsAny(text, "public", "unauthenticated", "anonymous", "login", "signup", "password reset", "reset password")
-		sensitiveFlow := containsAny(text, "login", "signup", "password", "otp", "token", "magic link", "reset")
-		hasRateLimit := containsAny(text, "rate limit", "ratelimit", "throttle", "quota", "abuse limit")
-		return publicEndpoint && sensitiveFlow && !hasRateLimit
-	case "rust_unsafe_without_safety_rationale":
-		usesUnsafe := containsAny(text, "unsafe {", "unsafe fn", "unsafe impl", "unsafe trait", "unsafe extern")
-		hasSafetyRationale := containsAny(text, "safety:", "safety invariant", "soundness", "invariant", "justification")
-		return usesUnsafe && !hasSafetyRationale
-	case "rust_unwrap_or_expect_in_request_path":
-		requestPath := containsAny(text, "handler", "endpoint", "route", "api", "request", "axum", "actix", "warp", "rocket")
-		usesPanicResult := containsAny(text, ".unwrap()", ".expect(")
-		hasFallibleHandling := containsAny(text, "map_err", "ok_or", "context(", "thiserror", "anyhow", "return error", "propagate")
-		return requestPath && usesPanicResult && !hasFallibleHandling
-	case "rust_command_with_user_input":
-		usesCommand := containsAny(text, "std::process::command", "tokio::process::command", "command::new", ".arg(")
-		userControlled := containsAny(text, "user input", "user supplied", "user-supplied", "request", "query param", "path param", "payload", "filename", "form")
-		hasAllowlist := containsAny(text, "allowlist", "allowed", "validated", "enum", "fixed args", "fixed argument", "no shell")
-		return usesCommand && userControlled && !hasAllowlist
-	case "rust_weak_rng_for_secret":
-		weakRandom := containsAny(text, "rand::thread_rng", "rand::random", "smallrng", "fastrand")
-		securitySensitive := containsAny(text, "token", "secret", "session", "password reset", "nonce", "api key", "credential")
-		cryptoRandom := containsAny(text, "osrng", "rand_core::osrng", "getrandom", "ring::rand", "crypto rng", "cryptographic")
-		return weakRandom && securitySensitive && !cryptoRandom
-	case "rust_path_traversal_without_canonicalize":
-		pathIO := containsAny(text, "pathbuf", "std::fs", "tokio::fs", "read_to_string", "file upload", "download", "filename", "user supplied path", "user-supplied path")
-		userPath := containsAny(text, "user", "request", "param", "filename", "upload", "download")
-		hasPathDefense := containsAny(text, "canonicalize", "starts_with", "safe base", "base dir", "sanitize", "path_clean")
-		return pathIO && userPath && !hasPathDefense
-	case "rust_panic_in_library_or_api":
-		libraryOrAPI := containsAny(text, "library", "api", "handler", "service", "crate", "server")
-		panics := containsAny(text, "panic!", "todo!", "unimplemented!", "unreachable!")
-		return libraryOrAPI && panics
-	case "rust_std_mutex_across_await":
-		syncLock := containsAny(text, "std::sync::mutex", "std::sync::rwlock", "parking_lot::mutex", "parking_lot::rwlock")
-		asyncContext := containsAny(text, "async", ".await", "tokio", "actix", "axum")
-		hasSafeLocking := containsAny(text, "tokio::sync::mutex", "drop(", "release before await", "no await while locked")
-		return syncLock && asyncContext && !hasSafeLocking
-	case "rust_serde_external_input_missing_deny_unknown_fields":
-		externalInput := containsAny(text, "api", "webhook", "request", "external input", "json", "payload")
-		deserializes := containsAny(text, "serde", "deserialize", "#[derive(deserialize)]")
-		hasValidation := containsAny(text, "deny_unknown_fields", "validator", "validate(", "schemars", "jsonschema")
-		return externalInput && deserializes && !hasValidation
-	default:
-		return false
-	}
-}
-
-func containsAny(text string, tokens ...string) bool {
-	for _, token := range tokens {
-		if strings.Contains(text, token) {
-			return true
-		}
-	}
-	return false
-}
-
-func splitCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
-}
-
 func globMatch(pattern, value string) bool {
-	pattern = strings.TrimSpace(pattern)
-	value = strings.TrimSpace(value)
+	pattern, value = strings.TrimSpace(pattern), strings.TrimSpace(value)
 	if pattern == "" || pattern == "*" {
 		return true
 	}
@@ -327,15 +276,49 @@ func globMatch(pattern, value string) bool {
 	return strings.EqualFold(pattern, value)
 }
 
-func dedupe(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
+func cloneContext(context *roomv1.EvaluationContext) *roomv1.EvaluationContext {
+	if context == nil {
+		return &roomv1.EvaluationContext{}
+	}
+	return proto.Clone(context).(*roomv1.EvaluationContext)
+}
+
+func dedupeKinds(values []roomv1.SignalKind) []roomv1.SignalKind {
+	seen := make(map[roomv1.SignalKind]bool, len(values))
+	out := make([]roomv1.SignalKind, 0, len(values))
+	for _, value := range values {
+		if !seen[value] {
+			seen[value] = true
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func dedupeStrings(values []string) []string {
+	seen := make(map[string]bool, len(values))
 	out := make([]string, 0, len(values))
 	for _, value := range values {
-		if _, ok := seen[value]; ok {
+		if !seen[value] {
+			seen[value] = true
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func dedupeGaps(values []*roomv1.EvaluationGap) []*roomv1.EvaluationGap {
+	seen := make(map[string]bool, len(values))
+	out := make([]*roomv1.EvaluationGap, 0, len(values))
+	for _, value := range values {
+		if value == nil {
 			continue
 		}
-		seen[value] = struct{}{}
-		out = append(out, value)
+		key := fmt.Sprintf("%d:%s:%d:%s", value.GetRequiredSignal(), value.GetAnalyzerId(), value.GetStatus(), value.GetReasonCode())
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, value)
+		}
 	}
 	return out
 }
@@ -345,4 +328,12 @@ func ruleMessage(rule *roomv1.Rule) string {
 		return rule.GetDescription()
 	}
 	return rule.GetTitle()
+}
+
+func newID() string {
+	var value [16]byte
+	if _, err := rand.Read(value[:]); err != nil {
+		return "evaluation"
+	}
+	return hex.EncodeToString(value[:])
 }

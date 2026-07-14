@@ -126,6 +126,8 @@
     <header>
       <h1>Room Rules</h1>
       <div class="toolbar">
+        <input id="admin-token" type="password" autocomplete="off" placeholder="Admin token (memory only)" aria-label="Admin token" />
+        <input id="agent-token" type="password" autocomplete="off" placeholder="Agent token (memory only)" aria-label="Agent token" />
         <button class="secondary" id="refresh">Refresh</button>
         <button id="publish">Publish Ruleset</button>
       </div>
@@ -152,17 +154,29 @@
               </select>
             </div>
             <div>
-              <label for="kind">Check Kind</label>
-              <select id="kind">
-                <option value="6">heuristic</option>
-                <option value="1">plan text</option>
-                <option value="2">diff text</option>
-                <option value="3">file path</option>
+              <label for="signal">Typed Security Signal</label>
+              <select id="signal">
+                <option value="1">tenant access without trusted scope</option>
+                <option value="2">protected access without auth context</option>
+                <option value="3">secret literal</option>
+                <option value="4">dynamic SQL with untrusted input</option>
+                <option value="5">untrusted outbound destination</option>
+                <option value="6">privilege mutation without audit</option>
+                <option value="7">unsigned webhook</option>
+                <option value="8">password persistence without KDF</option>
+                <option value="9">public credential flow without rate limit</option>
+                <option value="10">destructive operation</option>
+                <option value="11">Rust unsafe without safety contract</option>
+                <option value="12">Rust panic in request path</option>
+                <option value="13">Rust command with untrusted argument</option>
+                <option value="14">Rust weak RNG for secret</option>
+                <option value="15">Rust untrusted path</option>
+                <option value="16">Rust panic in library API</option>
+                <option value="17">Rust blocking lock across await</option>
+                <option value="18">Rust unvalidated external deserialization</option>
               </select>
             </div>
           </div>
-          <label for="expression">Expression</label>
-          <input id="expression" required placeholder="touches_tenant_data_without_scope" />
           <label for="tags">Tags, comma separated</label>
           <input id="tags" placeholder="security, tenancy" />
           <label for="evidence">Required Evidence, one per line</label>
@@ -196,14 +210,19 @@
       const severityName = value => ["", "info", "low", "medium", "high", "critical"][value] || "unspecified";
       const lineList = value => value.split("\n").map(v => v.trim()).filter(Boolean);
       const csv = value => value.split(",").map(v => v.trim()).filter(Boolean);
+      const authFetch = (url, options = {}, role = "admin") => {
+        const token = $(role === "agent" ? "agent-token" : "admin-token").value.trim();
+        const headers = new Headers(options.headers || {});
+        if (token) headers.set("authorization", `Bearer ${token}`);
+        return fetch(url, { ...options, headers });
+      };
 
       function fillForm(rule) {
         $("id").value = rule?.id || "";
         $("title").value = rule?.title || "";
         $("description").value = rule?.description || "";
         $("severity").value = String(rule?.severity || 5);
-        $("kind").value = String(rule?.checks?.[0]?.kind || 6);
-        $("expression").value = rule?.checks?.[0]?.expression || "";
+        $("signal").value = String(rule?.triggers?.[0]?.signal || 1);
         $("tags").value = (rule?.tags || []).join(", ");
         $("evidence").value = (rule?.requiredEvidence || []).join("\n");
         $("remediation").value = (rule?.remediation || []).join("\n");
@@ -217,21 +236,27 @@
           severity: Number($("severity").value),
           tags: csv($("tags").value),
           enabled: true,
-          checks: [{ kind: Number($("kind").value), expression: $("expression").value.trim() }],
+          triggers: [{ signal: Number($("signal").value), phases: [1, 2], minimumConfidenceBasisPoints: 8000 }],
+          requiredCoverage: [Number($("signal").value)],
           requiredEvidence: lineList($("evidence").value),
           remediation: lineList($("remediation").value)
         };
       }
 
       async function refresh() {
-        const response = await fetch("/api/rules");
+        const response = await authFetch("/api/rules");
         const data = await response.json();
         state.rules = data.rules || [];
         $("rules").innerHTML = "";
         for (const rule of state.rules) {
           const tr = document.createElement("tr");
           const severity = severityName(rule.severity);
-          tr.innerHTML = `<td>${rule.id}</td><td class="${severity}">${severity}</td><td>${rule.title}</td><td>${(rule.tags || []).join(", ")}</td>`;
+          for (const value of [rule.id, severity, rule.title, (rule.tags || []).join(", ")]) {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            tr.appendChild(cell);
+          }
+          tr.children[1].className = severity;
           const actions = document.createElement("td");
           actions.className = "rule-actions";
           const edit = document.createElement("button");
@@ -251,7 +276,7 @@
       async function saveRule(event) {
         event.preventDefault();
         const rule = formRule();
-        const response = await fetch("/api/rules", {
+        const response = await authFetch("/api/rules", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ rule })
@@ -261,18 +286,18 @@
       }
 
       async function deleteRule(id) {
-        const response = await fetch(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const response = await authFetch(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
         $("result").textContent = JSON.stringify(await response.json(), null, 2);
         fillForm(null);
         await refresh();
       }
 
       async function evaluate() {
-        const response = await fetch("/api/evaluate", {
+        const response = await authFetch("/api/evaluate", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ plan: $("plan").value })
-        });
+          body: JSON.stringify({ phase: 1, plan: $("plan").value })
+        }, "agent");
         $("result").textContent = JSON.stringify(await response.json(), null, 2);
       }
 
@@ -281,13 +306,10 @@
       $("refresh").onclick = refresh;
       $("evaluate").onclick = evaluate;
       $("publish").onclick = async () => {
-        $("result").textContent = JSON.stringify(await (await fetch("/api/publish", { method: "POST" })).json(), null, 2);
+        $("result").textContent = JSON.stringify(await (await authFetch("/api/publish", { method: "POST" })).json(), null, 2);
         await refresh();
       };
-      refresh().then(() => {
-        if (state.rules[0]) fillForm(state.rules[0]);
-      });
-      evaluate();
+      $("admin-token").onchange = () => refresh().then(() => { if (state.rules[0]) fillForm(state.rules[0]); });
     </script>
   </body>
 </html>

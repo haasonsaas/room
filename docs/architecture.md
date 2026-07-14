@@ -1,45 +1,30 @@
 # Architecture
 
-Room has two planes.
-
-## Control plane
-
-The dashboard and admin API publish rules. Every publish creates an immutable
-`RulesetVersion` with a version and hash. Rollback is an active-version pointer
-change, not a mutation of old rules.
+Room separates authority, analysis, and policy evaluation.
 
 ```text
-Dashboard / API client
-  -> RuleAdminService
-  -> file store today, database later
-  -> immutable ruleset versions
+admin credential -> rule/MCP policy publication -> immutable scoped ruleset
+agent credential -> raw plan or diff -> trusted analyzer -> typed receipt
+typed receipt + verified credential scope + ruleset -> decision -> SQLite audit
+typed MCP identity + MCP policy -> decision -> SQLite audit
 ```
 
-## Agent plane
+The authenticated agent credential is authoritative for workspace, repository,
+agent, and subject identity. Caller-supplied identity fields are overwritten.
+Returned rulesets include that authorized scope and a scope-specific hash, so a
+cache from one credential cannot masquerade as another scope.
 
-Agents do not write rules. They fetch or watch active rulesets and evaluate
-plans/diffs through the MCP sidecar or hook runner.
+The analyzer is the only component that receives raw plans and diffs. The policy
+engine accepts fixed `SignalKind` values, analyzer identity/config digests,
+coverage receipts, artifact hashes, and confidence values. Missing, partial,
+invalid, or untrusted analysis produces `INDETERMINATE`, not an implicit allow.
 
-```text
-Coding agent
-  -> MCP tool or lifecycle hook
-  -> room-mcp / roomctl
-  -> AgentRulesService
-  -> active ruleset
-```
+MCP governance likewise consumes typed identity. Direct proxies can provide
+transport-verified server/tool identity; hook adapters must use explicit provider
+bindings. Room never splits or interprets display names such as
+`mcp__server__tool`.
 
-`roomctl` and `room-mcp` cache the latest fetched ruleset locally. Hook
-evaluation uses that cache as a fallback when the control plane is offline, so a
-short outage does not remove guardrails from the agent loop.
-
-For push-style updates, `AgentRulesService.WatchRuleset` streams new active
-ruleset versions, and `roomctl watch-rules` persists those updates into the
-same local cache used by hooks.
-
-## Why both MCP and hooks
-
-MCP is the advisory interface: it lets the model ask for guidance before making
-an implementation choice.
-
-Hooks are the deterministic interface: they run during lifecycle events and can
-block or add feedback even if the model forgets to call the MCP tool.
+SQLite stores protobuf snapshots and append-only audit rows. WAL mode, private
+file permissions, idempotent event IDs, and payload digests provide durable local
+operation. Existing JSON stores are preserved as `.legacy.json`, migrated once,
+and known legacy heuristic rules are converted to typed signal rules.

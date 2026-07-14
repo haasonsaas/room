@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"strings"
-	"time"
 
+	roomauth "github.com/haasonsaas/room/internal/auth"
+	"github.com/haasonsaas/room/internal/config"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -28,11 +30,22 @@ func main() {
 }
 
 func run(ctx context.Context, endpoint, tool, plan, diff string, listOnly bool) error {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-
 	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "room-mcp-call", Version: "dev"}, nil)
-	session, err := client.Connect(ctx, &mcpsdk.StreamableClientTransport{Endpoint: endpoint}, nil)
+	httpClient := http.DefaultClient
+	cfg := config.Load()
+	if err := cfg.ValidateClient(); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, cfg.ClientTimeout)
+	defer cancel()
+	if !cfg.AuthDisabled {
+		token, tokenErr := config.LoadToken(cfg.TokenFile)
+		if tokenErr != nil {
+			return fmt.Errorf("load Room token: %w", tokenErr)
+		}
+		httpClient = roomauth.NewHTTPClientWithTimeout(token, cfg.ClientTimeout)
+	}
+	session, err := client.Connect(ctx, &mcpsdk.StreamableClientTransport{Endpoint: endpoint, HTTPClient: httpClient}, nil)
 	if err != nil {
 		return fmt.Errorf("connect to %s: %w", endpoint, err)
 	}
