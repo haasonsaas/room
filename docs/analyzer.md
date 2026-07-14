@@ -6,10 +6,14 @@ content bytes, changed files, and the SHA-256 input digest. The executable must
 return exactly one JSON object on stdout; unknown or trailing fields are rejected.
 
 The response declares the same phase and input digest, a status, complete
-covered-signal names, and zero or more typed signals. Every signal has a stable
-fingerprint, a confidence from 0–10000, and optional typed location/evidence
-hashes. Room—not the provider—stamps the configured analyzer ID, version, and
-configuration digest onto accepted receipts.
+covered-signal names, and zero or more typed signals. It may also declare
+`languages` and `frameworks` detected from the analyzed artifact. Room validates,
+normalizes, deduplicates, and stamps those classifications onto the artifact;
+policy uses them only when the report contains a valid receipt from the configured
+analyzer. Agent-supplied classification cannot narrow a rule's scope. Every signal
+has a stable fingerprint, a confidence from 0–10000, and optional typed
+location/evidence hashes. Room—not the provider—stamps the configured analyzer
+ID, version, and configuration digest onto accepted receipts.
 
 For `COMPLETE`, all signals configured for the analyzer must be present in
 `covered_signals`, even when no finding exists. Process failure, digest mismatch,

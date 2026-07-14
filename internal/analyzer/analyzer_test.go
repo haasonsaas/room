@@ -22,6 +22,8 @@ func TestExternalAnalyzerStampsTrustedIdentityAndArtifact(t *testing.T) {
 	executable := writeProvider(t, fmt.Sprintf(`{
   "phase":"ANALYSIS_PHASE_DIFF",
   "status":"ANALYSIS_STATUS_COMPLETE",
+  "languages":[" Go ","SQL"],
+  "frameworks":["ConnectRPC"],
   "covered_signals":["SIGNAL_KIND_SECRET_LITERAL"],
   "signals":[{
     "kind":"SIGNAL_KIND_SECRET_LITERAL",
@@ -51,6 +53,9 @@ func TestExternalAnalyzerStampsTrustedIdentityAndArtifact(t *testing.T) {
 	if got := report.GetArtifact().GetPhase(); got != input.Phase {
 		t.Fatalf("phase = %s", got)
 	}
+	if fmt.Sprint(report.GetArtifact().GetLanguages()) != "[go sql]" || fmt.Sprint(report.GetArtifact().GetFrameworks()) != "[connectrpc]" {
+		t.Fatalf("artifact classification = languages %v frameworks %v", report.GetArtifact().GetLanguages(), report.GetArtifact().GetFrameworks())
+	}
 	receipt := report.GetReceipts()[0]
 	wantConfigDigest := sha256.Sum256([]byte("rules-v4"))
 	if receipt.GetAnalyzer().GetId() != "semgrep" || receipt.GetAnalyzer().GetVersion() != "1.2.3" {
@@ -78,6 +83,7 @@ func TestExternalAnalyzerRejectsInvalidProviderReceipts(t *testing.T) {
 		{"invalid confidence", fmt.Sprintf(`{"phase":"ANALYSIS_PHASE_PLAN","status":"ANALYSIS_STATUS_COMPLETE","covered_signals":["SIGNAL_KIND_SECRET_LITERAL"],"signals":[{"kind":"SIGNAL_KIND_SECRET_LITERAL","fingerprint":"x","confidence_basis_points":10001}],"input_sha256":%q}`, validDigest), "confidence_invalid"},
 		{"unstamped identity", fmt.Sprintf(`{"phase":"ANALYSIS_PHASE_PLAN","status":"ANALYSIS_STATUS_COMPLETE","covered_signals":["SIGNAL_KIND_SECRET_LITERAL"],"analyzer":{"id":"attacker"},"input_sha256":%q}`, validDigest), "provider_output_invalid"},
 		{"unknown signal", fmt.Sprintf(`{"phase":"ANALYSIS_PHASE_PLAN","status":"ANALYSIS_STATUS_COMPLETE","covered_signals":["SIGNAL_KIND_NOT_REAL"],"input_sha256":%q}`, validDigest), "provider_output_invalid"},
+		{"invalid classification", fmt.Sprintf(`{"phase":"ANALYSIS_PHASE_PLAN","status":"ANALYSIS_STATUS_COMPLETE","languages":["go"," GO "],"covered_signals":["SIGNAL_KIND_SECRET_LITERAL"],"input_sha256":%q}`, validDigest), "classification_invalid"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
