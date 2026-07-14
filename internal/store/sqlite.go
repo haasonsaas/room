@@ -170,6 +170,9 @@ func (s *Store) UpsertRule(rule *roomv1.Rule) (*roomv1.Rule, error) {
 	for i, existing := range candidate.DraftRules {
 		if existing.GetId() == copyRule.GetId() {
 			copyRule.CreatedAt = existing.GetCreatedAt()
+			if copyRule.Scope == nil {
+				copyRule.Scope = cloneRule(existing).GetScope()
+			}
 			candidate.DraftRules[i] = copyRule
 			sortRules(candidate.DraftRules)
 			return cloneRule(copyRule), s.commitCandidateLocked(candidate, nil, nil)
