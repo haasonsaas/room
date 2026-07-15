@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -26,8 +27,21 @@ const registryVersion = 1
 var credentialIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]{0,127}$`)
 
 type registryFile struct {
-	Version     int              `json:"version"`
-	Credentials []credentialFile `json:"credentials"`
+	Version             int                         `json:"version"`
+	Credentials         []credentialFile            `json:"credentials"`
+	CredentialMutations []CredentialMutationReceipt `json:"credential_mutations,omitempty"`
+}
+
+// CredentialMutationReceipt is persisted in the same atomic replacement as
+// the credential mutation it records.
+type CredentialMutationReceipt struct {
+	ID           string    `json:"id"`
+	ActorID      string    `json:"actor_id"`
+	CredentialID string    `json:"credential_id"`
+	Action       string    `json:"action"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	OldScope     Scope     `json:"old_scope"`
+	NewScope     Scope     `json:"new_scope"`
 }
 
 type credentialFile struct {
@@ -47,6 +61,7 @@ type credential struct {
 // Registry is an immutable, validated in-memory credential registry.
 type Registry struct {
 	credentials []credential
+	mutations   []CredentialMutationReceipt
 }
 
 // FileAuthenticator reloads a validated registry before every authentication.
@@ -118,7 +133,7 @@ func decodeRegistry(reader io.Reader) (*Registry, error) {
 	if stored.Version != registryVersion {
 		return nil, fmt.Errorf("unsupported credential registry version %d", stored.Version)
 	}
-	registry := &Registry{credentials: make([]credential, 0, len(stored.Credentials))}
+	registry := &Registry{credentials: make([]credential, 0, len(stored.Credentials)), mutations: append([]CredentialMutationReceipt(nil), stored.CredentialMutations...)}
 	seen := make(map[string]struct{}, len(stored.Credentials))
 	for index, item := range stored.Credentials {
 		if _, exists := seen[item.ID]; exists {
@@ -201,7 +216,8 @@ func parseToken(token string) (string, []byte, bool) {
 	return id, secret, true
 }
 
-// IssueOrUpdateToken generates a credential and atomically replaces its registry entry.
+// IssueOrUpdateToken bootstraps a new credential. Existing IDs must use an
+// authenticated, audited rotation workflow.
 // The returned plaintext token is never persisted and should be displayed only once.
 func IssueOrUpdateToken(path string, principal Principal) (string, error) {
 	if err := validatePrincipal(principal); err != nil {
@@ -223,10 +239,11 @@ func IssueOrUpdateToken(path string, principal Principal) (string, error) {
 	stored := registryFile{Version: registryVersion, Credentials: []credentialFile{}}
 	registry, err := LoadRegistry(path)
 	if err == nil {
+		stored.CredentialMutations = append([]CredentialMutationReceipt(nil), registry.mutations...)
 		stored.Credentials = make([]credentialFile, 0, len(registry.credentials)+1)
 		for _, existing := range registry.credentials {
 			if existing.principal.ID == principal.ID {
-				continue
+				return "", errors.New("credential already exists; use an authenticated audited rotation workflow")
 			}
 			stored.Credentials = append(stored.Credentials, credentialFile{
 				ID: existing.principal.ID, Role: existing.principal.Role,
@@ -244,6 +261,85 @@ func IssueOrUpdateToken(path string, principal Principal) (string, error) {
 		return "", err
 	}
 	return token, nil
+}
+
+// RotateAgentScope replaces an existing agent token and records the human
+// approval and exact scope change in the same durable registry write.
+func RotateAgentScope(path string, actor Principal, credentialID string, newScope Scope, confirmation string) (string, CredentialMutationReceipt, error) {
+	if actor.Role != RoleAdmin || !actor.HumanOperator || actor.LocalAuth {
+		return "", CredentialMutationReceipt{}, errors.New("authenticated human-operator credential required")
+	}
+	if confirmation != "APPROVE" {
+		return "", CredentialMutationReceipt{}, errors.New("explicit APPROVE confirmation required")
+	}
+	if strings.ContainsAny(newScope.WorkspaceID+newScope.Repository+newScope.AgentID, "*?[") {
+		return "", CredentialMutationReceipt{}, errors.New("credential scope must identify one exact workspace, repository, and agent")
+	}
+	lock, err := lockRegistry(path)
+	if err != nil {
+		return "", CredentialMutationReceipt{}, err
+	}
+	defer unlockRegistry(lock)
+	registry, err := LoadRegistry(path)
+	if err != nil {
+		return "", CredentialMutationReceipt{}, err
+	}
+	var subject Principal
+	for _, existing := range registry.credentials {
+		if existing.principal.ID == credentialID {
+			subject = existing.principal
+			break
+		}
+	}
+	if subject.ID == "" || subject.Role != RoleAgent {
+		return "", CredentialMutationReceipt{}, errors.New("existing agent credential required")
+	}
+	newScope.HookProvider = subject.Scope.HookProvider
+	newScope.MCPProxy = subject.Scope.MCPProxy
+	updated := subject
+	updated.Scope = newScope
+	if err := validatePrincipal(updated); err != nil {
+		return "", CredentialMutationReceipt{}, err
+	}
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return "", CredentialMutationReceipt{}, fmt.Errorf("generate token: %w", err)
+	}
+	token := "room_" + updated.ID + "_" + base64.RawURLEncoding.EncodeToString(secret)
+	clear(secret)
+	digest := sha256.Sum256([]byte(token))
+	receiptBytes := make([]byte, 16)
+	if _, err := rand.Read(receiptBytes); err != nil {
+		return "", CredentialMutationReceipt{}, fmt.Errorf("generate receipt id: %w", err)
+	}
+	receipt := CredentialMutationReceipt{ID: hex.EncodeToString(receiptBytes), ActorID: actor.ID, CredentialID: updated.ID, Action: "rotate_agent_scope", OccurredAt: time.Now().UTC(), OldScope: subject.Scope, NewScope: updated.Scope}
+	stored := registryFile{Version: registryVersion, Credentials: make([]credentialFile, 0, len(registry.credentials)), CredentialMutations: append(append([]CredentialMutationReceipt(nil), registry.mutations...), receipt)}
+	for _, existing := range registry.credentials {
+		principal := existing.principal
+		tokenDigest := existing.digest
+		if principal.ID == updated.ID {
+			principal = updated
+			tokenDigest = digest
+		}
+		stored.Credentials = append(stored.Credentials, credentialFile{ID: principal.ID, Role: principal.Role, TokenSHA256: hex.EncodeToString(tokenDigest[:]), Scope: principal.Scope, HumanOperator: principal.HumanOperator})
+	}
+	if err := writeRegistryAtomic(path, stored); err != nil {
+		return "", CredentialMutationReceipt{}, err
+	}
+	return token, receipt, nil
+}
+
+// CredentialMutationReceipts returns a copy of the registry's durable receipts.
+func (r *Registry) CredentialMutationReceipts() []CredentialMutationReceipt {
+	if r == nil {
+		return nil
+	}
+	return append([]CredentialMutationReceipt(nil), r.mutations...)
+}
+
+// RotateAgentScope applies the audited scope rotation to a reloadable registry.
+func (a *FileAuthenticator) RotateAgentScope(actor Principal, credentialID string, scope Scope, confirmation string) (string, CredentialMutationReceipt, error) {
+	return RotateAgentScope(a.path, actor, credentialID, scope, confirmation)
 }
 
 func validatePrincipal(principal Principal) error {

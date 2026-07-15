@@ -100,6 +100,21 @@ approval_policy = { granular = { sandbox_approval = false, rules = false, mcp_el
 approvals_reviewer = "user"
 ```
 
+For reliable native Codex tool discovery, prefer the `room-mcp-stdio` entrypoint
+through a Codex plugin. It reads the agent token from a private
+`ROOM_TOKEN_FILE`, so the Codex GUI process does not need to inherit a bearer
+token environment variable. Because the stdio server is Codex's direct MCP
+peer, Room form and URL elicitations render in the native Codex UI.
+
+```bash
+go build -o ~/.local/bin/room-mcp-stdio ./cmd/room-mcp-stdio
+```
+
+The plugin MCP entry should invoke that binary with `ROOM_TOKEN_FILE`,
+`ROOM_SERVER_URL`, and `ROOM_CONTROL_PLANE_URL` in its non-secret environment.
+After installing or updating the plugin, start a new Codex task so its MCP tool
+catalog is rebuilt from the plugin.
+
 ## Hooks and CLI
 
 ```bash
@@ -112,8 +127,10 @@ The ruleset cache is a private, scoped advisory cache. Evaluations are performed
 by Room and do not fall back to legacy local text heuristics when the server is
 unavailable.
 
-Credential registry changes are loaded live. Reissuing an ID revokes its old
-token without restarting `roomd` or `room-mcp`.
+Credential registry changes are loaded live. Existing IDs cannot be reissued
+through the bootstrap command; scope changes require the authenticated,
+human-confirmed dashboard workflow, which rotates the token and records the
+mutation receipt atomically without restarting `roomd` or `room-mcp`.
 
 See [architecture](docs/architecture.md), [analyzer contract](docs/analyzer.md),
 [rules](docs/rules.md), and [hooks](docs/hooks.md).

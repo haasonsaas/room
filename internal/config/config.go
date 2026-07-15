@@ -149,6 +149,10 @@ func (c Config) ValidateMCPServer() error {
 	if c.WriteTimeout <= c.ClientTimeout+5*time.Second {
 		return errors.New("ROOM_WRITE_TIMEOUT must exceed ROOM_CLIENT_TIMEOUT by more than 5s for room-mcp")
 	}
+	return c.ValidateMCPControlPlane()
+}
+
+func (c Config) ValidateMCPControlPlane() error {
 	parsed, err := url.Parse(c.ControlPlaneURL)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return errors.New("ROOM_CONTROL_PLANE_URL must be an absolute URL")
@@ -207,6 +211,13 @@ func LoadToken(path string) (string, error) {
 	}
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("ROOM_TOKEN_FILE or ROOM_TOKEN is required")
+	}
+	return LoadTokenFile(path)
+}
+
+func LoadTokenFile(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", errors.New("ROOM_TOKEN_FILE is required")
 	}
 	file, err := os.Open(path)
 	if err != nil {

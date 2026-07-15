@@ -22,16 +22,26 @@ import (
 var webFS embed.FS
 
 type options struct {
-	authenticator auth.Authenticator
-	localAuth     bool
-	maxBodyBytes  int64
+	authenticator     auth.Authenticator
+	credentialRotator interface {
+		RotateAgentScope(auth.Principal, string, auth.Scope, string) (string, auth.CredentialMutationReceipt, error)
+	}
+	localAuth    bool
+	maxBodyBytes int64
 }
 
 type Option func(*options)
 
 func WithRegistry(registry *auth.Registry) Option { return WithAuthenticator(registry) }
 func WithAuthenticator(authenticator auth.Authenticator) Option {
-	return func(o *options) { o.authenticator = authenticator }
+	return func(o *options) {
+		o.authenticator = authenticator
+		if rotator, ok := authenticator.(interface {
+			RotateAgentScope(auth.Principal, string, auth.Scope, string) (string, auth.CredentialMutationReceipt, error)
+		}); ok {
+			o.credentialRotator = rotator
+		}
+	}
 }
 func WithLocalAuth() Option               { return func(o *options) { o.localAuth = true } }
 func WithMaxBodyBytes(value int64) Option { return func(o *options) { o.maxBodyBytes = value } }
@@ -163,6 +173,38 @@ func New(service *app.Service, optionValues ...Option) http.Handler {
 		}
 		resp, err := service.ListAuditEvents(r.Context(), connect.NewRequest(&roomv1.ListAuditEventsRequest{Limit: 100}))
 		writeProtoJSON(w, message(resp), err)
+	})))
+	mux.Handle("/api/credentials/rotate-scope", protectedHandler(settings, auth.RoleAdmin, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if settings.credentialRotator == nil {
+			writeError(w, connect.NewError(connect.CodeFailedPrecondition, errors.New("credential mutation workflow unavailable")))
+			return
+		}
+		principal, ok := auth.PrincipalFromContext(r.Context())
+		if !ok || !principal.HumanOperator || principal.LocalAuth {
+			writeError(w, connect.NewError(connect.CodePermissionDenied, errors.New("authenticated human-operator credential required")))
+			return
+		}
+		var body struct {
+			CredentialID string `json:"credential_id"`
+			WorkspaceID  string `json:"workspace_id"`
+			Repository   string `json:"repository"`
+			AgentID      string `json:"agent_id"`
+			Confirmation string `json:"confirmation"`
+		}
+		if err := readJSON(w, r, &body, settings.maxBodyBytes); err != nil {
+			writeError(w, err)
+			return
+		}
+		token, receipt, err := settings.credentialRotator.RotateAgentScope(principal, body.CredentialID, auth.Scope{WorkspaceID: body.WorkspaceID, Repository: body.Repository, AgentID: body.AgentID}, body.Confirmation)
+		if err != nil {
+			writeError(w, connect.NewError(connect.CodeInvalidArgument, err))
+			return
+		}
+		writeJSONResponse(w, map[string]any{"token": token, "receipt": receipt})
 	})))
 	mux.Handle("/api/review-findings", protectedRolesHandler(settings, []auth.Role{auth.RoleAdmin, auth.RoleReviewer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -347,6 +389,13 @@ func writeProtoJSON(w http.ResponseWriter, value proto.Message, err error) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(data)
+}
+
+func writeJSONResponse(w http.ResponseWriter, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		http.Error(w, "encode response", http.StatusInternalServerError)
+	}
 }
 
 func writeError(w http.ResponseWriter, err error) {

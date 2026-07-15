@@ -135,6 +135,17 @@ func TestValidateMCPServerRequiresSecureFixedControlPlaneURL(t *testing.T) {
 	}
 }
 
+func TestValidateMCPControlPlaneIgnoresHTTPWriteDeadline(t *testing.T) {
+	t.Setenv("ROOM_CLIENT_TIMEOUT", "10m")
+	cfg := Load()
+	if err := cfg.ValidateMCPControlPlane(); err != nil {
+		t.Fatalf("stdio-appropriate MCP validation rejected long client timeout: %v", err)
+	}
+	if err := cfg.ValidateMCPServer(); err == nil {
+		t.Fatal("expected HTTP MCP validation to preserve write deadline ordering")
+	}
+}
+
 func TestLoadDefaultsControlPlaneURLToServerURL(t *testing.T) {
 	t.Setenv("ROOM_SERVER_URL", "http://127.0.0.1:9876")
 	t.Setenv("ROOM_CONTROL_PLANE_URL", "")
@@ -164,5 +175,21 @@ func TestLoadTokenRequiresPrivateFile(t *testing.T) {
 	}
 	if token, err := LoadToken(path); err != nil || token != "secret" {
 		t.Fatalf("token = %q, err = %v", token, err)
+	}
+}
+
+func TestLoadTokenFileIgnoresRoomToken(t *testing.T) {
+	t.Setenv("ROOM_TOKEN", "inherited-token")
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte("file-token\n"), 0o600); err != nil {
+		t.Fatalf("write token: %v", err)
+	}
+
+	token, err := LoadTokenFile(path)
+	if err != nil {
+		t.Fatalf("load token file: %v", err)
+	}
+	if token != "file-token" {
+		t.Fatalf("token = %q, want file-token", token)
 	}
 }

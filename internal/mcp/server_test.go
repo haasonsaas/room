@@ -323,6 +323,54 @@ func TestAnalyzePlanElicitsTypedResolutionAndAuditsAcceptance(t *testing.T) {
 	}
 }
 
+func TestNativeServerFactoryForwardsTypedElicitation(t *testing.T) {
+	t.Setenv("ROOM_CACHE_FILE", filepath.Join(t.TempDir(), "ruleset.json"))
+	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ruleStore.Close()
+	identity := &roomv1.AnalyzerIdentity{Id: "test", Version: "1", ConfigSha256: make([]byte, 32)}
+	roomServer := httptest.NewServer(server.New(app.New(ruleStore, app.WithAnalyzer(&signalAnalyzer{identity: identity})), server.WithLocalAuth()))
+	defer roomServer.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	serverTransport, clientTransport := mcpsdk.NewInMemoryTransports()
+	nativeServer := NewServerWithTokenAndTimeout(roomServer.URL, roomServer.URL, "local-test-token", 5*time.Second)
+	serverExit := make(chan error, 1)
+	go func() { serverExit <- nativeServer.Run(ctx, serverTransport) }()
+
+	var elicited *mcpsdk.ElicitParams
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "codex-native-test", Version: "test"}, &mcpsdk.ClientOptions{
+		ElicitationHandler: func(_ context.Context, request *mcpsdk.ElicitRequest) (*mcpsdk.ElicitResult, error) {
+			elicited = request.Params
+			return &mcpsdk.ElicitResult{Action: "accept", Content: map[string]any{"resolution": "revise"}}, nil
+		},
+		Capabilities: &mcpsdk.ClientCapabilities{Elicitation: &mcpsdk.ElicitationCapabilities{Form: &mcpsdk.FormElicitationCapabilities{}}},
+	})
+	session, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	tools, err := session.ListTools(ctx, nil)
+	if err != nil || len(tools.Tools) != 4 {
+		t.Fatalf("native tools = %d, err = %v", len(tools.Tools), err)
+	}
+	result, err := session.CallTool(ctx, &mcpsdk.CallToolParams{Name: "room_analyze_plan", Arguments: map[string]any{"plan": "Add a customer endpoint that queries projects from the database."}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elicited == nil || elicited.Mode != "form" || elicited.RequestedSchema == nil || result.IsError {
+		t.Fatalf("elicitation = %#v, result = %#v", elicited, result)
+	}
+	cancel()
+	if err := <-serverExit; !errors.Is(err, context.Canceled) {
+		t.Fatalf("native server exit = %v", err)
+	}
+}
+
 func TestAnalyzePlanReturnsAuditedUnsupportedFallbackWithoutClientCapability(t *testing.T) {
 	t.Setenv("ROOM_CACHE_FILE", filepath.Join(t.TempDir(), "ruleset.json"))
 	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))

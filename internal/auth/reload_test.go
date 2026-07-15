@@ -24,8 +24,11 @@ func TestFileAuthenticatorReloadsRotatedCredential(t *testing.T) {
 	if _, err := authenticator.Authenticate(oldToken); err != nil {
 		t.Fatalf("initial token: %v", err)
 	}
-
-	newToken, err := IssueOrUpdateToken(path, principal)
+	human := Principal{ID: "human", Role: RoleAdmin, HumanOperator: true}
+	if _, err := IssueOrUpdateToken(path, human); err != nil {
+		t.Fatal(err)
+	}
+	newToken, _, err := RotateAgentScope(path, human, principal.ID, principal.Scope, "APPROVE")
 	if err != nil {
 		t.Fatal(err)
 	}

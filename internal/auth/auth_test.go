@@ -63,7 +63,7 @@ func TestIssueOrUpdateTokenStoresOnlyDigestAndAuthenticates(t *testing.T) {
 	}
 }
 
-func TestIssueOrUpdateTokenReplacesCredentialAndPreservesOthers(t *testing.T) {
+func TestIssueOrUpdateTokenRejectsUnauditedReplacementAndPreservesOthers(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "credentials.json")
 	admin := Principal{ID: "operator", Role: RoleAdmin}
 	oldToken, err := IssueOrUpdateToken(path, admin)
@@ -75,22 +75,15 @@ func TestIssueOrUpdateTokenReplacesCredentialAndPreservesOthers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newToken, err := IssueOrUpdateToken(path, admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if newToken == oldToken {
-		t.Fatal("updated credential reused a token")
+	if _, err := IssueOrUpdateToken(path, admin); err == nil {
+		t.Fatal("unaudited credential replacement succeeded")
 	}
 	registry, err := LoadRegistry(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := registry.Authenticate(oldToken); err != ErrUnauthenticated {
-		t.Fatalf("old token remains valid: %v", err)
-	}
-	if _, err := registry.Authenticate(newToken); err != nil {
-		t.Fatalf("new token: %v", err)
+	if _, err := registry.Authenticate(oldToken); err != nil {
+		t.Fatalf("rejected replacement revoked old token: %v", err)
 	}
 	if _, err := registry.Authenticate(agentToken); err != nil {
 		t.Fatalf("preserved token: %v", err)
@@ -117,6 +110,80 @@ func TestHumanOperatorCapabilityIsCredentialBound(t *testing.T) {
 	}
 	if _, err := IssueOrUpdateToken(path, Principal{ID: "agent", Role: RoleAgent, HumanOperator: true, Scope: Scope{WorkspaceID: "w", Repository: "r", AgentID: "a"}}); err == nil {
 		t.Fatal("agent credential accepted human-operator capability")
+	}
+}
+
+func TestRotateAgentScopeRequiresHumanApprovalAndPersistsReceiptAtomically(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	human := Principal{ID: "human-admin", Role: RoleAdmin, HumanOperator: true}
+	if _, err := IssueOrUpdateToken(path, human); err != nil {
+		t.Fatal(err)
+	}
+	oldScope := Scope{WorkspaceID: "local", Repository: "evalops/room", AgentID: "codex", HookProvider: HookProviderCodex}
+	oldToken, err := IssueOrUpdateToken(path, Principal{ID: "codex-local", Role: RoleAgent, Scope: oldScope})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newToken, receipt, err := RotateAgentScope(path, human, "codex-local", Scope{WorkspaceID: "local", Repository: "evalops/platform", AgentID: "codex"}, "APPROVE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.ActorID != human.ID || receipt.CredentialID != "codex-local" || receipt.Action != "rotate_agent_scope" || receipt.OldScope != oldScope || receipt.NewScope.Repository != "evalops/platform" || receipt.NewScope.HookProvider != HookProviderCodex {
+		t.Fatalf("receipt = %#v", receipt)
+	}
+	registry, err := LoadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.Authenticate(oldToken); err != ErrUnauthenticated {
+		t.Fatalf("old token remains valid: %v", err)
+	}
+	principal, err := registry.Authenticate(newToken)
+	if err != nil || principal.Scope != receipt.NewScope {
+		t.Fatalf("new principal = %#v, err = %v", principal, err)
+	}
+	receipts := registry.CredentialMutationReceipts()
+	if len(receipts) != 1 || receipts[0] != receipt {
+		t.Fatalf("persisted receipts = %#v", receipts)
+	}
+}
+
+func TestRotateAgentScopeRejectsUnapprovedOrInexactMutationWithoutRevokingToken(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	human := Principal{ID: "human-admin", Role: RoleAdmin, HumanOperator: true}
+	if _, err := IssueOrUpdateToken(path, human); err != nil {
+		t.Fatal(err)
+	}
+	token, err := IssueOrUpdateToken(path, Principal{ID: "codex-local", Role: RoleAgent, Scope: Scope{WorkspaceID: "local", Repository: "evalops/room", AgentID: "codex"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name         string
+		actor        Principal
+		scope        Scope
+		confirmation string
+	}{
+		{"non-human admin", Principal{ID: "automation", Role: RoleAdmin}, Scope{WorkspaceID: "local", Repository: "evalops/platform", AgentID: "codex"}, "APPROVE"},
+		{"wrong confirmation", human, Scope{WorkspaceID: "local", Repository: "evalops/platform", AgentID: "codex"}, "approve"},
+		{"wildcard repository", human, Scope{WorkspaceID: "local", Repository: "evalops/**", AgentID: "codex"}, "APPROVE"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, _, err := RotateAgentScope(path, tt.actor, "codex-local", tt.scope, tt.confirmation); err == nil {
+				t.Fatal("rotation succeeded")
+			}
+			registry, err := LoadRegistry(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := registry.Authenticate(token); err != nil {
+				t.Fatalf("rejected rotation revoked token: %v", err)
+			}
+			if len(registry.CredentialMutationReceipts()) != 0 {
+				t.Fatal("rejected rotation persisted a receipt")
+			}
+		})
 	}
 }
 

@@ -70,6 +70,16 @@ func NewAuthenticatedHandlerWithControlPlaneURLAndTimeout(serverURL, controlPlan
 	return mcpauth.RequireBearerToken(verifier, &mcpauth.RequireBearerTokenOptions{Scopes: []string{agentScope}})(newStreamableHandler(serverURL, controlPlaneURL, timeout))
 }
 
+// NewServerWithTokenAndTimeout creates the native MCP server used by trusted
+// local transports such as stdio. The token is applied only to Room API calls.
+func NewServerWithTokenAndTimeout(serverURL, controlPlaneURL, token string, timeout time.Duration) *mcpsdk.Server {
+	h := &Handler{
+		client:          agentclient.NewAuthenticatedWithTimeout(strings.TrimRight(serverURL, "/"), agentclient.DefaultCachePath(), token, timeout),
+		controlPlaneURL: strings.TrimRight(controlPlaneURL, "/"),
+	}
+	return h.server()
+}
+
 func newStreamableHandler(serverURL, controlPlaneURL string, timeout time.Duration) http.Handler {
 	serverURL = strings.TrimRight(serverURL, "/")
 	controlPlaneURL = strings.TrimRight(controlPlaneURL, "/")
