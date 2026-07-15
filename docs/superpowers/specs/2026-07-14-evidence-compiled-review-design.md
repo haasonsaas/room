@@ -71,7 +71,7 @@ An explanation can help a human understand a finding, but it cannot change the f
 
 ### Fail closed at authority boundaries
 
-Missing, stale, malformed, uncovered, untrusted, or mismatched verification is `indeterminate`. It is never silently accepted as verified. Existing policy decides whether an indeterminate result blocks a caller; the review subsystem does not invent fallback authority.
+No failed authority binding is silently accepted as verified. Missing, unavailable, timed-out, conflicting, or uncovered verification is `indeterminate`; malformed, untrusted, stale, or mismatched contracts are `invalid`. Existing policy decides how a non-verified result affects a caller; the review subsystem does not invent fallback authority.
 
 ## Phased architecture
 

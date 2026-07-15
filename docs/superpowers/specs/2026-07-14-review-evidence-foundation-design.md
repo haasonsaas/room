@@ -54,7 +54,7 @@ A scout- or human-proposed claim. Required authority bindings are:
 - producer identity and configuration digest;
 - creation timestamp.
 
-Room computes the hypothesis ID from deterministic serialization of the authority-bearing fields. Caller-provided IDs are either empty or must match the computed value.
+Room computes the hypothesis ID from deterministic serialization of the authority-bearing fields. Structured preconditions and causal-path steps are bound as claim content but are never parsed to classify the claim. Invariant, impact, remediation, confidence, timestamps, and other presentation metadata are excluded. Caller-provided IDs are either empty or must match the computed value.
 
 ### `ReviewEvidenceRef`
 
@@ -96,6 +96,8 @@ A receipt binds:
 - typed reason code for rejected or indeterminate results.
 
 Statuses are `VERIFIED`, `REJECTED`, and `INDETERMINATE`. `VERIFIED` requires non-empty evidence and no failure reason. `REJECTED` or `INDETERMINATE` requires a typed reason and cannot produce a verified finding.
+
+Room computes the expected execution-input digest from the canonical hypothesis digest, artifact digest, impact-slice digest, and full verifier tuple. A receipt cannot choose this binding. Later execution adapters may add other materialized inputs by extending the versioned derivation rather than trusting an opaque caller value.
 
 ### `VerifiedReviewFinding`
 
@@ -145,13 +147,14 @@ The compiler does not inspect invariant or remediation prose to choose a claim k
 
 All digests use deterministic Protobuf serialization after normalization. Authority-bearing repeated fields that are semantically sets—affected paths, locations, coverage, and evidence references—are sorted by stable typed keys. Ordered causal paths and preconditions preserve their input order because order can be semantically meaningful.
 
-Timestamps and presentation-only text are excluded from stable finding identity so rerunning the same deterministic claim does not create a new logical finding. They remain in the stored receipt digest for audit integrity.
+Timestamps and presentation-only text are excluded from stable finding identity so rerunning the same deterministic claim does not create a new logical finding. Ordered preconditions and causal-path steps remain bound because they define the structured claim being verified. Presentation data remains in the stored receipt or hypothesis payload for audit integrity.
 
 Stable identities are domain-separated:
 
 ```text
 room.review.hypothesis.v1 || deterministic-proto(authority fields)
 room.review.evidence-set.v1 || deterministic-proto(canonical evidence)
+room.review.execution-input.v1 || hypothesis digest || artifact digest || impact-slice digest || deterministic-proto(verifier tuple)
 room.review.receipt.v1 || deterministic-proto(full receipt)
 room.review.finding.v1 || hypothesis digest || verifier tuple || evidence-set digest
 ```
@@ -167,9 +170,9 @@ The initial registry is immutable after construction. It rejects:
 - unspecified verifier kinds;
 - unspecified or duplicate claim coverage;
 - conflicting entries for the same ID;
-- semantic scouts registered as deterministic verifiers.
+- identities whose declared kind or coverage is malformed.
 
-Lookup requires complete identity equality. ID-only trust is forbidden. Runtime configuration and persistence are deferred until the execution adapter slice; the pure constructor is sufficient to make trust behavior testable now.
+Lookup requires complete identity equality. ID-only trust is forbidden. The registry may recognize a semantic-scout identity for provenance, but the compiler categorically refuses to treat it as verification authority. Runtime configuration and persistence are deferred until the execution adapter slice; the pure constructor is sufficient to make trust behavior testable now.
 
 ## Error and gap taxonomy
 
