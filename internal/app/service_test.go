@@ -147,6 +147,20 @@ func TestRecordMcpPolicyControlElicitationRequiresCurrentScopedCandidate(t *test
 	if err != nil || response.Msg.GetAuditEventId() == "" {
 		t.Fatalf("record current policy handoff: response %+v, err %v", response, err)
 	}
+	audits, err := database.ListAudit(10, roomv1.AuditEventKind_AUDIT_EVENT_KIND_MCP_ELICITATION)
+	if err != nil {
+		t.Fatalf("list policy handoff audits: %v", err)
+	}
+	foundCandidateAudit := false
+	for _, audit := range audits {
+		if audit.GetPolicyCandidateId() == candidate.GetId() {
+			foundCandidateAudit = true
+			break
+		}
+	}
+	if !foundCandidateAudit {
+		t.Fatalf("policy handoff audit not discoverable by candidate %q: %+v", candidate.GetId(), audits)
+	}
 	unchanged, err := database.PolicyCandidate(candidate.GetId())
 	if err != nil || unchanged.GetRolloutStage() != roomv1.RolloutStage_ROLLOUT_STAGE_DRAFT {
 		t.Fatalf("policy handoff mutated candidate: stage %v, err %v", unchanged.GetRolloutStage(), err)

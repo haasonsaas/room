@@ -285,7 +285,7 @@ func (s *Service) RecordMcpElicitation(ctx context.Context, req *connect.Request
 	event := &roomv1.AuditEvent{
 		Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_MCP_ELICITATION, OccurredAt: timestamppb.Now(),
 		SubjectId: principal.ID, WorkspaceId: principal.Scope.WorkspaceID, Repository: principal.Scope.Repository, AgentType: principal.Scope.AgentID,
-		EvidenceRecordId: receipt.GetId(), McpElicitation: receipt,
+		PolicyCandidateId: receipt.GetPolicyCandidateId(), EvidenceRecordId: receipt.GetId(), McpElicitation: receipt,
 	}
 	eventID, err := s.store.AppendAudit(event)
 	if err != nil {
