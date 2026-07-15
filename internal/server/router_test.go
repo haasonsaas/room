@@ -99,6 +99,9 @@ func TestDashboardSupportsNonMutatingPolicyControlDeepLinks(t *testing.T) {
 	if strings.Contains(handler, "transitionCandidate(") || strings.Contains(handler, "requestTransition(") || strings.Contains(handler, "showModal(") {
 		t.Fatal("deep-link handler must not trigger a policy mutation or approval dialog")
 	}
+	if strings.Count(handler, "state.policyControlDeepLink = null") < 2 {
+		t.Fatal("deep-link handler must clear stale state when the candidate fragment is absent or unknown")
+	}
 	transitionStart := strings.Index(html, "function requestTransition")
 	transitionEnd := strings.Index(html[transitionStart:], "async function transitionCandidate")
 	if transitionStart < 0 || transitionEnd < 0 {

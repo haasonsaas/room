@@ -412,9 +412,9 @@
       function applyPolicyControlDeepLink() {
         const params = new URLSearchParams(location.hash.startsWith("#") ? location.hash.slice(1) : location.hash);
         const candidateID = params.get("candidate");
-        if (!candidateID) return;
+        if (!candidateID) { state.policyControlDeepLink = null; return; }
         const candidate = state.candidates.find(item => item.id === candidateID);
-        if (!candidate) { setStatus(`Policy control candidate ${candidateID} was not found`, true); return; }
+        if (!candidate) { state.policyControlDeepLink = null; setStatus(`Policy control candidate ${candidateID} was not found`, true); return; }
         const target = params.get("target");
         const allowedTargets = new Set(["block", "paused", "rolled_back"]);
         const expectedCandidateUpdatedAt = params.get("expected_candidate_updated_at");
