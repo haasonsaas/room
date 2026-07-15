@@ -23,6 +23,7 @@ import (
 	"github.com/haasonsaas/room/internal/server"
 	"github.com/haasonsaas/room/internal/store"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestAuthenticatedHandlerRejectsSessionReuseAcrossPrincipals(t *testing.T) {
@@ -73,6 +74,29 @@ func TestEvaluationOutputFailsClosedWithoutResult(t *testing.T) {
 	output := evaluationOutput(nil)
 	if output.Decision != "indeterminate" || !output.Blocking {
 		t.Fatalf("output = %+v, want blocking indeterminate", output)
+	}
+}
+
+func TestElicitationActionsAndResolutionTriggersAreTyped(t *testing.T) {
+	for action, want := range map[string]roomv1.McpElicitationAction{
+		"accept":     roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ACCEPT,
+		"decline":    roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_DECLINE,
+		"cancel":     roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_CANCEL,
+		"unexpected": roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ERROR,
+	} {
+		got, _ := elicitationAction(action)
+		if got != want {
+			t.Errorf("elicitationAction(%q) = %v, want %v", action, got, want)
+		}
+	}
+	if requiresEvaluationResolution(&roomv1.EvaluationResult{Decision: roomv1.Decision_DECISION_ALLOW, RequiredChecks: []string{"ignored"}}) {
+		t.Fatal("allow decision must not elicit")
+	}
+	if requiresEvaluationResolution(&roomv1.EvaluationResult{Decision: roomv1.Decision_DECISION_DENY}) {
+		t.Fatal("deny without a typed resolution field must not elicit")
+	}
+	if !requiresEvaluationResolution(&roomv1.EvaluationResult{Decision: roomv1.Decision_DECISION_DENY, RequiredChecks: []string{"run unit tests"}}) {
+		t.Fatal("deny with typed required checks must elicit")
 	}
 }
 
@@ -194,7 +218,7 @@ func TestAnalyzePlanFlagsUnsafePlanThroughMCP(t *testing.T) {
 		toolNames = append(toolNames, tool.Name)
 	}
 	slices.Sort(toolNames)
-	wantToolNames := []string{"room_analyze_plan", "room_check_diff", "room_get_rules"}
+	wantToolNames := []string{"room_analyze_plan", "room_check_diff", "room_get_rules", "room_open_policy_control"}
 	if !slices.Equal(toolNames, wantToolNames) {
 		t.Fatalf("MCP tools = %v, want exactly %v", toolNames, wantToolNames)
 	}
@@ -244,6 +268,161 @@ func TestAnalyzePlanFlagsUnsafePlanThroughMCP(t *testing.T) {
 	}
 	if structured.Decision != "deny" || !structured.Blocking {
 		t.Fatalf("structured = %+v, want deny blocking", structured)
+	}
+}
+
+func TestAnalyzePlanElicitsTypedResolutionAndAuditsAcceptance(t *testing.T) {
+	t.Setenv("ROOM_CACHE_FILE", filepath.Join(t.TempDir(), "ruleset.json"))
+	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer ruleStore.Close()
+	identity := &roomv1.AnalyzerIdentity{Id: "test", Version: "1", ConfigSha256: make([]byte, 32)}
+	roomServer := httptest.NewServer(server.New(app.New(ruleStore, app.WithAnalyzer(&signalAnalyzer{identity: identity})), server.WithLocalAuth()))
+	defer roomServer.Close()
+	mcpServer := httptest.NewServer(NewHandler(roomServer.URL))
+	defer mcpServer.Close()
+
+	var elicited *mcpsdk.ElicitParams
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "room-test", Version: "test"}, &mcpsdk.ClientOptions{
+		ElicitationHandler: func(_ context.Context, request *mcpsdk.ElicitRequest) (*mcpsdk.ElicitResult, error) {
+			elicited = request.Params
+			return &mcpsdk.ElicitResult{Action: "accept", Content: map[string]any{"resolution": "run_required_checks"}}, nil
+		},
+		Capabilities: &mcpsdk.ClientCapabilities{Elicitation: &mcpsdk.ElicitationCapabilities{Form: &mcpsdk.FormElicitationCapabilities{}}},
+	})
+	session, err := client.Connect(context.Background(), &mcpsdk.StreamableClientTransport{Endpoint: mcpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("connect MCP client: %v", err)
+	}
+	defer session.Close()
+
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_analyze_plan", Arguments: map[string]any{"plan": "Add a customer endpoint that queries projects from the database."}})
+	if err != nil {
+		t.Fatalf("call room_analyze_plan: %v", err)
+	}
+	if elicited == nil || elicited.Mode != "form" || elicited.RequestedSchema == nil {
+		t.Fatalf("elicitation = %+v, want typed form", elicited)
+	}
+	data, _ := json.Marshal(result.StructuredContent)
+	var output toolOutput
+	if err := json.Unmarshal(data, &output); err != nil {
+		t.Fatalf("decode tool output: %v", err)
+	}
+	if output.Elicitation == nil || output.Elicitation.Action != "accept" || output.Elicitation.Resolution != "run_required_checks" || output.Elicitation.AuditEventID == "" || output.Elicitation.OfferAuditEventID == "" {
+		t.Fatalf("elicitation output = %+v", output.Elicitation)
+	}
+	events, err := ruleStore.ListAudit(10, roomv1.AuditEventKind_AUDIT_EVENT_KIND_MCP_ELICITATION)
+	if err != nil || len(events) != 2 {
+		t.Fatalf("elicitation audits = %d, err %v", len(events), err)
+	}
+	if events[0].GetMcpElicitation().GetResolution() != roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_RUN_REQUIRED_CHECKS || events[1].GetMcpElicitation().GetAction() != roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED {
+		t.Fatalf("audit receipts = %+v", events)
+	}
+}
+
+func TestAnalyzePlanReturnsAuditedUnsupportedFallbackWithoutClientCapability(t *testing.T) {
+	t.Setenv("ROOM_CACHE_FILE", filepath.Join(t.TempDir(), "ruleset.json"))
+	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer ruleStore.Close()
+	identity := &roomv1.AnalyzerIdentity{Id: "test", Version: "1", ConfigSha256: make([]byte, 32)}
+	roomServer := httptest.NewServer(server.New(app.New(ruleStore, app.WithAnalyzer(&signalAnalyzer{identity: identity})), server.WithLocalAuth()))
+	defer roomServer.Close()
+	mcpServer := httptest.NewServer(NewHandler(roomServer.URL))
+	defer mcpServer.Close()
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "room-test", Version: "test"}, &mcpsdk.ClientOptions{Capabilities: &mcpsdk.ClientCapabilities{}})
+	session, err := client.Connect(context.Background(), &mcpsdk.StreamableClientTransport{Endpoint: mcpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("connect MCP client: %v", err)
+	}
+	defer session.Close()
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_analyze_plan", Arguments: map[string]any{"plan": "Add a customer endpoint that queries projects from the database."}})
+	if err != nil {
+		t.Fatalf("call room_analyze_plan: %v", err)
+	}
+	data, _ := json.Marshal(result.StructuredContent)
+	var output toolOutput
+	if err := json.Unmarshal(data, &output); err != nil {
+		t.Fatalf("decode tool output: %v", err)
+	}
+	if output.Elicitation == nil || output.Elicitation.Action != "unsupported" || output.Elicitation.AuditEventID == "" {
+		t.Fatalf("unsupported fallback = %+v", output.Elicitation)
+	}
+}
+
+func TestOpenPolicyControlUsesURLWithoutMutatingCandidate(t *testing.T) {
+	t.Setenv("ROOM_CACHE_FILE", filepath.Join(t.TempDir(), "ruleset.json"))
+	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer ruleStore.Close()
+	now := timestamppb.Now()
+	candidate := &roomv1.PolicyCandidate{Id: "candidate-1", ClaimKind: roomv1.ReviewClaimKind_REVIEW_CLAIM_KIND_STATE_TRANSITION, ArtifactKind: roomv1.PolicyArtifactKind_POLICY_ARTIFACT_KIND_DETERMINISTIC_CHECK, ProposedRule: &roomv1.Rule{Id: "rule-1", Title: "Typed transition", Severity: roomv1.Severity_SEVERITY_HIGH, Enabled: false, Scope: &roomv1.RuleScope{Repositories: []string{"local"}}, RequiredEvidence: []string{"receipt"}, Remediation: []string{"persist atomically"}, Owner: "reviewer", Triggers: []*roomv1.SignalSelector{{Signal: roomv1.SignalKind_SIGNAL_KIND_REVIEW_STATE_TRANSITION, Phases: []roomv1.AnalysisPhase{roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN}, MinimumConfidenceBasisPoints: 9000}}, RequiredCoverage: []roomv1.SignalKind{roomv1.SignalKind_SIGNAL_KIND_REVIEW_STATE_TRANSITION}, CreatedAt: now, UpdatedAt: now}, SourceFindingIds: []string{"finding-1"}, Metrics: &roomv1.PolicyMetrics{SupportCount: 1}, RolloutStage: roomv1.RolloutStage_ROLLOUT_STAGE_DRAFT, MinimumConfidenceBasisPoints: 9000, CreatedBy: "reviewer", CreatedAt: now, UpdatedAt: now}
+	if _, err := ruleStore.UpsertPolicyCandidate(candidate); err != nil {
+		t.Fatalf("seed candidate: %v", err)
+	}
+	roomServer := httptest.NewServer(server.New(app.New(ruleStore), server.WithLocalAuth()))
+	defer roomServer.Close()
+	mcpServer := httptest.NewServer(NewHandlerWithControlPlaneURL(roomServer.URL, "https://room.example.test/control"))
+	defer mcpServer.Close()
+	var elicited *mcpsdk.ElicitParams
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "room-test", Version: "test"}, &mcpsdk.ClientOptions{
+		ElicitationHandler: func(_ context.Context, request *mcpsdk.ElicitRequest) (*mcpsdk.ElicitResult, error) {
+			elicited = request.Params
+			return &mcpsdk.ElicitResult{Action: "accept"}, nil
+		},
+		Capabilities: &mcpsdk.ClientCapabilities{Elicitation: &mcpsdk.ElicitationCapabilities{URL: &mcpsdk.URLElicitationCapabilities{}}},
+	})
+	session, err := client.Connect(context.Background(), &mcpsdk.StreamableClientTransport{Endpoint: mcpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("connect MCP client: %v", err)
+	}
+	defer session.Close()
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_open_policy_control", Arguments: map[string]any{"candidate_id": candidate.GetId(), "target_rollout_stage": "block", "expected_updated_at": candidate.GetUpdatedAt().AsTime().Format(time.RFC3339Nano)}})
+	if err != nil {
+		t.Fatalf("call room_open_policy_control: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("room_open_policy_control returned tool error: %s", firstText(result))
+	}
+	if elicited == nil || elicited.Mode != "url" || !strings.HasPrefix(elicited.URL, "https://room.example.test/control") || strings.Contains(strings.ToLower(elicited.URL), "token") {
+		t.Fatalf("URL elicitation = %+v", elicited)
+	}
+	data, _ := json.Marshal(result.StructuredContent)
+	var output toolOutput
+	if err := json.Unmarshal(data, &output); err != nil {
+		t.Fatalf("decode tool output: %v", err)
+	}
+	if output.Elicitation == nil || output.Elicitation.Action != "accept" || output.Elicitation.AuditEventID == "" {
+		t.Fatalf("policy control output = %+v", output.Elicitation)
+	}
+	stored, err := ruleStore.PolicyCandidate(candidate.GetId())
+	if err != nil || stored.GetRolloutStage() != roomv1.RolloutStage_ROLLOUT_STAGE_DRAFT {
+		t.Fatalf("candidate mutated by URL handoff: stage %v, err %v", stored.GetRolloutStage(), err)
+	}
+
+	unsupportedClient := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "room-no-url", Version: "test"}, &mcpsdk.ClientOptions{Capabilities: &mcpsdk.ClientCapabilities{}})
+	unsupportedSession, err := unsupportedClient.Connect(context.Background(), &mcpsdk.StreamableClientTransport{Endpoint: mcpServer.URL}, nil)
+	if err != nil {
+		t.Fatalf("connect client without URL elicitation: %v", err)
+	}
+	defer unsupportedSession.Close()
+	unsupportedResult, err := unsupportedSession.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_open_policy_control", Arguments: map[string]any{"candidate_id": candidate.GetId(), "target_rollout_stage": "block", "expected_updated_at": candidate.GetUpdatedAt().AsTime().Format(time.RFC3339Nano)}})
+	if err != nil || unsupportedResult.IsError {
+		t.Fatalf("unsupported URL fallback: result %+v, err %v", unsupportedResult, err)
+	}
+	data, _ = json.Marshal(unsupportedResult.StructuredContent)
+	output = toolOutput{}
+	if err := json.Unmarshal(data, &output); err != nil {
+		t.Fatalf("decode unsupported URL output: %v", err)
+	}
+	if output.Elicitation == nil || output.Elicitation.Action != "unsupported" || output.Elicitation.AuditEventID == "" || !strings.HasPrefix(output.Elicitation.HandoffURL, "https://room.example.test/control") {
+		t.Fatalf("unsupported URL output = %+v", output.Elicitation)
 	}
 }
 

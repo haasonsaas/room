@@ -8,7 +8,7 @@ import (
 )
 
 func validConfig() Config {
-	return Config{Addr: "127.0.0.1:8787", ServerURL: "http://127.0.0.1:8787", AuthDisabled: true, AnalyzerArgsValid: true, AnalyzerSignalsValid: true, AnalyzerSignals: []string{"SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT"}, AnalyzerTimeout: time.Second, AnalyzerTimeoutValid: true, ReadTimeout: time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: time.Second, ClientTimeout: 10 * time.Second, MaxBodyBytes: 1024}
+	return Config{Addr: "127.0.0.1:8787", ServerURL: "http://127.0.0.1:8787", ControlPlaneURL: "http://127.0.0.1:8787", AuthDisabled: true, AnalyzerArgsValid: true, AnalyzerSignalsValid: true, AnalyzerSignals: []string{"SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT"}, AnalyzerTimeout: time.Second, AnalyzerTimeoutValid: true, ReadTimeout: time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: time.Second, ClientTimeout: 10 * time.Second, MaxBodyBytes: 1024}
 }
 
 func TestValidateServerRequiresExplicitAnalyzerCoverage(t *testing.T) {
@@ -109,6 +109,37 @@ func TestValidateDeadlineOrdering(t *testing.T) {
 	cfg.WriteTimeout = 25 * time.Second
 	if err := cfg.ValidateMCPServer(); err == nil {
 		t.Fatal("expected MCP write deadline without client overhead to fail")
+	}
+}
+
+func TestValidateMCPServerRequiresSecureFixedControlPlaneURL(t *testing.T) {
+	for name, raw := range map[string]string{
+		"remote HTTP": "http://room.example.test",
+		"userinfo":    "https://user:secret@room.example.test",
+		"relative":    "/control-plane",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig()
+			cfg.WriteTimeout = 20 * time.Second
+			cfg.ControlPlaneURL = raw
+			if err := cfg.ValidateMCPServer(); err == nil {
+				t.Fatalf("expected control plane URL %q to be rejected", raw)
+			}
+		})
+	}
+	cfg := validConfig()
+	cfg.WriteTimeout = 20 * time.Second
+	cfg.ControlPlaneURL = "https://room.example.test/control"
+	if err := cfg.ValidateMCPServer(); err != nil {
+		t.Fatalf("secure control plane URL rejected: %v", err)
+	}
+}
+
+func TestLoadDefaultsControlPlaneURLToServerURL(t *testing.T) {
+	t.Setenv("ROOM_SERVER_URL", "http://127.0.0.1:9876")
+	t.Setenv("ROOM_CONTROL_PLANE_URL", "")
+	if got := Load().ControlPlaneURL; got != "http://127.0.0.1:9876" {
+		t.Fatalf("control plane URL = %q", got)
 	}
 }
 

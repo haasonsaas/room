@@ -138,6 +138,20 @@ func (c *Client) EvaluateDiff(ctx context.Context, input *roomv1.EvaluationInput
 	return resp.Msg.GetResult(), nil
 }
 
+func (c *Client) RecordMcpElicitation(ctx context.Context, receipt *roomv1.McpElicitationReceipt) (string, error) {
+	if receipt == nil {
+		return "", errors.New("MCP elicitation receipt is required")
+	}
+	resp, err := c.service.RecordMcpElicitation(ctx, connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: receipt}))
+	if err != nil {
+		return "", fmt.Errorf("record MCP elicitation at %s: %w", c.server, err)
+	}
+	if resp.Msg.GetAuditEventId() == "" {
+		return "", errors.New("MCP elicitation audit id is required")
+	}
+	return resp.Msg.GetAuditEventId(), nil
+}
+
 func (c *Client) CachePath() string { return c.cache }
 
 func (c *Client) ValidateRuleset(ruleset *roomv1.RulesetVersion) error {

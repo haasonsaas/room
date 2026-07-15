@@ -133,9 +133,31 @@ func TestAuthenticatedClientSendsBearerToken(t *testing.T) {
 	}
 }
 
+func TestRecordMcpElicitationReturnsDurableAuditID(t *testing.T) {
+	service := &stubAgentRulesService{}
+	_, handler := roomv1connect.NewAgentRulesServiceHandler(service)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := New(server.URL, filepath.Join(t.TempDir(), "ruleset.json"))
+	receipt := &roomv1.McpElicitationReceipt{Id: "elicitation-1"}
+	auditID, err := client.RecordMcpElicitation(context.Background(), receipt)
+	if err != nil {
+		t.Fatalf("record MCP elicitation: %v", err)
+	}
+	if auditID != "audit-elicitation-1" || service.elicitation.GetId() != receipt.GetId() {
+		t.Fatalf("audit id = %q, receipt = %+v", auditID, service.elicitation)
+	}
+}
+
 type stubAgentRulesService struct {
 	roomv1connect.UnimplementedAgentRulesServiceHandler
-	ruleset *roomv1.RulesetVersion
+	ruleset     *roomv1.RulesetVersion
+	elicitation *roomv1.McpElicitationReceipt
+}
+
+func (s *stubAgentRulesService) RecordMcpElicitation(_ context.Context, req *connect.Request[roomv1.RecordMcpElicitationRequest]) (*connect.Response[roomv1.RecordMcpElicitationResponse], error) {
+	s.elicitation = req.Msg.GetReceipt()
+	return connect.NewResponse(&roomv1.RecordMcpElicitationResponse{AuditEventId: "audit-elicitation-1"}), nil
 }
 
 func (s *stubAgentRulesService) GetActiveRuleset(_ context.Context, _ *connect.Request[roomv1.AgentRulesServiceGetActiveRulesetRequest]) (*connect.Response[roomv1.AgentRulesServiceGetActiveRulesetResponse], error) {

@@ -113,6 +113,9 @@ const (
 	// AgentRulesServiceReportEvaluationProcedure is the fully-qualified name of the AgentRulesService's
 	// ReportEvaluation RPC.
 	AgentRulesServiceReportEvaluationProcedure = "/room.v1.AgentRulesService/ReportEvaluation"
+	// AgentRulesServiceRecordMcpElicitationProcedure is the fully-qualified name of the
+	// AgentRulesService's RecordMcpElicitation RPC.
+	AgentRulesServiceRecordMcpElicitationProcedure = "/room.v1.AgentRulesService/RecordMcpElicitation"
 )
 
 // RuleAdminServiceClient is a client for the room.v1.RuleAdminService service.
@@ -687,6 +690,7 @@ type AgentRulesServiceClient interface {
 	EvaluateDiff(context.Context, *connect.Request[v1.EvaluateDiffRequest]) (*connect.Response[v1.EvaluateDiffResponse], error)
 	EvaluateMcpInvocation(context.Context, *connect.Request[v1.EvaluateMcpInvocationRequest]) (*connect.Response[v1.EvaluateMcpInvocationResponse], error)
 	ReportEvaluation(context.Context, *connect.Request[v1.ReportEvaluationRequest]) (*connect.Response[v1.ReportEvaluationResponse], error)
+	RecordMcpElicitation(context.Context, *connect.Request[v1.RecordMcpElicitationRequest]) (*connect.Response[v1.RecordMcpElicitationResponse], error)
 }
 
 // NewAgentRulesServiceClient constructs a client for the room.v1.AgentRulesService service. By
@@ -736,6 +740,12 @@ func NewAgentRulesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(agentRulesServiceMethods.ByName("ReportEvaluation")),
 			connect.WithClientOptions(opts...),
 		),
+		recordMcpElicitation: connect.NewClient[v1.RecordMcpElicitationRequest, v1.RecordMcpElicitationResponse](
+			httpClient,
+			baseURL+AgentRulesServiceRecordMcpElicitationProcedure,
+			connect.WithSchema(agentRulesServiceMethods.ByName("RecordMcpElicitation")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -747,6 +757,7 @@ type agentRulesServiceClient struct {
 	evaluateDiff          *connect.Client[v1.EvaluateDiffRequest, v1.EvaluateDiffResponse]
 	evaluateMcpInvocation *connect.Client[v1.EvaluateMcpInvocationRequest, v1.EvaluateMcpInvocationResponse]
 	reportEvaluation      *connect.Client[v1.ReportEvaluationRequest, v1.ReportEvaluationResponse]
+	recordMcpElicitation  *connect.Client[v1.RecordMcpElicitationRequest, v1.RecordMcpElicitationResponse]
 }
 
 // GetActiveRuleset calls room.v1.AgentRulesService.GetActiveRuleset.
@@ -779,6 +790,11 @@ func (c *agentRulesServiceClient) ReportEvaluation(ctx context.Context, req *con
 	return c.reportEvaluation.CallUnary(ctx, req)
 }
 
+// RecordMcpElicitation calls room.v1.AgentRulesService.RecordMcpElicitation.
+func (c *agentRulesServiceClient) RecordMcpElicitation(ctx context.Context, req *connect.Request[v1.RecordMcpElicitationRequest]) (*connect.Response[v1.RecordMcpElicitationResponse], error) {
+	return c.recordMcpElicitation.CallUnary(ctx, req)
+}
+
 // AgentRulesServiceHandler is an implementation of the room.v1.AgentRulesService service.
 type AgentRulesServiceHandler interface {
 	GetActiveRuleset(context.Context, *connect.Request[v1.AgentRulesServiceGetActiveRulesetRequest]) (*connect.Response[v1.AgentRulesServiceGetActiveRulesetResponse], error)
@@ -787,6 +803,7 @@ type AgentRulesServiceHandler interface {
 	EvaluateDiff(context.Context, *connect.Request[v1.EvaluateDiffRequest]) (*connect.Response[v1.EvaluateDiffResponse], error)
 	EvaluateMcpInvocation(context.Context, *connect.Request[v1.EvaluateMcpInvocationRequest]) (*connect.Response[v1.EvaluateMcpInvocationResponse], error)
 	ReportEvaluation(context.Context, *connect.Request[v1.ReportEvaluationRequest]) (*connect.Response[v1.ReportEvaluationResponse], error)
+	RecordMcpElicitation(context.Context, *connect.Request[v1.RecordMcpElicitationRequest]) (*connect.Response[v1.RecordMcpElicitationResponse], error)
 }
 
 // NewAgentRulesServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -832,6 +849,12 @@ func NewAgentRulesServiceHandler(svc AgentRulesServiceHandler, opts ...connect.H
 		connect.WithSchema(agentRulesServiceMethods.ByName("ReportEvaluation")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentRulesServiceRecordMcpElicitationHandler := connect.NewUnaryHandler(
+		AgentRulesServiceRecordMcpElicitationProcedure,
+		svc.RecordMcpElicitation,
+		connect.WithSchema(agentRulesServiceMethods.ByName("RecordMcpElicitation")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/room.v1.AgentRulesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AgentRulesServiceGetActiveRulesetProcedure:
@@ -846,6 +869,8 @@ func NewAgentRulesServiceHandler(svc AgentRulesServiceHandler, opts ...connect.H
 			agentRulesServiceEvaluateMcpInvocationHandler.ServeHTTP(w, r)
 		case AgentRulesServiceReportEvaluationProcedure:
 			agentRulesServiceReportEvaluationHandler.ServeHTTP(w, r)
+		case AgentRulesServiceRecordMcpElicitationProcedure:
+			agentRulesServiceRecordMcpElicitationHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -877,4 +902,8 @@ func (UnimplementedAgentRulesServiceHandler) EvaluateMcpInvocation(context.Conte
 
 func (UnimplementedAgentRulesServiceHandler) ReportEvaluation(context.Context, *connect.Request[v1.ReportEvaluationRequest]) (*connect.Response[v1.ReportEvaluationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.AgentRulesService.ReportEvaluation is not implemented"))
+}
+
+func (UnimplementedAgentRulesServiceHandler) RecordMcpElicitation(context.Context, *connect.Request[v1.RecordMcpElicitationRequest]) (*connect.Response[v1.RecordMcpElicitationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.AgentRulesService.RecordMcpElicitation is not implemented"))
 }

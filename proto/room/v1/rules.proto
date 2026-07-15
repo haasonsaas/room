@@ -36,6 +36,7 @@ service AgentRulesService {
   rpc EvaluateDiff(EvaluateDiffRequest) returns (EvaluateDiffResponse);
   rpc EvaluateMcpInvocation(EvaluateMcpInvocationRequest) returns (EvaluateMcpInvocationResponse);
   rpc ReportEvaluation(ReportEvaluationRequest) returns (ReportEvaluationResponse);
+  rpc RecordMcpElicitation(RecordMcpElicitationRequest) returns (RecordMcpElicitationResponse);
 }
 
 enum Severity {
@@ -133,6 +134,37 @@ enum AuditEventKind {
   AUDIT_EVENT_KIND_POLICY_REPLAYED = 11;
   AUDIT_EVENT_KIND_POLICY_TRANSITIONED = 12;
   AUDIT_EVENT_KIND_POLICY_TUNED = 13;
+  AUDIT_EVENT_KIND_MCP_ELICITATION = 14;
+}
+
+enum McpElicitationMode {
+  MCP_ELICITATION_MODE_UNSPECIFIED = 0;
+  MCP_ELICITATION_MODE_FORM = 1;
+  MCP_ELICITATION_MODE_URL = 2;
+}
+
+enum McpElicitationPurpose {
+  MCP_ELICITATION_PURPOSE_UNSPECIFIED = 0;
+  MCP_ELICITATION_PURPOSE_EVALUATION_RESOLUTION = 1;
+  MCP_ELICITATION_PURPOSE_POLICY_CONTROL = 2;
+}
+
+enum McpElicitationAction {
+  MCP_ELICITATION_ACTION_UNSPECIFIED = 0;
+  MCP_ELICITATION_ACTION_ACCEPT = 1;
+  MCP_ELICITATION_ACTION_DECLINE = 2;
+  MCP_ELICITATION_ACTION_CANCEL = 3;
+  MCP_ELICITATION_ACTION_UNSUPPORTED = 4;
+  MCP_ELICITATION_ACTION_ERROR = 5;
+  MCP_ELICITATION_ACTION_OFFERED = 6;
+}
+
+enum McpResolutionAction {
+  MCP_RESOLUTION_ACTION_UNSPECIFIED = 0;
+  MCP_RESOLUTION_ACTION_REVISE = 1;
+  MCP_RESOLUTION_ACTION_RUN_REQUIRED_CHECKS = 2;
+  MCP_RESOLUTION_ACTION_PROVIDE_EVIDENCE = 3;
+  MCP_RESOLUTION_ACTION_OPEN_CONTROL_PLANE = 4;
 }
 
 enum HookProvider {
@@ -430,6 +462,23 @@ message AuditEvent {
   repeated string matched_rule_ids = 16;
   string policy_candidate_id = 17;
   string evidence_record_id = 18;
+  McpElicitationReceipt mcp_elicitation = 19;
+  string evaluation_id = 20;
+}
+
+message McpElicitationReceipt {
+  string id = 1;
+  string evaluation_id = 2;
+  string policy_candidate_id = 3;
+  McpElicitationMode mode = 4;
+  McpElicitationPurpose purpose = 5;
+  McpElicitationAction action = 6;
+  McpResolutionAction resolution = 7;
+  string evidence_record_id = 8;
+  google.protobuf.Timestamp occurred_at = 9;
+  string evaluation_audit_event_id = 10;
+  RolloutStage target_rollout_stage = 11;
+  google.protobuf.Timestamp expected_candidate_updated_at = 12;
 }
 
 message ReviewSource {
@@ -619,6 +668,14 @@ message ListAuditEventsRequest {
 
 message ListAuditEventsResponse {
   repeated AuditEvent events = 1;
+}
+
+message RecordMcpElicitationRequest {
+  McpElicitationReceipt receipt = 1;
+}
+
+message RecordMcpElicitationResponse {
+  string audit_event_id = 1;
 }
 
 message IngestReviewFindingRequest {

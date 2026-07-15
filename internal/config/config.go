@@ -17,6 +17,7 @@ type Config struct {
 	MCPAddr              string
 	DataFile             string
 	ServerURL            string
+	ControlPlaneURL      string
 	CredentialFile       string
 	AuthDisabled         bool
 	TokenFile            string
@@ -45,6 +46,7 @@ type Config struct {
 }
 
 func Load() Config {
+	serverURL := envOr("ROOM_SERVER_URL", "http://127.0.0.1:8787")
 	analyzerArgs, analyzerArgsValid := jsonStringSlice(os.Getenv("ROOM_ANALYZER_ARGS"))
 	analyzerSignals, analyzerSignalsValid := jsonStringSlice(os.Getenv("ROOM_ANALYZER_COVERED_SIGNALS"))
 	analyzerTimeout, analyzerTimeoutValid := envDuration("ROOM_ANALYZER_TIMEOUT", 30*time.Second)
@@ -59,7 +61,8 @@ func Load() Config {
 		Addr:                 envOr("ROOM_ADDR", "127.0.0.1:8787"),
 		MCPAddr:              envOr("ROOM_MCP_ADDR", "127.0.0.1:8788"),
 		DataFile:             envOr("ROOM_DATA_FILE", "room-data.json"),
-		ServerURL:            envOr("ROOM_SERVER_URL", "http://127.0.0.1:8787"),
+		ServerURL:            serverURL,
+		ControlPlaneURL:      envOr("ROOM_CONTROL_PLANE_URL", serverURL),
 		CredentialFile:       envOr("ROOM_CREDENTIAL_FILE", "room-credentials.json"),
 		AuthDisabled:         authDisabled,
 		TokenFile:            strings.TrimSpace(os.Getenv("ROOM_TOKEN_FILE")),
@@ -145,6 +148,19 @@ func (c Config) ValidateDaemon() error {
 func (c Config) ValidateMCPServer() error {
 	if c.WriteTimeout <= c.ClientTimeout+5*time.Second {
 		return errors.New("ROOM_WRITE_TIMEOUT must exceed ROOM_CLIENT_TIMEOUT by more than 5s for room-mcp")
+	}
+	parsed, err := url.Parse(c.ControlPlaneURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return errors.New("ROOM_CONTROL_PLANE_URL must be an absolute URL")
+	}
+	if parsed.User != nil {
+		return errors.New("ROOM_CONTROL_PLANE_URL must not contain userinfo")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return errors.New("ROOM_CONTROL_PLANE_URL must not contain a query or fragment")
+	}
+	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname())) {
+		return errors.New("ROOM_CONTROL_PLANE_URL must use HTTPS unless it targets loopback")
 	}
 	return nil
 }

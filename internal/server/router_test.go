@@ -66,6 +66,41 @@ func TestDashboardRuleLifecycleAPI(t *testing.T) {
 	}
 }
 
+func TestDashboardSupportsNonMutatingPolicyControlDeepLinks(t *testing.T) {
+	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer ruleStore.Close()
+	httpServer := httptest.NewServer(New(app.New(ruleStore), WithLocalAuth()))
+	defer httpServer.Close()
+
+	resp, err := http.Get(httpServer.URL + "/")
+	if err != nil {
+		t.Fatalf("get dashboard: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read dashboard: %v", err)
+	}
+	html := string(body)
+	for _, contract := range []string{"location.hash", "applyPolicyControlDeepLink", "Opening this link did not change policy", `state.selected = { kind: "candidate", id: candidate.id }`, `state.tab = "rollout"`} {
+		if !strings.Contains(html, contract) {
+			t.Fatalf("dashboard missing deep-link contract %q", contract)
+		}
+	}
+	start := strings.Index(html, "function applyPolicyControlDeepLink")
+	end := strings.Index(html[start:], "async function refreshCandidates")
+	if start < 0 || end < 0 {
+		t.Fatal("could not isolate policy-control deep-link handler")
+	}
+	handler := html[start : start+end]
+	if strings.Contains(handler, "transitionCandidate(") || strings.Contains(handler, "requestTransition(") || strings.Contains(handler, "showModal(") {
+		t.Fatal("deep-link handler must not trigger a policy mutation or approval dialog")
+	}
+}
+
 func TestReviewIntelligenceLifecycleAPI(t *testing.T) {
 	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
 	if err != nil {

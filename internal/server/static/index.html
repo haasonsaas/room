@@ -185,7 +185,7 @@
     </dialog>
 
     <script>
-      const state = { rules: [], candidates: [], findings: [], audit: [], mcpPolicy: null, selected: null, tab: "policy", view: "all", replayByCandidate: new Map(), pendingTransition: null };
+      const state = { rules: [], candidates: [], findings: [], audit: [], mcpPolicy: null, selected: null, tab: "policy", view: "all", replayByCandidate: new Map(), pendingTransition: null, policyControlDeepLink: null };
       const $ = id => document.getElementById(id);
       const severityNames = ["unspecified", "info", "low", "medium", "high", "critical"];
       const rolloutNames = ["unspecified", "draft", "shadow", "warn", "block", "paused", "rolled back"];
@@ -404,6 +404,21 @@
         if (!pending) return;
         await task("Transition policy", async () => { await postJSON(`/api/policy-candidates/${encodeURIComponent(pending.candidateId)}/transition`, { targetStage: pending.stage, humanApproved, expectedUpdatedAt: pending.expectedUpdatedAt }); await refreshCandidates(); renderInspector(); });
       }
+      function applyPolicyControlDeepLink() {
+        const params = new URLSearchParams(location.hash.startsWith("#") ? location.hash.slice(1) : location.hash);
+        const candidateID = params.get("candidate");
+        if (!candidateID) return;
+        const candidate = state.candidates.find(item => item.id === candidateID);
+        if (!candidate) { setStatus(`Policy control candidate ${candidateID} was not found`, true); return; }
+        const target = params.get("target");
+        const allowedTargets = new Set(["block", "paused", "rolled_back"]);
+        state.policyControlDeepLink = { candidateID: candidate.id, target: allowedTargets.has(target) ? target : null };
+        state.selected = { kind: "candidate", id: candidate.id };
+        state.tab = "rollout";
+        renderCatalog(); renderInspector();
+        const targetCopy = state.policyControlDeepLink.target ? ` Review the requested ${state.policyControlDeepLink.target.replace("_", " ")} transition.` : "";
+        setStatus(`Policy control opened for ${candidate.id}.${targetCopy} Opening this link did not change policy.`);
+      }
       async function refreshCandidates() { const data = await apiJSON("/api/policy-candidates"); state.candidates = data.candidates || []; updateSummary(); renderCatalog(); }
       async function refresh() {
         const requests = [
@@ -419,6 +434,7 @@
         $("connection").textContent = failures.length ? `${requests.length - failures.length}/${requests.length} sources connected` : "Connected";
         updateSummary(); renderCatalog(); renderInspector();
         if (failures.length) setStatus(failures.map(item => item.reason.message).join(" · "), true); else setStatus("Control plane refreshed");
+        applyPolicyControlDeepLink();
       }
 
       document.querySelectorAll("[data-view]").forEach(button => button.onclick = () => { state.view = button.dataset.view; document.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("active", item === button)); renderCatalog(); });
@@ -452,6 +468,7 @@
       $("publish").onclick = async () => { await task("Publish ruleset", async () => { const data = await postJSON("/api/publish"); $("active-summary").textContent = `Active v${data.ruleset?.version || "?"} · ${(data.ruleset?.hash || "").slice(0, 10)}`; await refresh(); }); };
       $("approval-phrase").addEventListener("input", () => { $("protected-confirm").disabled = $("approval-phrase").value !== "APPROVE"; });
       $("protected-form").addEventListener("submit", event => { if (event.submitter?.value === "confirm") transitionCandidate(); });
+      refresh();
     </script>
   </body>
 </html>

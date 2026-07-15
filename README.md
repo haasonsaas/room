@@ -7,7 +7,7 @@ MCP identities; and records durable audit events.
 ## What it includes
 
 - ConnectRPC and Protobuf admin/agent APIs.
-- Three focused MCP tools: `room_get_rules`, `room_analyze_plan`, and `room_check_diff`.
+- Four focused MCP tools: `room_get_rules`, `room_analyze_plan`, `room_check_diff`, and `room_open_policy_control`.
 - Scoped opaque bearer credentials with separate admin and agent roles.
 - A strict external-analyzer boundary: policy never classifies prompt, plan, diff, title, or display text.
 - SQLite persistence for ruleset versions, MCP policy, and append-only audit events.
@@ -66,6 +66,7 @@ Run the MCP sidecar separately:
 
 ```bash
 ROOM_SERVER_URL=http://127.0.0.1:8787 \
+ROOM_CONTROL_PLANE_URL=http://127.0.0.1:8787 \
 go run ./cmd/room-mcp
 ```
 
@@ -73,6 +74,31 @@ It listens at `http://127.0.0.1:8788/mcp` by default. MCP callers must send the
 same scoped agent bearer credential; the sidecar validates and forwards each
 request's credential, and binds MCP sessions to that principal. `room-mcp-call`
 reads `ROOM_TOKEN_FILE` for the caller.
+
+Room uses MCP elicitation only from typed evaluation state. A blocking
+evaluation with required checks, evidence, remediation, or analyzer gaps can
+offer a closed-choice form (`revise`, `run_required_checks`,
+`provide_evidence`, or `open_control_plane`). Allow decisions and blocking
+decisions without a typed next-step contract do not elicit. Accept, decline,
+cancel, unsupported-client, and error outcomes are written to the append-only
+audit log and bound to the original evaluation and authenticated agent scope.
+
+`room_open_policy_control` uses URL-mode elicitation for the human-only block,
+pause, and rollback controls. Its inputs are a candidate ID, target rollout
+stage, and the candidate's expected `updated_at` value. The sidecar creates the
+URL only from `ROOM_CONTROL_PLANE_URL`, verifies candidate scope and freshness,
+and audits both the offer and result. Opening the dashboard selects the
+candidate and Rollout tab but never changes policy. The actual transition still
+requires the dashboard's human-operator credential, confirmation, and
+compare-and-swap checks. Do not put credentials in the control-plane URL.
+
+For Codex, keep general approvals locked down while allowing the user to review
+MCP elicitations:
+
+```toml
+approval_policy = { granular = { sandbox_approval = false, rules = false, mcp_elicitations = true, request_permissions = false, skill_approval = false } }
+approvals_reviewer = "user"
+```
 
 ## Hooks and CLI
 

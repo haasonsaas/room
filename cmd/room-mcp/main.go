@@ -23,13 +23,13 @@ func main() {
 	mux := http.NewServeMux()
 	var handler http.Handler
 	if cfg.AuthDisabled {
-		handler = roommcp.NewHandlerWithTimeout(cfg.ServerURL, cfg.ClientTimeout)
+		handler = roommcp.NewHandlerWithControlPlaneURLAndTimeout(cfg.ServerURL, cfg.ControlPlaneURL, cfg.ClientTimeout)
 	} else {
 		authenticator, loadErr := auth.NewFileAuthenticator(cfg.CredentialFile)
 		if loadErr != nil {
 			log.Fatalf("load credential authenticator: %v", loadErr)
 		}
-		handler = roommcp.NewAuthenticatedHandlerWithTimeout(cfg.ServerURL, authenticator, cfg.ClientTimeout)
+		handler = roommcp.NewAuthenticatedHandlerWithControlPlaneURLAndTimeout(cfg.ServerURL, cfg.ControlPlaneURL, authenticator, cfg.ClientTimeout)
 	}
 	mux.Handle("/mcp", handler)
 	httpServer := &http.Server{Addr: cfg.MCPAddr, Handler: mux, ReadTimeout: cfg.ReadTimeout, WriteTimeout: cfg.WriteTimeout, IdleTimeout: cfg.IdleTimeout}

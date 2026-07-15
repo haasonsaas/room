@@ -2,9 +2,12 @@ package mcp
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -14,16 +17,23 @@ import (
 	roomauth "github.com/haasonsaas/room/internal/auth"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const agentScope = "agent"
 
 type Handler struct {
-	client *agentclient.Client
+	client          *agentclient.Client
+	controlPlaneURL string
 }
 
 func NewHandler(serverURL string) http.Handler {
 	return NewHandlerWithTimeout(serverURL, 45*time.Second)
+}
+
+func NewHandlerWithControlPlaneURL(serverURL, controlPlaneURL string) http.Handler {
+	return NewHandlerWithControlPlaneURLAndTimeout(serverURL, controlPlaneURL, 45*time.Second)
 }
 
 func NewAuthenticatedHandler(serverURL string, authenticator roomauth.Authenticator) http.Handler {
@@ -31,10 +41,18 @@ func NewAuthenticatedHandler(serverURL string, authenticator roomauth.Authentica
 }
 
 func NewHandlerWithTimeout(serverURL string, timeout time.Duration) http.Handler {
-	return newStreamableHandler(serverURL, timeout)
+	return newStreamableHandler(serverURL, serverURL, timeout)
+}
+
+func NewHandlerWithControlPlaneURLAndTimeout(serverURL, controlPlaneURL string, timeout time.Duration) http.Handler {
+	return newStreamableHandler(serverURL, controlPlaneURL, timeout)
 }
 
 func NewAuthenticatedHandlerWithTimeout(serverURL string, authenticator roomauth.Authenticator, timeout time.Duration) http.Handler {
+	return NewAuthenticatedHandlerWithControlPlaneURLAndTimeout(serverURL, serverURL, authenticator, timeout)
+}
+
+func NewAuthenticatedHandlerWithControlPlaneURLAndTimeout(serverURL, controlPlaneURL string, authenticator roomauth.Authenticator, timeout time.Duration) http.Handler {
 	verifier := func(_ context.Context, token string, _ *http.Request) (*mcpauth.TokenInfo, error) {
 		if authenticator == nil {
 			return nil, mcpauth.ErrInvalidToken
@@ -49,14 +67,15 @@ func NewAuthenticatedHandlerWithTimeout(serverURL string, authenticator roomauth
 			UserID:     principal.ID,
 		}, nil
 	}
-	return mcpauth.RequireBearerToken(verifier, &mcpauth.RequireBearerTokenOptions{Scopes: []string{agentScope}})(newStreamableHandler(serverURL, timeout))
+	return mcpauth.RequireBearerToken(verifier, &mcpauth.RequireBearerTokenOptions{Scopes: []string{agentScope}})(newStreamableHandler(serverURL, controlPlaneURL, timeout))
 }
 
-func newStreamableHandler(serverURL string, timeout time.Duration) http.Handler {
+func newStreamableHandler(serverURL, controlPlaneURL string, timeout time.Duration) http.Handler {
 	serverURL = strings.TrimRight(serverURL, "/")
+	controlPlaneURL = strings.TrimRight(controlPlaneURL, "/")
 	return mcpsdk.NewStreamableHTTPHandler(func(request *http.Request) *mcpsdk.Server {
 		requestToken, _ := roomauth.ExtractBearer(request)
-		h := &Handler{client: agentclient.NewAuthenticatedWithTimeout(serverURL, agentclient.DefaultCachePath(), requestToken, timeout)}
+		h := &Handler{client: agentclient.NewAuthenticatedWithTimeout(serverURL, agentclient.DefaultCachePath(), requestToken, timeout), controlPlaneURL: controlPlaneURL}
 		return h.server()
 	}, nil)
 }
@@ -84,6 +103,11 @@ func (h *Handler) server() *mcpsdk.Server {
 		Description: "Analyze a proposed or completed diff against the active security ruleset.",
 	}, h.checkDiff)
 
+	mcpsdk.AddTool(server, &mcpsdk.Tool{
+		Name:        "room_open_policy_control",
+		Description: "Open the authenticated Room control plane for a human-only block, pause, or rollback action. This tool never mutates policy.",
+	}, h.openPolicyControl)
+
 	return server
 }
 
@@ -100,6 +124,12 @@ type planInput struct {
 type diffInput struct {
 	ruleInput
 	Diff string `json:"diff" jsonschema:"required,Unified diff or patch text to evaluate"`
+}
+
+type policyControlInput struct {
+	CandidateID        string `json:"candidate_id" jsonschema:"required,Immutable policy candidate revision ID"`
+	TargetRolloutStage string `json:"target_rollout_stage" jsonschema:"required,Human-only target: block, paused, or rolled_back"`
+	ExpectedUpdatedAt  string `json:"expected_updated_at" jsonschema:"required,RFC3339 candidate updated_at used for optimistic concurrency"`
 }
 
 type toolOutput struct {
@@ -123,6 +153,19 @@ type toolOutput struct {
 	RulesetProvenance *rulesetProvenanceOutput  `json:"ruleset_provenance,omitempty"`
 	RuleCount         int                       `json:"rule_count,omitempty"`
 	Rules             []ruleOutput              `json:"rules,omitempty"`
+	Elicitation       *elicitationOutput        `json:"elicitation,omitempty"`
+}
+
+type elicitationOutput struct {
+	Required          bool   `json:"required"`
+	Mode              string `json:"mode"`
+	Purpose           string `json:"purpose"`
+	Action            string `json:"action"`
+	Resolution        string `json:"resolution,omitempty"`
+	HandoffURL        string `json:"handoff_url,omitempty"`
+	AuditEventID      string `json:"audit_event_id,omitempty"`
+	OfferAuditEventID string `json:"offer_audit_event_id,omitempty"`
+	ElicitationID     string `json:"elicitation_id"`
 }
 
 type matchOutput struct {
@@ -224,22 +267,245 @@ func (h *Handler) getRules(ctx context.Context, _ *mcpsdk.CallToolRequest, input
 	return textResult(output.Summary), output, nil
 }
 
-func (h *Handler) analyzePlan(ctx context.Context, _ *mcpsdk.CallToolRequest, input planInput) (*mcpsdk.CallToolResult, toolOutput, error) {
+func (h *Handler) analyzePlan(ctx context.Context, request *mcpsdk.CallToolRequest, input planInput) (*mcpsdk.CallToolResult, toolOutput, error) {
 	result, err := h.client.EvaluatePlan(ctx, &roomv1.EvaluationInput{Context: input.context(), Plan: input.Plan})
 	if err != nil {
 		return nil, toolOutput{}, err
 	}
 	output := evaluationOutput(result)
+	if err := h.elicitEvaluationResolution(ctx, request, result, &output); err != nil {
+		return nil, toolOutput{}, err
+	}
 	return textResult(output.Summary), output, nil
 }
 
-func (h *Handler) checkDiff(ctx context.Context, _ *mcpsdk.CallToolRequest, input diffInput) (*mcpsdk.CallToolResult, toolOutput, error) {
+func (h *Handler) checkDiff(ctx context.Context, request *mcpsdk.CallToolRequest, input diffInput) (*mcpsdk.CallToolResult, toolOutput, error) {
 	result, err := h.client.EvaluateDiff(ctx, &roomv1.EvaluationInput{Context: input.context(), Diff: input.Diff})
 	if err != nil {
 		return nil, toolOutput{}, err
 	}
 	output := evaluationOutput(result)
+	if err := h.elicitEvaluationResolution(ctx, request, result, &output); err != nil {
+		return nil, toolOutput{}, err
+	}
 	return textResult(output.Summary), output, nil
+}
+
+func (h *Handler) openPolicyControl(ctx context.Context, request *mcpsdk.CallToolRequest, input policyControlInput) (*mcpsdk.CallToolResult, toolOutput, error) {
+	stage := rolloutStage(input.TargetRolloutStage)
+	if stage == roomv1.RolloutStage_ROLLOUT_STAGE_UNSPECIFIED {
+		return nil, toolOutput{}, errors.New("target_rollout_stage must be block, paused, or rolled_back")
+	}
+	expected, err := time.Parse(time.RFC3339Nano, input.ExpectedUpdatedAt)
+	if err != nil {
+		return nil, toolOutput{}, errors.New("expected_updated_at must be RFC3339")
+	}
+	id, err := elicitationID()
+	if err != nil {
+		return nil, toolOutput{}, err
+	}
+	handoffURL, err := policyControlURL(h.controlPlaneURL, input.CandidateID, input.TargetRolloutStage)
+	if err != nil {
+		return nil, toolOutput{}, err
+	}
+	receipt := &roomv1.McpElicitationReceipt{Id: id, PolicyCandidateId: input.CandidateID, Mode: roomv1.McpElicitationMode_MCP_ELICITATION_MODE_URL, Purpose: roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_POLICY_CONTROL, TargetRolloutStage: stage, ExpectedCandidateUpdatedAt: timestamppb.New(expected)}
+	elicitation := &elicitationOutput{Required: true, Mode: "url", Purpose: "policy_control", ElicitationID: id, HandoffURL: handoffURL}
+	output := toolOutput{Summary: "Room policy control requires an authenticated human operator. Opening the URL does not mutate policy.", Elicitation: elicitation}
+	if !supportsURLElicitation(request) {
+		receipt.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_UNSUPPORTED
+		elicitation.Action = "unsupported"
+		if err := h.persistElicitation(ctx, receipt, elicitation); err != nil {
+			return nil, toolOutput{}, err
+		}
+		return textResult(output.Summary), output, nil
+	}
+	offered := proto.Clone(receipt).(*roomv1.McpElicitationReceipt)
+	offered.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED
+	offerOutput := &elicitationOutput{}
+	if err := h.persistElicitation(ctx, offered, offerOutput); err != nil {
+		return nil, toolOutput{}, err
+	}
+	elicitation.OfferAuditEventID = offerOutput.AuditEventID
+	response, elicitErr := request.Session.Elicit(ctx, &mcpsdk.ElicitParams{Mode: "url", Message: "Open Room to complete this human-only policy action with an authenticated human-operator credential.", URL: handoffURL, ElicitationID: id})
+	if elicitErr != nil || response == nil {
+		receipt.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ERROR
+		elicitation.Action = "error"
+	} else {
+		receipt.Action, elicitation.Action = elicitationAction(response.Action)
+	}
+	if err := h.persistElicitation(ctx, receipt, elicitation); err != nil {
+		return nil, toolOutput{}, err
+	}
+	return textResult(output.Summary), output, nil
+}
+
+func (h *Handler) elicitEvaluationResolution(ctx context.Context, request *mcpsdk.CallToolRequest, result *roomv1.EvaluationResult, output *toolOutput) error {
+	if !requiresEvaluationResolution(result) {
+		return nil
+	}
+	id, err := elicitationID()
+	if err != nil {
+		return err
+	}
+	receipt := &roomv1.McpElicitationReceipt{
+		Id: id, EvaluationId: result.GetEvaluationId(), EvaluationAuditEventId: result.GetAuditEventId(),
+		Mode:    roomv1.McpElicitationMode_MCP_ELICITATION_MODE_FORM,
+		Purpose: roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_EVALUATION_RESOLUTION,
+	}
+	elicitation := &elicitationOutput{Required: true, Mode: "form", Purpose: "evaluation_resolution", ElicitationID: id}
+	output.Elicitation = elicitation
+	if !supportsFormElicitation(request) {
+		receipt.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_UNSUPPORTED
+		elicitation.Action = "unsupported"
+		return h.persistElicitation(ctx, receipt, elicitation)
+	}
+	offered := proto.Clone(receipt).(*roomv1.McpElicitationReceipt)
+	offered.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED
+	offerOutput := &elicitationOutput{}
+	if err := h.persistElicitation(ctx, offered, offerOutput); err != nil {
+		return err
+	}
+	elicitation.OfferAuditEventID = offerOutput.AuditEventID
+	response, elicitErr := request.Session.Elicit(ctx, &mcpsdk.ElicitParams{
+		Mode:    "form",
+		Message: "Room requires a typed next step before this evaluation can be resolved.",
+		RequestedSchema: map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"properties": map[string]any{
+				"resolution": map[string]any{"type": "string", "title": "Resolution", "enum": []string{"revise", "run_required_checks", "provide_evidence", "open_control_plane"}},
+			},
+			"required": []string{"resolution"},
+		},
+	})
+	if elicitErr != nil || response == nil {
+		receipt.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ERROR
+		elicitation.Action = "error"
+		if err := h.persistElicitation(ctx, receipt, elicitation); err != nil {
+			return err
+		}
+		return nil
+	}
+	receipt.Action, elicitation.Action = elicitationAction(response.Action)
+	if receipt.GetAction() == roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ACCEPT {
+		resolution, ok := response.Content["resolution"].(string)
+		if !ok {
+			receipt.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ERROR
+			elicitation.Action = "error"
+		} else {
+			receipt.Resolution = resolutionAction(resolution)
+			if receipt.GetResolution() == roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_UNSPECIFIED {
+				receipt.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ERROR
+				elicitation.Action = "error"
+			} else {
+				elicitation.Resolution = resolution
+			}
+		}
+	}
+	return h.persistElicitation(ctx, receipt, elicitation)
+}
+
+func requiresEvaluationResolution(result *roomv1.EvaluationResult) bool {
+	if result == nil {
+		return false
+	}
+	switch result.GetDecision() {
+	case roomv1.Decision_DECISION_NEEDS_CHANGES, roomv1.Decision_DECISION_DENY, roomv1.Decision_DECISION_INDETERMINATE:
+	default:
+		return false
+	}
+	if len(result.GetRequiredChecks()) > 0 || len(result.GetGaps()) > 0 {
+		return true
+	}
+	for _, match := range result.GetMatches() {
+		if len(match.GetRequiredEvidence()) > 0 || len(match.GetRemediation()) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func supportsFormElicitation(request *mcpsdk.CallToolRequest) bool {
+	if request == nil || request.Session == nil || request.Session.InitializeParams() == nil || request.Session.InitializeParams().Capabilities == nil {
+		return false
+	}
+	capability := request.Session.InitializeParams().Capabilities.Elicitation
+	return capability != nil && (capability.Form != nil || (capability.Form == nil && capability.URL == nil))
+}
+
+func supportsURLElicitation(request *mcpsdk.CallToolRequest) bool {
+	if request == nil || request.Session == nil || request.Session.InitializeParams() == nil || request.Session.InitializeParams().Capabilities == nil {
+		return false
+	}
+	capability := request.Session.InitializeParams().Capabilities.Elicitation
+	return capability != nil && capability.URL != nil
+}
+
+func rolloutStage(value string) roomv1.RolloutStage {
+	switch value {
+	case "block":
+		return roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK
+	case "paused":
+		return roomv1.RolloutStage_ROLLOUT_STAGE_PAUSED
+	case "rolled_back":
+		return roomv1.RolloutStage_ROLLOUT_STAGE_ROLLED_BACK
+	default:
+		return roomv1.RolloutStage_ROLLOUT_STAGE_UNSPECIFIED
+	}
+}
+
+func policyControlURL(base, candidateID, target string) (string, error) {
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", errors.New("control plane URL is invalid")
+	}
+	parsed.Fragment = url.Values{"candidate": []string{candidateID}, "tab": []string{"rollout"}, "target": []string{target}}.Encode()
+	return parsed.String(), nil
+}
+
+func elicitationAction(action string) (roomv1.McpElicitationAction, string) {
+	switch action {
+	case "accept":
+		return roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ACCEPT, action
+	case "decline":
+		return roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_DECLINE, action
+	case "cancel":
+		return roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_CANCEL, action
+	default:
+		return roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ERROR, "error"
+	}
+}
+
+func resolutionAction(value string) roomv1.McpResolutionAction {
+	switch value {
+	case "revise":
+		return roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_REVISE
+	case "run_required_checks":
+		return roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_RUN_REQUIRED_CHECKS
+	case "provide_evidence":
+		return roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_PROVIDE_EVIDENCE
+	case "open_control_plane":
+		return roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_OPEN_CONTROL_PLANE
+	default:
+		return roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_UNSPECIFIED
+	}
+}
+
+func (h *Handler) persistElicitation(ctx context.Context, receipt *roomv1.McpElicitationReceipt, output *elicitationOutput) error {
+	auditID, err := h.client.RecordMcpElicitation(ctx, receipt)
+	if err != nil {
+		return err
+	}
+	output.AuditEventID = auditID
+	return nil
+}
+
+func elicitationID() (string, error) {
+	value := make([]byte, 16)
+	if _, err := rand.Read(value); err != nil {
+		return "", fmt.Errorf("generate elicitation id: %w", err)
+	}
+	return "elicitation-" + hex.EncodeToString(value), nil
 }
 
 func (i ruleInput) context() *roomv1.EvaluationContext {
