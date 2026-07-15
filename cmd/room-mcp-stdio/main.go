@@ -22,7 +22,7 @@ func run(ctx context.Context) error {
 	if err := cfg.ValidateClient(); err != nil {
 		return fmt.Errorf("invalid upstream configuration: %w", err)
 	}
-	if err := cfg.ValidateMCPServer(); err != nil {
+	if err := cfg.ValidateMCPControlPlane(); err != nil {
 		return fmt.Errorf("invalid MCP configuration: %w", err)
 	}
 	token, err := config.LoadTokenFile(cfg.TokenFile)
