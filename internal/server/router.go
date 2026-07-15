@@ -46,7 +46,7 @@ func New(service *app.Service, optionValues ...Option) http.Handler {
 	readLimit := connect.WithReadMaxBytes(int(settings.maxBodyBytes))
 	adminPath, adminHandler := roomv1connect.NewRuleAdminServiceHandler(service.Admin(), readLimit)
 	agentPath, agentHandler := roomv1connect.NewAgentRulesServiceHandler(service.Agent(), readLimit)
-	mux.Handle(adminPath, protectedHandler(settings, auth.RoleAdmin, adminHandler))
+	mux.Handle(adminPath, protectedRolesHandler(settings, []auth.Role{auth.RoleAdmin, auth.RoleReviewer}, adminHandler))
 	mux.Handle(agentPath, protectedHandler(settings, auth.RoleAgent, agentHandler))
 	reflector := grpcreflect.NewStaticReflector(roomv1connect.RuleAdminServiceName, roomv1connect.AgentRulesServiceName)
 	reflectionPath, reflectionHandler := grpcreflect.NewHandlerV1(reflector)
@@ -164,6 +164,114 @@ func New(service *app.Service, optionValues ...Option) http.Handler {
 		resp, err := service.ListAuditEvents(r.Context(), connect.NewRequest(&roomv1.ListAuditEventsRequest{Limit: 100}))
 		writeProtoJSON(w, message(resp), err)
 	})))
+	mux.Handle("/api/review-findings", protectedRolesHandler(settings, []auth.Role{auth.RoleAdmin, auth.RoleReviewer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			claimKind := roomv1.ReviewClaimKind_REVIEW_CLAIM_KIND_UNSPECIFIED
+			if raw := r.URL.Query().Get("claim_kind"); raw != "" {
+				if value, ok := roomv1.ReviewClaimKind_value[raw]; ok {
+					claimKind = roomv1.ReviewClaimKind(value)
+				} else {
+					writeError(w, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid claim_kind")))
+					return
+				}
+			}
+			resp, err := service.ListReviewFindings(r.Context(), connect.NewRequest(&roomv1.ListReviewFindingsRequest{Repository: r.URL.Query().Get("repository"), ClaimKind: claimKind, Limit: 500}))
+			writeProtoJSON(w, message(resp), err)
+		case http.MethodPost:
+			var msg roomv1.IngestReviewFindingRequest
+			if err := readProtoJSON(w, r, &msg, settings.maxBodyBytes); err != nil {
+				writeError(w, err)
+				return
+			}
+			resp, err := service.IngestReviewFinding(r.Context(), connect.NewRequest(&msg))
+			writeProtoJSON(w, message(resp), err)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})))
+	mux.Handle("/api/review-findings/", protectedRolesHandler(settings, []auth.Role{auth.RoleAdmin, auth.RoleReviewer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/review-findings/"), "/"), "/")
+		if r.Method != http.MethodPost || len(parts) != 2 || parts[0] == "" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		switch parts[1] {
+		case "outcomes":
+			var msg roomv1.RecordReviewOutcomeRequest
+			if err := readProtoJSON(w, r, &msg, settings.maxBodyBytes); err != nil {
+				writeError(w, err)
+				return
+			}
+			msg.FindingId = parts[0]
+			resp, err := service.RecordReviewOutcome(r.Context(), connect.NewRequest(&msg))
+			writeProtoJSON(w, message(resp), err)
+		case "adjudications":
+			var msg roomv1.AdjudicateReviewFindingRequest
+			if err := readProtoJSON(w, r, &msg, settings.maxBodyBytes); err != nil {
+				writeError(w, err)
+				return
+			}
+			msg.FindingId = parts[0]
+			resp, err := service.AdjudicateReviewFinding(r.Context(), connect.NewRequest(&msg))
+			writeProtoJSON(w, message(resp), err)
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})))
+	mux.Handle("/api/policy-infer", protectedRolesHandler(settings, []auth.Role{auth.RoleAdmin, auth.RoleReviewer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var msg roomv1.InferPolicyCandidatesRequest
+		if err := readProtoJSON(w, r, &msg, settings.maxBodyBytes); err != nil {
+			writeError(w, err)
+			return
+		}
+		resp, err := service.InferPolicyCandidates(r.Context(), connect.NewRequest(&msg))
+		writeProtoJSON(w, message(resp), err)
+	})))
+	mux.Handle("/api/policy-candidates", protectedRolesHandler(settings, []auth.Role{auth.RoleAdmin, auth.RoleReviewer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		resp, err := service.ListPolicyCandidates(r.Context(), connect.NewRequest(&roomv1.ListPolicyCandidatesRequest{}))
+		writeProtoJSON(w, message(resp), err)
+	})))
+	mux.Handle("/api/policy-candidates/", protectedRolesHandler(settings, []auth.Role{auth.RoleAdmin, auth.RoleReviewer}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/policy-candidates/"), "/"), "/")
+		if r.Method != http.MethodPost || len(parts) != 2 || parts[0] == "" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		switch parts[1] {
+		case "replay":
+			resp, err := service.RunPolicyReplay(r.Context(), connect.NewRequest(&roomv1.RunPolicyReplayRequest{PolicyCandidateId: parts[0]}))
+			writeProtoJSON(w, message(resp), err)
+		case "tune":
+			var msg roomv1.TunePolicyCandidateRequest
+			if err := readProtoJSON(w, r, &msg, settings.maxBodyBytes); err != nil {
+				writeError(w, err)
+				return
+			}
+			msg.PolicyCandidateId = parts[0]
+			resp, err := service.TunePolicyCandidate(r.Context(), connect.NewRequest(&msg))
+			writeProtoJSON(w, message(resp), err)
+		case "transition":
+			var msg roomv1.TransitionPolicyCandidateRequest
+			if err := readProtoJSON(w, r, &msg, settings.maxBodyBytes); err != nil {
+				writeError(w, err)
+				return
+			}
+			msg.PolicyCandidateId = parts[0]
+			resp, err := service.TransitionPolicyCandidate(r.Context(), connect.NewRequest(&msg))
+			writeProtoJSON(w, message(resp), err)
+		default:
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})))
 	return securityHeaders(mux)
 }
 
@@ -178,9 +286,20 @@ func protectedHandler(settings options, role auth.Role, next http.Handler) http.
 	return rejectProtectedHandler()
 }
 
+func protectedRolesHandler(settings options, roles []auth.Role, next http.Handler) http.Handler {
+	rolesRequired := auth.RequireAnyRole(roles...)(next)
+	if settings.authenticator != nil {
+		return auth.Middleware(settings.authenticator, rolesRequired)
+	}
+	if settings.localAuth {
+		return localPrincipalMiddleware(auth.RoleAdmin, rolesRequired)
+	}
+	return rejectProtectedHandler()
+}
+
 func localPrincipalMiddleware(role auth.Role, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		principal := auth.Principal{ID: "local-admin", Role: role}
+		principal := auth.Principal{ID: "local-admin", Role: role, HumanOperator: true}
 		if role == auth.RoleAgent {
 			principal = auth.Principal{ID: "local-agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "local", Repository: "local", AgentID: "local-agent"}}
 		}
@@ -243,6 +362,10 @@ func writeError(w http.ResponseWriter, err error) {
 			status = http.StatusBadRequest
 		case connect.CodeNotFound:
 			status = http.StatusNotFound
+		case connect.CodeFailedPrecondition:
+			status = http.StatusPreconditionFailed
+		case connect.CodeAborted:
+			status = http.StatusConflict
 		}
 	}
 	if errors.Is(err, errBodyTooLarge) {

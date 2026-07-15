@@ -11,6 +11,7 @@ import (
 	"github.com/haasonsaas/room/internal/analyzer"
 	"github.com/haasonsaas/room/internal/auth"
 	"github.com/haasonsaas/room/internal/compliance"
+	"github.com/haasonsaas/room/internal/intelligence"
 	"github.com/haasonsaas/room/internal/store"
 )
 
@@ -65,6 +66,79 @@ func TestAdminRPCRejectsAgentRole(t *testing.T) {
 	ctx := auth.WithPrincipal(context.Background(), auth.Principal{ID: "agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "w", Repository: "r", AgentID: "a"}})
 	if _, err := service.ListRules(ctx, connect.NewRequest(&roomv1.ListRulesRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("code = %s, want permission denied", connect.CodeOf(err))
+	}
+}
+
+func TestReviewerCannotBypassHumanPolicyPublication(t *testing.T) {
+	database, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := New(database)
+	reviewer := auth.WithPrincipal(context.Background(), auth.Principal{ID: "review-bot", Role: auth.RoleReviewer})
+	if _, err := service.IngestReviewFinding(reviewer, connect.NewRequest(&roomv1.IngestReviewFindingRequest{Finding: &roomv1.ReviewFinding{Id: "f", Source: &roomv1.ReviewSource{Repository: "evalops/room"}, ClaimKind: roomv1.ReviewClaimKind_REVIEW_CLAIM_KIND_PROTOCOL_CONTRACT, Severity: roomv1.Severity_SEVERITY_HIGH}})); err != nil {
+		t.Fatalf("reviewer ingestion rejected: %v", err)
+	}
+	if _, err := service.PublishRuleset(reviewer, connect.NewRequest(&roomv1.PublishRulesetRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("reviewer publish code = %s, want permission denied", connect.CodeOf(err))
+	}
+	admin := auth.WithPrincipal(context.Background(), auth.Principal{ID: "automation-admin", Role: auth.RoleAdmin})
+	if _, err := service.PublishRuleset(admin, connect.NewRequest(&roomv1.PublishRulesetRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("non-human admin publish code = %s, want permission denied", connect.CodeOf(err))
+	}
+	human := auth.WithPrincipal(context.Background(), auth.Principal{ID: "operator", Role: auth.RoleAdmin, HumanOperator: true})
+	if _, err := service.PublishRuleset(human, connect.NewRequest(&roomv1.PublishRulesetRequest{Author: "operator"})); err != nil {
+		t.Fatalf("human publish rejected: %v", err)
+	}
+}
+
+func TestProtectedOrgPolicyRequiresHumanApprovalToBlock(t *testing.T) {
+	candidate := &roomv1.PolicyCandidate{RolloutStage: roomv1.RolloutStage_ROLLOUT_STAGE_WARN, ProtectedOrgPolicy: true}
+	replay := &roomv1.PolicyReplayRun{PolicyCandidateId: candidate.GetId(), Metrics: &roomv1.PolicyMetrics{AcceptedCount: 1, TruePositiveCount: 1, PrecisionBasisPoints: 10000, RecallBasisPoints: 10000}}
+	replay.PolicyCandidateSha256, _ = intelligence.CandidateDigest(candidate)
+	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK, false, replay); err == nil {
+		t.Fatal("protected org policy advanced to blocking without human approval")
+	}
+	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK, true, replay); err != nil {
+		t.Fatalf("approved transition rejected: %v", err)
+	}
+	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW, true, replay); err == nil {
+		t.Fatal("backward non-rollback transition accepted")
+	}
+	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_ROLLED_BACK, false, replay); err == nil {
+		t.Fatal("emergency rollback accepted without human operator")
+	}
+	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_ROLLED_BACK, true, replay); err != nil {
+		t.Fatalf("human emergency rollback rejected: %v", err)
+	}
+}
+
+func TestRolloutPromotionRequiresReplayQualityGates(t *testing.T) {
+	draft := &roomv1.PolicyCandidate{Id: "candidate", RolloutStage: roomv1.RolloutStage_ROLLOUT_STAGE_DRAFT}
+	if err := validateRolloutTransition(draft, roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW, false, nil); err == nil {
+		t.Fatal("shadow promotion accepted without replay")
+	}
+	shadow := &roomv1.PolicyCandidate{Id: "candidate", RolloutStage: roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW}
+	weak := &roomv1.PolicyReplayRun{PolicyCandidateId: "candidate", Metrics: &roomv1.PolicyMetrics{AcceptedCount: 1, PrecisionBasisPoints: 7000, RecallBasisPoints: 9000}}
+	weak.PolicyCandidateSha256, _ = intelligence.CandidateDigest(shadow)
+	if err := validateRolloutTransition(shadow, roomv1.RolloutStage_ROLLOUT_STAGE_WARN, false, weak); err == nil {
+		t.Fatal("warn promotion accepted below precision gate")
+	}
+	strong := &roomv1.PolicyReplayRun{PolicyCandidateId: "candidate", Metrics: &roomv1.PolicyMetrics{AcceptedCount: 1, PrecisionBasisPoints: 9000, RecallBasisPoints: 7000}}
+	strong.PolicyCandidateSha256, _ = intelligence.CandidateDigest(shadow)
+	if err := validateRolloutTransition(shadow, roomv1.RolloutStage_ROLLOUT_STAGE_WARN, false, strong); err != nil {
+		t.Fatalf("qualified warn promotion rejected: %v", err)
+	}
+}
+
+func TestRolloutPromotionRejectsReplayFromStaleCandidateRevision(t *testing.T) {
+	candidate := &roomv1.PolicyCandidate{Id: "candidate", RolloutStage: roomv1.RolloutStage_ROLLOUT_STAGE_DRAFT, MinimumConfidenceBasisPoints: 8000}
+	replay := &roomv1.PolicyReplayRun{PolicyCandidateId: candidate.GetId(), Metrics: &roomv1.PolicyMetrics{AcceptedCount: 1}}
+	replay.PolicyCandidateSha256, _ = intelligence.CandidateDigest(candidate)
+	candidate.MinimumConfidenceBasisPoints = 9000
+	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW, false, replay); err == nil {
+		t.Fatal("promotion accepted replay from stale candidate revision")
 	}
 }
 

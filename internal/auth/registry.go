@@ -31,9 +31,10 @@ type registryFile struct {
 }
 
 type credentialFile struct {
-	ID          string `json:"id"`
-	Role        Role   `json:"role"`
-	TokenSHA256 string `json:"token_sha256"`
+	ID            string `json:"id"`
+	Role          Role   `json:"role"`
+	TokenSHA256   string `json:"token_sha256"`
+	HumanOperator bool   `json:"human_operator,omitempty"`
 	Scope
 }
 
@@ -124,7 +125,7 @@ func decodeRegistry(reader io.Reader) (*Registry, error) {
 			return nil, fmt.Errorf("credential %d duplicates id %q", index, item.ID)
 		}
 		seen[item.ID] = struct{}{}
-		principal := Principal{ID: item.ID, Role: item.Role, Scope: item.Scope}
+		principal := Principal{ID: item.ID, Role: item.Role, Scope: item.Scope, HumanOperator: item.HumanOperator}
 		if err := validatePrincipal(principal); err != nil {
 			return nil, fmt.Errorf("credential %d: %w", index, err)
 		}
@@ -229,14 +230,14 @@ func IssueOrUpdateToken(path string, principal Principal) (string, error) {
 			}
 			stored.Credentials = append(stored.Credentials, credentialFile{
 				ID: existing.principal.ID, Role: existing.principal.Role,
-				TokenSHA256: hex.EncodeToString(existing.digest[:]), Scope: existing.principal.Scope,
+				TokenSHA256: hex.EncodeToString(existing.digest[:]), Scope: existing.principal.Scope, HumanOperator: existing.principal.HumanOperator,
 			})
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
 	stored.Credentials = append(stored.Credentials, credentialFile{
-		ID: principal.ID, Role: principal.Role, TokenSHA256: hex.EncodeToString(digest[:]), Scope: principal.Scope,
+		ID: principal.ID, Role: principal.Role, TokenSHA256: hex.EncodeToString(digest[:]), Scope: principal.Scope, HumanOperator: principal.HumanOperator,
 	})
 	sort.Slice(stored.Credentials, func(i, j int) bool { return stored.Credentials[i].ID < stored.Credentials[j].ID })
 	if err := writeRegistryAtomic(path, stored); err != nil {
@@ -255,6 +256,9 @@ func validatePrincipal(principal Principal) error {
 			return errors.New("admin credential must not have agent scope")
 		}
 	case RoleAgent:
+		if principal.HumanOperator {
+			return errors.New("agent credential cannot be a human operator")
+		}
 		if principal.Scope.WorkspaceID == "" || principal.Scope.Repository == "" || principal.Scope.AgentID == "" {
 			return errors.New("agent credential requires exact workspace, repository, and agent scope")
 		}
@@ -265,6 +269,10 @@ func validatePrincipal(principal Principal) error {
 		}
 		if principal.Scope.MCPProxy && principal.Scope.HookProvider != "" && principal.Scope.HookProvider != HookProviderNone {
 			return errors.New("MCP proxy credential cannot also bind a hook provider")
+		}
+	case RoleReviewer:
+		if principal.Scope != (Scope{}) || principal.HumanOperator {
+			return errors.New("reviewer credential cannot have agent scope or human-operator authority")
 		}
 	default:
 		return fmt.Errorf("unsupported credential role %q", principal.Role)

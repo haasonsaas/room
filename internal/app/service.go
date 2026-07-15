@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,7 @@ import (
 	"github.com/haasonsaas/room/internal/auth"
 	"github.com/haasonsaas/room/internal/compliance"
 	"github.com/haasonsaas/room/internal/eval"
+	"github.com/haasonsaas/room/internal/intelligence"
 	"github.com/haasonsaas/room/internal/store"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -111,7 +113,7 @@ func (s *Service) PreviewRuleset(ctx context.Context, req *connect.Request[roomv
 }
 
 func (s *Service) PublishRuleset(ctx context.Context, req *connect.Request[roomv1.PublishRulesetRequest]) (*connect.Response[roomv1.PublishRulesetResponse], error) {
-	principal, err := principalForRole(ctx, auth.RoleAdmin)
+	principal, err := principalForHumanAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +126,7 @@ func (s *Service) PublishRuleset(ctx context.Context, req *connect.Request[roomv
 }
 
 func (s *Service) RollbackRuleset(ctx context.Context, req *connect.Request[roomv1.RollbackRulesetRequest]) (*connect.Response[roomv1.RollbackRulesetResponse], error) {
-	principal, err := principalForRole(ctx, auth.RoleAdmin)
+	principal, err := principalForHumanAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +273,7 @@ func (s *Service) GetMcpPolicy(ctx context.Context, _ *connect.Request[roomv1.Ge
 }
 
 func (s *Service) UpdateMcpPolicy(ctx context.Context, req *connect.Request[roomv1.UpdateMcpPolicyRequest]) (*connect.Response[roomv1.UpdateMcpPolicyResponse], error) {
-	principal, err := principalForRole(ctx, auth.RoleAdmin)
+	principal, err := principalForHumanAdmin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +294,279 @@ func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[room
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&roomv1.ListAuditEventsResponse{Events: events}), nil
+}
+
+func (s *Service) IngestReviewFinding(ctx context.Context, req *connect.Request[roomv1.IngestReviewFindingRequest]) (*connect.Response[roomv1.IngestReviewFindingResponse], error) {
+	principal, err := principalForReview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	requested := req.Msg.GetFinding()
+	audit := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_REVIEW_FINDING_INGESTED, SubjectId: principal.ID}
+	if requested != nil {
+		audit.Repository = requested.GetSource().GetRepository()
+		audit.EvidenceRecordId = requested.GetId()
+	}
+	finding, err := s.store.UpsertReviewFindingAudited(requested, audit)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&roomv1.IngestReviewFindingResponse{Finding: finding}), nil
+}
+
+func (s *Service) RecordReviewOutcome(ctx context.Context, req *connect.Request[roomv1.RecordReviewOutcomeRequest]) (*connect.Response[roomv1.RecordReviewOutcomeResponse], error) {
+	principal, err := principalForReview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	outcome := req.Msg.GetOutcome()
+	if outcome != nil {
+		outcome = proto.Clone(outcome).(*roomv1.ReviewOutcome)
+		outcome.ActorId = principal.ID
+	}
+	audit := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_REVIEW_OUTCOME_RECORDED, SubjectId: principal.ID, EvidenceRecordId: outcome.GetId()}
+	finding, err := s.store.AppendReviewOutcomeAudited(req.Msg.GetFindingId(), outcome, audit)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&roomv1.RecordReviewOutcomeResponse{Finding: finding}), nil
+}
+
+func (s *Service) AdjudicateReviewFinding(ctx context.Context, req *connect.Request[roomv1.AdjudicateReviewFindingRequest]) (*connect.Response[roomv1.AdjudicateReviewFindingResponse], error) {
+	principal, err := principalForReview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	adjudication := req.Msg.GetAdjudication()
+	if adjudication != nil {
+		adjudication = proto.Clone(adjudication).(*roomv1.ReviewAdjudication)
+		adjudication.AgentId = principal.ID
+	}
+	audit := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_REVIEW_ADJUDICATED, SubjectId: principal.ID, EvidenceRecordId: adjudication.GetId()}
+	finding, err := s.store.AppendReviewAdjudicationAudited(req.Msg.GetFindingId(), adjudication, audit)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&roomv1.AdjudicateReviewFindingResponse{Finding: finding}), nil
+}
+
+func (s *Service) ListReviewFindings(ctx context.Context, req *connect.Request[roomv1.ListReviewFindingsRequest]) (*connect.Response[roomv1.ListReviewFindingsResponse], error) {
+	if _, err := principalForReview(ctx); err != nil {
+		return nil, err
+	}
+	findings, err := s.store.ListReviewFindings(req.Msg.GetRepository(), req.Msg.GetClaimKind(), req.Msg.GetLimit())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&roomv1.ListReviewFindingsResponse{Findings: findings}), nil
+}
+
+func (s *Service) InferPolicyCandidates(ctx context.Context, req *connect.Request[roomv1.InferPolicyCandidatesRequest]) (*connect.Response[roomv1.InferPolicyCandidatesResponse], error) {
+	principal, err := principalForReview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	findings, err := s.store.ListReviewFindings(req.Msg.GetRepository(), roomv1.ReviewClaimKind_REVIEW_CLAIM_KIND_UNSPECIFIED, 500)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	candidates, err := intelligence.Infer(findings, req.Msg.GetMinimumSupport(), principal.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	audits := make([]*roomv1.AuditEvent, 0, len(candidates))
+	for _, candidate := range candidates {
+		existing, lookupErr := s.store.PolicyCandidate(candidate.GetId())
+		if lookupErr != nil {
+			return nil, connect.NewError(connect.CodeInternal, lookupErr)
+		}
+		if existing != nil {
+			candidate.CreatedAt = existing.GetCreatedAt()
+			candidate.CreatedBy = existing.GetCreatedBy()
+			candidate.RolloutStage = existing.GetRolloutStage()
+			candidate.MinimumConfidenceBasisPoints = existing.GetMinimumConfidenceBasisPoints()
+			for _, trigger := range candidate.GetProposedRule().GetTriggers() {
+				trigger.MinimumConfidenceBasisPoints = existing.GetMinimumConfidenceBasisPoints()
+			}
+			candidate.ProtectedOrgPolicy = candidate.GetProtectedOrgPolicy() || existing.GetProtectedOrgPolicy()
+		}
+		audits = append(audits, &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_POLICY_INFERRED, SubjectId: principal.ID, Repository: req.Msg.GetRepository(), PolicyCandidateId: candidate.GetId()})
+	}
+	stored, err := s.store.UpsertPolicyCandidatesAudited(candidates, audits)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&roomv1.InferPolicyCandidatesResponse{Candidates: stored}), nil
+}
+
+func (s *Service) ListPolicyCandidates(ctx context.Context, req *connect.Request[roomv1.ListPolicyCandidatesRequest]) (*connect.Response[roomv1.ListPolicyCandidatesResponse], error) {
+	if _, err := principalForReview(ctx); err != nil {
+		return nil, err
+	}
+	candidates, err := s.store.ListPolicyCandidates(req.Msg.GetRolloutStage())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&roomv1.ListPolicyCandidatesResponse{Candidates: candidates}), nil
+}
+
+func (s *Service) RunPolicyReplay(ctx context.Context, req *connect.Request[roomv1.RunPolicyReplayRequest]) (*connect.Response[roomv1.RunPolicyReplayResponse], error) {
+	principal, err := principalForReview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	candidate, err := s.store.PolicyCandidate(req.Msg.GetPolicyCandidateId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if candidate == nil {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("policy candidate not found"))
+	}
+	repository, err := candidateRepository(candidate)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	findings, err := s.store.ListReviewFindings(repository, candidate.GetClaimKind(), 500)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	replay, err := intelligence.Replay(candidate, findings)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	audit := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_POLICY_REPLAYED, SubjectId: principal.ID, PolicyCandidateId: candidate.GetId(), EvidenceRecordId: replay.GetId()}
+	if err := s.store.SavePolicyReplayAudited(replay, audit); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&roomv1.RunPolicyReplayResponse{Replay: replay}), nil
+}
+
+func (s *Service) TransitionPolicyCandidate(ctx context.Context, req *connect.Request[roomv1.TransitionPolicyCandidateRequest]) (*connect.Response[roomv1.TransitionPolicyCandidateResponse], error) {
+	principal, err := principalForReview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	candidate, err := s.store.PolicyCandidate(req.Msg.GetPolicyCandidateId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if candidate == nil {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("policy candidate not found"))
+	}
+	if req.Msg.GetExpectedUpdatedAt() == nil || !proto.Equal(req.Msg.GetExpectedUpdatedAt(), candidate.GetUpdatedAt()) {
+		return nil, connect.NewError(connect.CodeAborted, fmt.Errorf("policy candidate changed; refresh before transitioning"))
+	}
+	replays, err := s.store.ListPolicyReplays(candidate.GetId(), 1)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	var latestReplay *roomv1.PolicyReplayRun
+	if len(replays) > 0 {
+		latestReplay = replays[0]
+	}
+	if err := validateRolloutTransition(candidate, req.Msg.GetTargetStage(), req.Msg.GetHumanApproved() && principal.HumanOperator, latestReplay); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	candidate.RolloutStage = req.Msg.GetTargetStage()
+	audit := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_POLICY_TRANSITIONED, SubjectId: principal.ID, PolicyCandidateId: candidate.GetId()}
+	candidate, _, err = s.store.ApplyPolicyCandidate(candidate, req.Msg.GetExpectedUpdatedAt(), nil, audit)
+	if err != nil {
+		if errors.Is(err, store.ErrPolicyCandidateConflict) {
+			return nil, connect.NewError(connect.CodeAborted, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&roomv1.TransitionPolicyCandidateResponse{Candidate: candidate}), nil
+}
+
+func (s *Service) TunePolicyCandidate(ctx context.Context, req *connect.Request[roomv1.TunePolicyCandidateRequest]) (*connect.Response[roomv1.TunePolicyCandidateResponse], error) {
+	principal, err := principalForReview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	candidate, err := s.store.PolicyCandidate(req.Msg.GetPolicyCandidateId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if candidate == nil {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("policy candidate not found"))
+	}
+	if req.Msg.GetExpectedUpdatedAt() == nil || !proto.Equal(req.Msg.GetExpectedUpdatedAt(), candidate.GetUpdatedAt()) {
+		return nil, connect.NewError(connect.CodeAborted, fmt.Errorf("policy candidate changed; refresh before tuning"))
+	}
+	replays, err := s.store.ListPolicyReplays(candidate.GetId(), 50)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	tuned, decision, err := intelligence.Tune(candidate, replays, principal.ID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	if decision.GetAction() == roomv1.TuningActionKind_TUNING_ACTION_KIND_ROLLBACK {
+		// Autonomous tuning may recommend an emergency rollback, but only the
+		// credential-gated transition path can apply it.
+		tuned = proto.Clone(candidate).(*roomv1.PolicyCandidate)
+	} else {
+		for _, trigger := range tuned.GetProposedRule().GetTriggers() {
+			trigger.MinimumConfidenceBasisPoints = tuned.GetMinimumConfidenceBasisPoints()
+		}
+	}
+	audit := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_POLICY_TUNED, SubjectId: principal.ID, PolicyCandidateId: candidate.GetId(), EvidenceRecordId: decision.GetId()}
+	tuned, _, err = s.store.ApplyPolicyCandidate(tuned, req.Msg.GetExpectedUpdatedAt(), decision, audit)
+	if err != nil {
+		if errors.Is(err, store.ErrPolicyCandidateConflict) {
+			return nil, connect.NewError(connect.CodeAborted, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&roomv1.TunePolicyCandidateResponse{Candidate: tuned, Decision: decision}), nil
+}
+
+func validateRolloutTransition(candidate *roomv1.PolicyCandidate, target roomv1.RolloutStage, humanAuthorized bool, replay *roomv1.PolicyReplayRun) error {
+	current := candidate.GetRolloutStage()
+	if target == roomv1.RolloutStage_ROLLOUT_STAGE_PAUSED || target == roomv1.RolloutStage_ROLLOUT_STAGE_ROLLED_BACK {
+		if !humanAuthorized {
+			return fmt.Errorf("a human-operator credential and explicit confirmation are required for emergency controls")
+		}
+		return nil
+	}
+	allowed := map[roomv1.RolloutStage]roomv1.RolloutStage{
+		roomv1.RolloutStage_ROLLOUT_STAGE_DRAFT:  roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW,
+		roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW: roomv1.RolloutStage_ROLLOUT_STAGE_WARN,
+		roomv1.RolloutStage_ROLLOUT_STAGE_WARN:   roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK,
+	}
+	if allowed[current] != target {
+		return fmt.Errorf("invalid rollout transition from %s to %s", current, target)
+	}
+	if replay == nil || replay.GetPolicyCandidateId() != candidate.GetId() || replay.GetMetrics().GetAcceptedCount() == 0 {
+		return fmt.Errorf("a successful replay with accepted evidence is required before promotion")
+	}
+	candidateDigest, err := intelligence.CandidateDigest(candidate)
+	if err != nil {
+		return fmt.Errorf("digest policy candidate: %w", err)
+	}
+	if !bytes.Equal(replay.GetPolicyCandidateSha256(), candidateDigest) {
+		return fmt.Errorf("replay evidence is stale; rerun replay for this policy candidate revision")
+	}
+	metrics := replay.GetMetrics()
+	if target == roomv1.RolloutStage_ROLLOUT_STAGE_WARN && (metrics.GetPrecisionBasisPoints() < 8000 || metrics.GetRecallBasisPoints() < 5000) {
+		return fmt.Errorf("warn rollout requires at least 80%% precision and 50%% recall")
+	}
+	if target == roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK && (metrics.GetPrecisionBasisPoints() < 9500 || metrics.GetRecallBasisPoints() < 8000 || metrics.GetFalsePositiveCount() != 0) {
+		return fmt.Errorf("block rollout requires at least 95%% precision, 80%% recall, and zero false positives")
+	}
+	if target == roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK && candidate.GetProtectedOrgPolicy() && !humanAuthorized {
+		return fmt.Errorf("a human-operator credential and explicit confirmation are required for protected org-wide blocking policies")
+	}
+	return nil
+}
+
+func candidateRepository(candidate *roomv1.PolicyCandidate) (string, error) {
+	repositories := candidate.GetProposedRule().GetScope().GetRepositories()
+	if len(repositories) != 1 || repositories[0] == "" {
+		return "", fmt.Errorf("policy candidate must have exactly one typed repository scope")
+	}
+	return repositories[0], nil
 }
 
 func (s *Service) analyze(ctx context.Context, phase roomv1.AnalysisPhase, content []byte, changedFiles []string) *roomv1.AnalysisReport {
@@ -316,6 +591,28 @@ func principalForRole(ctx context.Context, role auth.Role) (auth.Principal, erro
 func requireRole(ctx context.Context, role auth.Role) error {
 	_, err := principalForRole(ctx, role)
 	return err
+}
+
+func principalForReview(ctx context.Context) (auth.Principal, error) {
+	principal, ok := auth.PrincipalFromContext(ctx)
+	if !ok {
+		return auth.Principal{}, connect.NewError(connect.CodeUnauthenticated, auth.ErrUnauthenticated)
+	}
+	if principal.Role != auth.RoleAdmin && principal.Role != auth.RoleReviewer {
+		return auth.Principal{}, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("permission denied"))
+	}
+	return principal, nil
+}
+
+func principalForHumanAdmin(ctx context.Context) (auth.Principal, error) {
+	principal, err := principalForRole(ctx, auth.RoleAdmin)
+	if err != nil {
+		return auth.Principal{}, err
+	}
+	if !principal.HumanOperator {
+		return auth.Principal{}, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("human-operator credential required"))
+	}
+	return principal, nil
 }
 
 func authorizedContext(principal auth.Principal, supplied *roomv1.EvaluationContext) *roomv1.EvaluationContext {

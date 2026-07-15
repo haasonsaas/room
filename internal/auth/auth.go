@@ -24,8 +24,9 @@ func TokenCredentialID(token string) (string, bool) {
 type Role string
 
 const (
-	RoleAdmin Role = "admin"
-	RoleAgent Role = "agent"
+	RoleAdmin    Role = "admin"
+	RoleAgent    Role = "agent"
+	RoleReviewer Role = "reviewer"
 )
 
 type HookProvider string
@@ -48,9 +49,10 @@ type Scope struct {
 
 // Principal is the typed identity established by successful authentication.
 type Principal struct {
-	ID    string
-	Role  Role
-	Scope Scope
+	ID            string
+	Role          Role
+	Scope         Scope
+	HumanOperator bool
 }
 
 type principalContextKey struct{}
@@ -114,6 +116,27 @@ func RequireRole(role Role) func(http.Handler) http.Handler {
 				return
 			}
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireAnyRole permits a principal with one of the explicitly listed roles.
+func RequireAnyRole(roles ...Role) func(http.Handler) http.Handler {
+	allowed := append([]Role(nil), roles...)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			principal, ok := PrincipalFromContext(r.Context())
+			if !ok {
+				writeUnauthorized(w)
+				return
+			}
+			for _, role := range allowed {
+				if subtle.ConstantTimeCompare([]byte(principal.Role), []byte(role)) == 1 {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			writeForbidden(w)
 		})
 	}
 }

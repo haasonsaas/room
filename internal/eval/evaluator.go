@@ -107,6 +107,7 @@ func (p *Policy) Evaluate(ruleset *roomv1.RulesetVersion, context *roomv1.Evalua
 			matches = append(matches, &roomv1.RuleMatch{
 				RuleId: rule.GetId(), Title: rule.GetTitle(), Severity: rule.GetSeverity(), Message: ruleMessage(rule),
 				Tags: append([]string(nil), rule.GetTags()...), RequiredEvidence: append([]string(nil), rule.GetRequiredEvidence()...), Remediation: append([]string(nil), rule.GetRemediation()...),
+				RolloutStage: rule.GetRolloutStage(),
 			})
 		}
 	}
@@ -129,22 +130,38 @@ func (p *Policy) Evaluate(ruleset *roomv1.RulesetVersion, context *roomv1.Evalua
 	})
 	result.Matches = matches
 	result.Decision = roomv1.Decision_DECISION_ALLOW
+	warnRollout := false
+	blockingHighest := roomv1.Severity_SEVERITY_UNSPECIFIED
 	for _, match := range matches {
 		if match.GetSeverity() > result.GetHighestSeverity() {
 			result.HighestSeverity = match.GetSeverity()
+		}
+		switch match.GetRolloutStage() {
+		case roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW:
+			continue
+		case roomv1.RolloutStage_ROLLOUT_STAGE_WARN:
+			warnRollout = true
+		default:
+			if match.GetSeverity() > blockingHighest {
+				blockingHighest = match.GetSeverity()
+			}
 		}
 		for _, evidence := range match.GetRequiredEvidence() {
 			result.RequiredChecks = append(result.RequiredChecks, fmt.Sprintf("%s: %s", match.GetRuleId(), evidence))
 		}
 	}
 	result.RequiredChecks = dedupeStrings(result.GetRequiredChecks())
-	switch result.GetHighestSeverity() {
+	switch blockingHighest {
 	case roomv1.Severity_SEVERITY_CRITICAL:
 		result.Decision = roomv1.Decision_DECISION_DENY
 	case roomv1.Severity_SEVERITY_HIGH:
 		result.Decision = roomv1.Decision_DECISION_NEEDS_CHANGES
 	case roomv1.Severity_SEVERITY_MEDIUM, roomv1.Severity_SEVERITY_LOW, roomv1.Severity_SEVERITY_INFO:
 		result.Decision = roomv1.Decision_DECISION_WARN
+	default:
+		if warnRollout {
+			result.Decision = roomv1.Decision_DECISION_WARN
+		}
 	}
 	return result
 }
