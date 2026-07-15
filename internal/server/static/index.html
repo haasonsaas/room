@@ -138,6 +138,16 @@
           <label for="admin-token">Admin token</label><input id="admin-token" type="password" autocomplete="off" placeholder="Kept in memory only" />
           <label for="agent-token">Agent token</label><input id="agent-token" type="password" autocomplete="off" placeholder="Kept in memory only" />
           <div class="toolbar" style="margin-top:12px"><button id="connect">Connect</button><button class="quiet" id="refresh">Refresh</button></div>
+          <hr />
+          <strong>Rotate exact agent scope</strong>
+          <label for="scope-credential-id">Credential ID</label><input id="scope-credential-id" autocomplete="off" />
+          <label for="scope-workspace">Workspace</label><input id="scope-workspace" autocomplete="off" />
+          <label for="scope-repository">Repository</label><input id="scope-repository" autocomplete="off" placeholder="organization/repository" />
+          <label for="scope-agent">Agent</label><input id="scope-agent" autocomplete="off" />
+          <label for="scope-confirmation">Type APPROVE</label><input id="scope-confirmation" autocomplete="off" />
+          <button id="rotate-scope" disabled>Rotate scope and token</button>
+          <label for="rotated-token">One-time replacement token</label><input id="rotated-token" readonly autocomplete="off" />
+          <div id="scope-receipt" class="muted" aria-live="polite"></div>
         </div>
       </details>
       <button id="publish">Publish ruleset</button>
@@ -451,6 +461,22 @@
         applyPolicyControlDeepLink();
       }
 
+      async function rotateCredentialScope() {
+        $("rotated-token").value = "";
+        $("scope-receipt").textContent = "";
+        const data = await task("Rotate credential scope", () => postJSON("/api/credentials/rotate-scope", {
+          credential_id: $("scope-credential-id").value.trim(),
+          workspace_id: $("scope-workspace").value.trim(),
+          repository: $("scope-repository").value.trim(),
+          agent_id: $("scope-agent").value.trim(),
+          confirmation: $("scope-confirmation").value
+        }));
+        $("rotated-token").value = data.token || "";
+        $("scope-receipt").textContent = data.receipt?.id ? `Durable receipt ${data.receipt.id}` : "Receipt unavailable";
+        $("scope-confirmation").value = "";
+        $("rotate-scope").disabled = true;
+      }
+
       document.querySelectorAll("[data-view]").forEach(button => button.onclick = () => { state.view = button.dataset.view; document.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("active", item === button)); renderCatalog(); });
       document.querySelectorAll("[data-tab]").forEach(button => button.onclick = () => selectTab(button.dataset.tab));
       document.querySelector("[role=tablist]").addEventListener("keydown", event => {
@@ -479,6 +505,8 @@
       $("infer").onclick = inferPolicies;
       $("connect").onclick = refresh;
       $("refresh").onclick = refresh;
+      $("scope-confirmation").addEventListener("input", () => { $("rotate-scope").disabled = $("scope-confirmation").value !== "APPROVE"; });
+      $("rotate-scope").onclick = rotateCredentialScope;
       $("publish").onclick = async () => { await task("Publish ruleset", async () => { const data = await postJSON("/api/publish"); $("active-summary").textContent = `Active v${data.ruleset?.version || "?"} · ${(data.ruleset?.hash || "").slice(0, 10)}`; await refresh(); }); };
       $("approval-phrase").addEventListener("input", () => { $("protected-confirm").disabled = $("approval-phrase").value !== "APPROVE"; });
       $("protected-form").addEventListener("submit", event => { if (event.submitter?.value === "confirm") transitionCandidate(); });

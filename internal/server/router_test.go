@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -110,6 +111,93 @@ func TestDashboardSupportsNonMutatingPolicyControlDeepLinks(t *testing.T) {
 	transitionBuilder := html[transitionStart : transitionStart+transitionEnd]
 	if !strings.Contains(transitionBuilder, "state.policyControlDeepLink?.candidateID === candidate.id") || !strings.Contains(transitionBuilder, "expectedUpdatedAt: offered") {
 		t.Fatal("deep-linked transition must retain the audited offered candidate revision")
+	}
+}
+
+func TestCredentialScopeRotationAPIRequiresHumanOperatorAndReturnsAuditedTokenOnce(t *testing.T) {
+	dir := t.TempDir()
+	credentials := filepath.Join(dir, "credentials.json")
+	humanToken, err := auth.IssueOrUpdateToken(credentials, auth.Principal{ID: "human", Role: auth.RoleAdmin, HumanOperator: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	automationToken, err := auth.IssueOrUpdateToken(credentials, auth.Principal{ID: "automation", Role: auth.RoleAdmin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldToken, err := auth.IssueOrUpdateToken(credentials, auth.Principal{ID: "codex-local", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "local", Repository: "evalops/room", AgentID: "codex"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authenticator, err := auth.NewFileAuthenticator(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ruleStore, err := store.Open(filepath.Join(dir, "room.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ruleStore.Close()
+	httpServer := httptest.NewServer(New(app.New(ruleStore), WithAuthenticator(authenticator)))
+	defer httpServer.Close()
+	body := `{"credential_id":"codex-local","workspace_id":"local","repository":"evalops/platform","agent_id":"codex","confirmation":"APPROVE"}`
+	request := func(token string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/api/credentials/rotate-scope", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+	if resp := request(automationToken); resp.StatusCode != http.StatusForbidden {
+		resp.Body.Close()
+		t.Fatalf("non-human status = %d", resp.StatusCode)
+	} else {
+		resp.Body.Close()
+	}
+	resp := request(humanToken)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("rotation status = %d", resp.StatusCode)
+	}
+	var result struct {
+		Token   string                         `json:"token"`
+		Receipt auth.CredentialMutationReceipt `json:"receipt"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Token == "" || result.Receipt.ActorID != "human" || result.Receipt.CredentialID != "codex-local" {
+		t.Fatalf("result = %#v", result)
+	}
+	reloaded, err := auth.LoadRegistry(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reloaded.Authenticate(oldToken); err != auth.ErrUnauthenticated {
+		t.Fatalf("old token remains valid: %v", err)
+	}
+	if principal, err := reloaded.Authenticate(result.Token); err != nil || principal.Scope.Repository != "evalops/platform" {
+		t.Fatalf("replacement principal = %#v, err = %v", principal, err)
+	}
+}
+
+func TestDashboardExposesConfirmedCredentialScopeRotation(t *testing.T) {
+	body, err := webFS.ReadFile("static/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(body)
+	for _, contract := range []string{"Rotate exact agent scope", "scope-confirmation", "Rotate scope and token", "/api/credentials/rotate-scope", "One-time replacement token", "Durable receipt"} {
+		if !strings.Contains(html, contract) {
+			t.Fatalf("dashboard missing credential rotation contract %q", contract)
+		}
 	}
 }
 
