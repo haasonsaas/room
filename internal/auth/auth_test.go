@@ -97,6 +97,29 @@ func TestIssueOrUpdateTokenReplacesCredentialAndPreservesOthers(t *testing.T) {
 	}
 }
 
+func TestHumanOperatorCapabilityIsCredentialBound(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "credentials.json")
+	want := Principal{ID: "human-admin", Role: RoleAdmin, HumanOperator: true}
+	token, err := IssueOrUpdateToken(path, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := LoadRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := registry.Authenticate(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("principal = %#v, want %#v", got, want)
+	}
+	if _, err := IssueOrUpdateToken(path, Principal{ID: "agent", Role: RoleAgent, HumanOperator: true, Scope: Scope{WorkspaceID: "w", Repository: "r", AgentID: "a"}}); err == nil {
+		t.Fatal("agent credential accepted human-operator capability")
+	}
+}
+
 func TestLoadRegistryRejectsInvalidFiles(t *testing.T) {
 	validDigest := strings.Repeat("a", 64)
 	tests := []struct {
@@ -228,6 +251,7 @@ func TestAuthorizationMiddlewareEnforcesRoleAndExactAgentScope(t *testing.T) {
 	}{
 		{"role allowed", RequireRole(RoleAgent)(ok), agent, http.StatusNoContent},
 		{"role denied", RequireRole(RoleAdmin)(ok), agent, http.StatusForbidden},
+		{"any role allowed", RequireAnyRole(RoleAdmin, RoleAgent)(ok), agent, http.StatusNoContent},
 		{"scope allowed", RequireAgentScope(Scope{WorkspaceID: "w1", Repository: "repo1", AgentID: "a1"})(ok), agent, http.StatusNoContent},
 		{"workspace mismatch", RequireAgentScope(Scope{WorkspaceID: "w2", Repository: "repo1", AgentID: "a1"})(ok), agent, http.StatusForbidden},
 		{"repository mismatch", RequireAgentScope(Scope{WorkspaceID: "w1", Repository: "repo2", AgentID: "a1"})(ok), agent, http.StatusForbidden},

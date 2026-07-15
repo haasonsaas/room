@@ -18,6 +18,15 @@ service RuleAdminService {
   rpc GetMcpPolicy(GetMcpPolicyRequest) returns (GetMcpPolicyResponse);
   rpc UpdateMcpPolicy(UpdateMcpPolicyRequest) returns (UpdateMcpPolicyResponse);
   rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
+  rpc IngestReviewFinding(IngestReviewFindingRequest) returns (IngestReviewFindingResponse);
+  rpc RecordReviewOutcome(RecordReviewOutcomeRequest) returns (RecordReviewOutcomeResponse);
+  rpc AdjudicateReviewFinding(AdjudicateReviewFindingRequest) returns (AdjudicateReviewFindingResponse);
+  rpc ListReviewFindings(ListReviewFindingsRequest) returns (ListReviewFindingsResponse);
+  rpc InferPolicyCandidates(InferPolicyCandidatesRequest) returns (InferPolicyCandidatesResponse);
+  rpc ListPolicyCandidates(ListPolicyCandidatesRequest) returns (ListPolicyCandidatesResponse);
+  rpc RunPolicyReplay(RunPolicyReplayRequest) returns (RunPolicyReplayResponse);
+  rpc TransitionPolicyCandidate(TransitionPolicyCandidateRequest) returns (TransitionPolicyCandidateResponse);
+  rpc TunePolicyCandidate(TunePolicyCandidateRequest) returns (TunePolicyCandidateResponse);
 }
 
 service AgentRulesService {
@@ -93,6 +102,13 @@ enum SignalKind {
   SIGNAL_KIND_RUST_PANIC_IN_LIBRARY_API = 16;
   SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT = 17;
   SIGNAL_KIND_RUST_UNVALIDATED_EXTERNAL_DESERIALIZATION = 18;
+  SIGNAL_KIND_REVIEW_AUTHORIZATION_BOUNDARY = 19;
+  SIGNAL_KIND_REVIEW_STATE_TRANSITION = 20;
+  SIGNAL_KIND_REVIEW_PROTOCOL_CONTRACT = 21;
+  SIGNAL_KIND_REVIEW_GUARDRAIL_COVERAGE = 22;
+  SIGNAL_KIND_REVIEW_OPERATIONAL_TRUTH = 23;
+  SIGNAL_KIND_REVIEW_SECURITY_BOUNDARY = 24;
+  SIGNAL_KIND_REVIEW_NEGATIVE_TEST_GAP = 25;
 }
 
 enum McpComplianceMode {
@@ -110,6 +126,13 @@ enum AuditEventKind {
   AUDIT_EVENT_KIND_RULESET_ROLLED_BACK = 4;
   AUDIT_EVENT_KIND_POLICY_UPDATED = 5;
   AUDIT_EVENT_KIND_AUTH_DENIED = 6;
+  AUDIT_EVENT_KIND_REVIEW_FINDING_INGESTED = 7;
+  AUDIT_EVENT_KIND_REVIEW_OUTCOME_RECORDED = 8;
+  AUDIT_EVENT_KIND_REVIEW_ADJUDICATED = 9;
+  AUDIT_EVENT_KIND_POLICY_INFERRED = 10;
+  AUDIT_EVENT_KIND_POLICY_REPLAYED = 11;
+  AUDIT_EVENT_KIND_POLICY_TRANSITIONED = 12;
+  AUDIT_EVENT_KIND_POLICY_TUNED = 13;
 }
 
 enum HookProvider {
@@ -132,6 +155,64 @@ enum RulesetStatus {
   RULESET_STATUS_DRAFT = 1;
   RULESET_STATUS_ACTIVE = 2;
   RULESET_STATUS_ARCHIVED = 3;
+}
+
+enum ReviewClaimKind {
+  REVIEW_CLAIM_KIND_UNSPECIFIED = 0;
+  REVIEW_CLAIM_KIND_AUTHORIZATION_BOUNDARY = 1;
+  REVIEW_CLAIM_KIND_STATE_TRANSITION = 2;
+  REVIEW_CLAIM_KIND_PROTOCOL_CONTRACT = 3;
+  REVIEW_CLAIM_KIND_GUARDRAIL_COVERAGE = 4;
+  REVIEW_CLAIM_KIND_OPERATIONAL_TRUTH = 5;
+  REVIEW_CLAIM_KIND_SECURITY_BOUNDARY = 6;
+  REVIEW_CLAIM_KIND_NEGATIVE_TEST_GAP = 7;
+}
+
+enum ReviewOutcomeKind {
+  REVIEW_OUTCOME_KIND_UNSPECIFIED = 0;
+  REVIEW_OUTCOME_KIND_FIX_COMMITTED = 1;
+  REVIEW_OUTCOME_KIND_THREAD_RESOLVED = 2;
+  REVIEW_OUTCOME_KIND_REJECTED = 3;
+  REVIEW_OUTCOME_KIND_MERGED = 4;
+  REVIEW_OUTCOME_KIND_REVERTED = 5;
+  REVIEW_OUTCOME_KIND_REGRESSION = 6;
+  REVIEW_OUTCOME_KIND_POSITIVE_REACTION = 7;
+  REVIEW_OUTCOME_KIND_NEGATIVE_REACTION = 8;
+}
+
+enum AdjudicationVerdict {
+  ADJUDICATION_VERDICT_UNSPECIFIED = 0;
+  ADJUDICATION_VERDICT_VALID_GENERALIZABLE = 1;
+  ADJUDICATION_VERDICT_VALID_ONE_OFF = 2;
+  ADJUDICATION_VERDICT_INVALID = 3;
+  ADJUDICATION_VERDICT_NEEDS_EVIDENCE = 4;
+}
+
+enum PolicyArtifactKind {
+  POLICY_ARTIFACT_KIND_UNSPECIFIED = 0;
+  POLICY_ARTIFACT_KIND_DETERMINISTIC_CHECK = 1;
+  POLICY_ARTIFACT_KIND_SEMANTIC_ANALYZER = 2;
+  POLICY_ARTIFACT_KIND_ARCHITECTURE_POLICY = 3;
+  POLICY_ARTIFACT_KIND_ONE_OFF_FINDING = 4;
+}
+
+enum RolloutStage {
+  ROLLOUT_STAGE_UNSPECIFIED = 0;
+  ROLLOUT_STAGE_DRAFT = 1;
+  ROLLOUT_STAGE_SHADOW = 2;
+  ROLLOUT_STAGE_WARN = 3;
+  ROLLOUT_STAGE_BLOCK = 4;
+  ROLLOUT_STAGE_PAUSED = 5;
+  ROLLOUT_STAGE_ROLLED_BACK = 6;
+}
+
+enum TuningActionKind {
+  TUNING_ACTION_KIND_UNSPECIFIED = 0;
+  TUNING_ACTION_KIND_ADJUST_CONFIDENCE = 1;
+  TUNING_ACTION_KIND_NARROW_SCOPE = 2;
+  TUNING_ACTION_KIND_EXPAND_SCOPE = 3;
+  TUNING_ACTION_KIND_CHANGE_ARTIFACT = 4;
+  TUNING_ACTION_KIND_ROLLBACK = 5;
 }
 
 message RuleScope {
@@ -260,6 +341,7 @@ message Rule {
   google.protobuf.Timestamp updated_at = 13;
   repeated SignalSelector triggers = 14;
   repeated SignalKind required_coverage = 15;
+  RolloutStage rollout_stage = 16;
 }
 
 message RulesetVersion {
@@ -310,6 +392,7 @@ message RuleMatch {
   repeated string tags = 5;
   repeated string required_evidence = 6;
   repeated string remediation = 7;
+  RolloutStage rollout_stage = 8;
 }
 
 message EvaluationResult {
@@ -345,6 +428,115 @@ message AuditEvent {
   McpInvocation mcp_invocation = 14;
   string reason_code = 15;
   repeated string matched_rule_ids = 16;
+  string policy_candidate_id = 17;
+  string evidence_record_id = 18;
+}
+
+message ReviewSource {
+  string repository = 1;
+  int64 pull_request_number = 2;
+  string head_sha = 3;
+  string review_comment_id = 4;
+  string reviewer_id = 5;
+  string provider = 6;
+}
+
+message ReviewOutcome {
+  string id = 1;
+  ReviewOutcomeKind kind = 2;
+  string actor_id = 3;
+  string commit_sha = 4;
+  int32 weight_basis_points = 5;
+  google.protobuf.Timestamp occurred_at = 6;
+}
+
+message ReviewAdjudication {
+  string id = 1;
+  AdjudicationVerdict verdict = 2;
+  string agent_id = 3;
+  string model_id = 4;
+  bytes input_sha256 = 5;
+  uint32 confidence_basis_points = 6;
+  repeated string evidence_refs = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+}
+
+message ReviewFinding {
+  string id = 1;
+  ReviewSource source = 2;
+  ReviewClaimKind claim_kind = 3;
+  string invariant = 4;
+  repeated string preconditions = 5;
+  repeated string causal_path = 6;
+  string impact = 7;
+  repeated string required_evidence = 8;
+  repeated string remediation = 9;
+  Severity severity = 10;
+  uint32 confidence_basis_points = 11;
+  repeated string affected_paths = 12;
+  repeated ReviewOutcome outcomes = 13;
+  repeated ReviewAdjudication adjudications = 14;
+  int64 reviewer_cost_micros = 15;
+  int64 reviewer_input_tokens = 16;
+  int64 reviewer_output_tokens = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp updated_at = 19;
+}
+
+message PolicyMetrics {
+  uint32 support_count = 1;
+  uint32 accepted_count = 2;
+  uint32 rejected_count = 3;
+  uint32 true_positive_count = 4;
+  uint32 false_positive_count = 5;
+  uint32 false_negative_count = 6;
+  uint32 precision_basis_points = 7;
+  uint32 recall_basis_points = 8;
+  int64 estimated_reviewer_cost_avoided_micros = 9;
+  int64 estimated_reviewer_tokens_avoided = 10;
+}
+
+message PolicyCandidate {
+  string id = 1;
+  ReviewClaimKind claim_kind = 2;
+  PolicyArtifactKind artifact_kind = 3;
+  Rule proposed_rule = 4;
+  repeated string source_finding_ids = 5;
+  PolicyMetrics metrics = 6;
+  RolloutStage rollout_stage = 7;
+  uint32 minimum_confidence_basis_points = 8;
+  bool protected_org_policy = 9;
+  string created_by = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message ReplayCaseResult {
+  string finding_id = 1;
+  bool expected_match = 2;
+  bool actual_match = 3;
+  uint32 confidence_basis_points = 4;
+}
+
+message PolicyReplayRun {
+  string id = 1;
+  string policy_candidate_id = 2;
+  repeated ReplayCaseResult cases = 3;
+  PolicyMetrics metrics = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp completed_at = 6;
+  bytes policy_candidate_sha256 = 7;
+}
+
+message TuningDecision {
+  string id = 1;
+  string policy_candidate_id = 2;
+  TuningActionKind action = 3;
+  uint32 previous_confidence_basis_points = 4;
+  uint32 new_confidence_basis_points = 5;
+  repeated string evidence_replay_ids = 6;
+  string actor_id = 7;
+  google.protobuf.Timestamp occurred_at = 8;
 }
 
 message CreateRuleRequest {
@@ -427,6 +619,71 @@ message ListAuditEventsRequest {
 
 message ListAuditEventsResponse {
   repeated AuditEvent events = 1;
+}
+
+message IngestReviewFindingRequest {
+  ReviewFinding finding = 1;
+}
+message IngestReviewFindingResponse {
+  ReviewFinding finding = 1;
+}
+message RecordReviewOutcomeRequest {
+  string finding_id = 1;
+  ReviewOutcome outcome = 2;
+}
+message RecordReviewOutcomeResponse {
+  ReviewFinding finding = 1;
+}
+message AdjudicateReviewFindingRequest {
+  string finding_id = 1;
+  ReviewAdjudication adjudication = 2;
+}
+message AdjudicateReviewFindingResponse {
+  ReviewFinding finding = 1;
+}
+message ListReviewFindingsRequest {
+  string repository = 1;
+  ReviewClaimKind claim_kind = 2;
+  int32 limit = 3;
+}
+message ListReviewFindingsResponse {
+  repeated ReviewFinding findings = 1;
+}
+message InferPolicyCandidatesRequest {
+  string repository = 1;
+  uint32 minimum_support = 2;
+}
+message InferPolicyCandidatesResponse {
+  repeated PolicyCandidate candidates = 1;
+}
+message ListPolicyCandidatesRequest {
+  RolloutStage rollout_stage = 1;
+}
+message ListPolicyCandidatesResponse {
+  repeated PolicyCandidate candidates = 1;
+}
+message RunPolicyReplayRequest {
+  string policy_candidate_id = 1;
+}
+message RunPolicyReplayResponse {
+  PolicyReplayRun replay = 1;
+}
+message TransitionPolicyCandidateRequest {
+  string policy_candidate_id = 1;
+  RolloutStage target_stage = 2;
+  bool human_approved = 3;
+  google.protobuf.Timestamp expected_updated_at = 4;
+}
+message TransitionPolicyCandidateResponse {
+  PolicyCandidate candidate = 1;
+}
+message TunePolicyCandidateRequest {
+  string policy_candidate_id = 1;
+  google.protobuf.Timestamp expected_updated_at = 2;
+}
+message TunePolicyCandidateResponse {
+  PolicyCandidate candidate = 1;
+  TuningDecision decision = 2;
 }
 
 message RuleAdminServiceGetActiveRulesetRequest {

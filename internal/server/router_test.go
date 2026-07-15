@@ -66,6 +66,110 @@ func TestDashboardRuleLifecycleAPI(t *testing.T) {
 	}
 }
 
+func TestReviewIntelligenceLifecycleAPI(t *testing.T) {
+	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer ruleStore.Close()
+	server := httptest.NewServer(New(app.New(ruleStore), WithLocalAuth()))
+	defer server.Close()
+
+	finding := &roomv1.ReviewFinding{
+		Id: "finding-1", Source: &roomv1.ReviewSource{Repository: "evalops/platform", PullRequestNumber: 4458, HeadSha: "abc123"},
+		ClaimKind: roomv1.ReviewClaimKind_REVIEW_CLAIM_KIND_PROTOCOL_CONTRACT, Invariant: "responses correlate to request ids",
+		Severity: roomv1.Severity_SEVERITY_HIGH, ConfidenceBasisPoints: 9000, ReviewerCostMicros: 125000, ReviewerInputTokens: 4000,
+	}
+	response := postProto(t, server.URL+"/api/review-findings", &roomv1.IngestReviewFindingRequest{Finding: finding})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("ingest status = %d", response.StatusCode)
+	}
+	decodeProtoResponse(t, response, &roomv1.IngestReviewFindingResponse{})
+
+	response = postProto(t, server.URL+"/api/review-findings/finding-1/outcomes", &roomv1.RecordReviewOutcomeRequest{Outcome: &roomv1.ReviewOutcome{Id: "outcome-1", Kind: roomv1.ReviewOutcomeKind_REVIEW_OUTCOME_KIND_FIX_COMMITTED, WeightBasisPoints: 10000}})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("outcome status = %d", response.StatusCode)
+	}
+	recorded := &roomv1.RecordReviewOutcomeResponse{}
+	decodeProtoResponse(t, response, recorded)
+	if got := recorded.GetFinding().GetOutcomes()[0].GetActorId(); got != "local-admin" {
+		t.Fatalf("outcome actor = %q, want authenticated principal", got)
+	}
+
+	response = postProto(t, server.URL+"/api/review-findings/finding-1/adjudications", &roomv1.AdjudicateReviewFindingRequest{Adjudication: &roomv1.ReviewAdjudication{Id: "adjudication-1", Verdict: roomv1.AdjudicationVerdict_ADJUDICATION_VERDICT_VALID_GENERALIZABLE, ModelId: "review-agent-v1", ConfidenceBasisPoints: 9500}})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("adjudication status = %d", response.StatusCode)
+	}
+	adjudicated := &roomv1.AdjudicateReviewFindingResponse{}
+	decodeProtoResponse(t, response, adjudicated)
+	if got := adjudicated.GetFinding().GetAdjudications()[0].GetAgentId(); got != "local-admin" {
+		t.Fatalf("adjudication agent = %q, want authenticated principal", got)
+	}
+
+	response = postProto(t, server.URL+"/api/policy-infer", &roomv1.InferPolicyCandidatesRequest{Repository: "evalops/platform", MinimumSupport: 1})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("infer status = %d", response.StatusCode)
+	}
+	inferred := &roomv1.InferPolicyCandidatesResponse{}
+	decodeProtoResponse(t, response, inferred)
+	if len(inferred.GetCandidates()) != 1 {
+		t.Fatalf("candidates = %d, want 1", len(inferred.GetCandidates()))
+	}
+	candidateID := inferred.GetCandidates()[0].GetId()
+
+	response = postProto(t, server.URL+"/api/policy-candidates/"+candidateID+"/replay", &roomv1.RunPolicyReplayRequest{})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("replay status = %d", response.StatusCode)
+	}
+	replayed := &roomv1.RunPolicyReplayResponse{}
+	decodeProtoResponse(t, response, replayed)
+	if replayed.GetReplay().GetMetrics().GetTruePositiveCount() != 1 {
+		t.Fatalf("replay metrics = %+v", replayed.GetReplay().GetMetrics())
+	}
+
+	response = postProto(t, server.URL+"/api/policy-candidates/"+candidateID+"/transition", &roomv1.TransitionPolicyCandidateRequest{TargetStage: roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW, ExpectedUpdatedAt: inferred.GetCandidates()[0].GetUpdatedAt()})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("transition status = %d", response.StatusCode)
+	}
+	transitioned := &roomv1.TransitionPolicyCandidateResponse{}
+	decodeProtoResponse(t, response, transitioned)
+	if transitioned.GetCandidate().GetRolloutStage() != roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW {
+		t.Fatalf("transitioned candidate = %+v", transitioned.GetCandidate())
+	}
+	foundMaterialized := false
+	for _, rule := range ruleStore.ActiveRuleset().GetRules() {
+		if rule.GetId() == transitioned.GetCandidate().GetProposedRule().GetId() {
+			foundMaterialized = rule.GetEnabled() && rule.GetRolloutStage() == roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW
+		}
+	}
+	if !foundMaterialized {
+		t.Fatal("shadow transition did not publish an executable shadow rule")
+	}
+
+	response, err = http.Get(server.URL + "/api/policy-candidates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := &roomv1.ListPolicyCandidatesResponse{}
+	decodeProtoResponse(t, response, listed)
+	if len(listed.GetCandidates()) != 1 {
+		t.Fatalf("listed candidates = %d", len(listed.GetCandidates()))
+	}
+}
+
+func postProto(t *testing.T, url string, message proto.Message) *http.Response {
+	t.Helper()
+	body, err := protojson.Marshal(message)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	response, err := http.Post(url, "application/json", strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("post %s: %v", url, err)
+	}
+	return response
+}
+
 func TestDashboardEditPreservesExistingRuleScope(t *testing.T) {
 	ruleStore, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
 	if err != nil {
@@ -173,7 +277,7 @@ func TestLocalAuthMiddlewareUsesDeclaredRouteRole(t *testing.T) {
 		role auth.Role
 		want auth.Principal
 	}{
-		{name: "admin", role: auth.RoleAdmin, want: auth.Principal{ID: "local-admin", Role: auth.RoleAdmin}},
+		{name: "admin", role: auth.RoleAdmin, want: auth.Principal{ID: "local-admin", Role: auth.RoleAdmin, HumanOperator: true}},
 		{name: "agent", role: auth.RoleAgent, want: auth.Principal{ID: "local-agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "local", Repository: "local", AgentID: "local-agent"}}},
 	}
 	for _, tt := range tests {
@@ -249,6 +353,10 @@ func TestRegistryAuthenticationAndRoles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issue agent: %v", err)
 	}
+	reviewerToken, err := auth.IssueOrUpdateToken(credentials, auth.Principal{ID: "reviewer", Role: auth.RoleReviewer})
+	if err != nil {
+		t.Fatalf("issue reviewer: %v", err)
+	}
 	registry, err := auth.LoadRegistry(credentials)
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
@@ -264,7 +372,7 @@ func TestRegistryAuthenticationAndRoles(t *testing.T) {
 	for _, test := range []struct {
 		name, token string
 		want        int
-	}{{"admin", adminToken, http.StatusOK}, {"agent", agentToken, http.StatusForbidden}} {
+	}{{"admin", adminToken, http.StatusOK}, {"reviewer", reviewerToken, http.StatusForbidden}, {"agent", agentToken, http.StatusForbidden}} {
 		t.Run(test.name, func(t *testing.T) {
 			request, err := http.NewRequest(http.MethodGet, httpServer.URL+"/api/rules", nil)
 			if err != nil {
@@ -280,6 +388,19 @@ func TestRegistryAuthenticationAndRoles(t *testing.T) {
 				t.Fatalf("status = %d, want %d", response.StatusCode, test.want)
 			}
 		})
+	}
+	request, err := http.NewRequest(http.MethodGet, httpServer.URL+"/api/policy-candidates", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+reviewerToken)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("reviewer intelligence status = %d, want 200", response.StatusCode)
 	}
 }
 

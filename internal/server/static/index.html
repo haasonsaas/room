@@ -3,316 +3,455 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Room Rules</title>
+    <title>Room Control Plane</title>
     <style>
       :root {
         color-scheme: light;
-        --bg: #f7f8fa;
-        --ink: #20242c;
-        --muted: #667085;
-        --line: #d9dee7;
-        --panel: #ffffff;
-        --accent: #0f766e;
+        --bg: #f4f5f7;
+        --panel: #fff;
+        --ink: #18201f;
+        --muted: #697471;
+        --line: #dce2df;
+        --soft: #edf2f0;
+        --accent: #087b69;
+        --accent-dark: #075f53;
         --danger: #b42318;
-        --warn: #b45309;
+        --warn: #a15c00;
+        --blue: #245c9f;
+        --purple: #6850a4;
+        --shadow: 0 12px 32px rgba(22, 38, 35, .08);
       }
       * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: var(--bg);
-        color: var(--ink);
-      }
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-        padding: 18px 24px;
-        border-bottom: 1px solid var(--line);
-        background: var(--panel);
-      }
-      h1 { margin: 0; font-size: 18px; letter-spacing: 0; }
-      h2 { margin: 0 0 14px; font-size: 15px; letter-spacing: 0; }
-      main {
-        display: grid;
-        grid-template-columns: minmax(360px, 460px) minmax(420px, 1fr);
-        min-height: calc(100vh - 64px);
-      }
-      section {
-        padding: 22px 24px;
-        border-right: 1px solid var(--line);
-      }
-      section + section { border-right: 0; }
-      label {
-        display: block;
-        margin: 10px 0 5px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      input, select, textarea {
-        width: 100%;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 9px 10px;
-        font: inherit;
-        background: white;
-      }
-      textarea {
-        min-height: 84px;
-        resize: vertical;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 13px;
-      }
-      button {
-        appearance: none;
-        border: 1px solid var(--accent);
-        background: var(--accent);
-        color: white;
-        min-height: 34px;
-        padding: 0 12px;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-      button.secondary {
-        background: white;
-        color: var(--accent);
-      }
-      button.danger {
-        border-color: var(--danger);
-        background: white;
-        color: var(--danger);
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        background: white;
-        border: 1px solid var(--line);
-      }
-      th, td {
-        padding: 10px 12px;
-        text-align: left;
-        border-bottom: 1px solid var(--line);
-        vertical-align: top;
-      }
-      th {
-        font-size: 12px;
-        color: var(--muted);
-        background: #f1f4f8;
-      }
-      .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      html, body { min-height: 100%; }
+      body { margin: 0; font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+      button, input, select, textarea { font: inherit; }
+      button { min-height: 34px; padding: 0 12px; border: 1px solid var(--accent); border-radius: 6px; color: #fff; background: var(--accent); cursor: pointer; font-weight: 650; }
+      button:hover { background: var(--accent-dark); }
+      button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(8, 123, 105, .25); outline-offset: 2px; }
+      button.secondary { color: var(--accent); background: #fff; }
+      button.secondary:hover { background: #f2faf8; }
+      button.quiet { color: var(--ink); border-color: var(--line); background: #fff; }
+      button.danger { color: var(--danger); border-color: #e7b8b3; background: #fff; }
+      button:disabled { color: #8b9592; border-color: var(--line); background: #edf0ef; cursor: not-allowed; }
+      input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+      textarea { min-height: 78px; resize: vertical; }
+      label { display: block; margin: 10px 0 5px; color: var(--muted); font-size: 12px; font-weight: 650; }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 { margin: 0; font-size: 18px; }
+      h2 { margin-bottom: 4px; font-size: 17px; }
+      h3 { margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
       .muted { color: var(--muted); }
-      .critical { color: var(--danger); font-weight: 700; }
-      .high { color: var(--warn); font-weight: 700; }
-      .result {
-        margin-top: 14px;
-        white-space: pre-wrap;
-        background: #111827;
-        color: #e5e7eb;
-        border-radius: 6px;
-        padding: 12px;
-        min-height: 120px;
-        overflow: auto;
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+      .app-header { display: flex; align-items: center; gap: 18px; min-height: 62px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: #fff; }
+      .brand { display: flex; align-items: center; gap: 10px; min-width: 230px; }
+      .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: #fff; background: var(--accent); font-weight: 800; }
+      .header-meta { display: flex; align-items: center; gap: 12px; margin-right: auto; color: var(--muted); font-size: 12px; }
+      .connection { display: inline-flex; align-items: center; gap: 6px; }
+      .connection::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #9da7a4; }
+      .connection.online::before { background: #16a36c; }
+      .credentials { position: relative; }
+      .credentials summary { list-style: none; cursor: pointer; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-weight: 650; }
+      .credentials summary::-webkit-details-marker { display: none; }
+      .credential-panel { position: absolute; z-index: 10; top: 44px; right: 0; width: 330px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: var(--shadow); }
+      .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .summary-strip { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); border-bottom: 1px solid var(--line); background: #fff; }
+      .summary-item { padding: 12px 18px; border-right: 1px solid var(--line); }
+      .summary-item:last-child { border-right: 0; }
+      .summary-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+      .summary-value { margin-top: 2px; font-size: 17px; font-weight: 750; }
+      .workspace { display: grid; grid-template-columns: minmax(470px, 58%) minmax(390px, 42%); min-height: calc(100vh - 125px); }
+      .catalog { border-right: 1px solid var(--line); background: #fff; }
+      .catalog-head, .inspector-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+      .catalog-tools { display: grid; grid-template-columns: minmax(180px, 1fr) 150px 140px auto; gap: 8px; margin-top: 14px; }
+      .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 7px; background: var(--soft); }
+      .segmented button { min-height: 28px; padding: 0 10px; border: 0; color: var(--muted); background: transparent; font-size: 12px; }
+      .segmented button.active { color: var(--ink); background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+      .catalog-list { margin: 0; padding: 0; list-style: none; }
+      .catalog-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); cursor: pointer; }
+      .catalog-row:hover, .catalog-row.selected { background: #f3faf8; }
+      .severity-rail { border-radius: 5px; background: #aeb7b4; }
+      .severity-rail.s5 { background: var(--danger); }
+      .severity-rail.s4 { background: var(--warn); }
+      .severity-rail.s3 { background: #d39b13; }
+      .row-title { display: flex; align-items: center; gap: 7px; font-weight: 720; }
+      .row-subtitle { margin-top: 3px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .row-metrics { display: flex; gap: 12px; margin-top: 7px; color: #52605d; font-size: 11px; }
+      .row-side { min-width: 92px; text-align: right; }
+      .badge { display: inline-flex; align-items: center; min-height: 22px; padding: 0 7px; border: 1px solid var(--line); border-radius: 999px; color: #58635f; background: #fff; font-size: 10px; font-weight: 750; text-transform: uppercase; letter-spacing: .03em; }
+      .badge.learned { color: var(--purple); border-color: #d6cdea; background: #f8f5ff; }
+      .badge.stage-4 { color: var(--danger); border-color: #efc3be; background: #fff6f5; }
+      .badge.stage-3 { color: var(--warn); border-color: #ecd3aa; background: #fff9ed; }
+      .badge.stage-2 { color: var(--blue); border-color: #c7d8ee; background: #f5f9ff; }
+      .human-only { color: #6c4a00; border-color: #dfc58b; background: #fff9e8; }
+      .empty { padding: 48px 24px; text-align: center; color: var(--muted); }
+      .inspector { min-width: 0; background: var(--bg); }
+      .inspector-head { background: #fff; }
+      .inspector-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .tabs { display: flex; gap: 18px; padding: 0 20px; border-bottom: 1px solid var(--line); background: #fff; overflow-x: auto; }
+      .tabs button { min-height: 42px; padding: 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); background: transparent; font-size: 12px; }
+      .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
+      .inspector-body { padding: 18px 20px 90px; }
+      .panel { margin-bottom: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+      .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+      .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--line); }
+      .metric { min-height: 76px; padding: 12px; background: #fff; }
+      .metric strong { display: block; margin-top: 3px; font-size: 18px; }
+      .definition { display: grid; grid-template-columns: 130px 1fr; gap: 7px 12px; margin: 0; }
+      .definition dt { color: var(--muted); }
+      .definition dd { margin: 0; overflow-wrap: anywhere; }
+      .timeline { margin: 0; padding: 0; list-style: none; }
+      .timeline li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+      .timeline li:last-child { border-bottom: 0; }
+      .inspector-footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); background: rgba(255,255,255,.96); backdrop-filter: blur(8px); }
+      .result { white-space: pre-wrap; overflow: auto; max-height: 270px; padding: 12px; border-radius: 6px; color: #e5ecea; background: #14201e; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .status { min-height: 20px; color: var(--muted); font-size: 12px; }
+      dialog { width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+      dialog::backdrop { background: rgba(16, 25, 23, .48); }
+      .dialog-head, .dialog-body, .dialog-actions { padding: 16px 18px; }
+      .dialog-head { border-bottom: 1px solid var(--line); }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); }
+      @media (max-width: 980px) {
+        .summary-strip { grid-template-columns: repeat(3, 1fr); }
+        .workspace { grid-template-columns: 1fr; }
+        .catalog { border-right: 0; }
+        .inspector { border-top: 1px solid var(--line); }
       }
-      .rule-actions { display: flex; gap: 6px; }
-      @media (max-width: 900px) {
-        main { grid-template-columns: 1fr; }
-        section { border-right: 0; border-bottom: 1px solid var(--line); }
+      @media (max-width: 650px) {
+        .app-header { align-items: flex-start; flex-wrap: wrap; }
+        .brand { min-width: 0; margin-right: auto; }
+        .header-meta { order: 3; width: 100%; }
+        .summary-strip { grid-template-columns: 1fr 1fr; }
+        .catalog-tools, .field-grid { grid-template-columns: 1fr; }
+        .metric-grid { grid-template-columns: 1fr 1fr; }
+        .catalog-row { padding: 12px; }
       }
     </style>
   </head>
   <body>
-    <header>
-      <h1>Room Rules</h1>
-      <div class="toolbar">
-        <input id="admin-token" type="password" autocomplete="off" placeholder="Admin token (memory only)" aria-label="Admin token" />
-        <input id="agent-token" type="password" autocomplete="off" placeholder="Agent token (memory only)" aria-label="Agent token" />
-        <button class="secondary" id="refresh">Refresh</button>
-        <button id="publish">Publish Ruleset</button>
-      </div>
-    </header>
-    <main>
-      <section>
-        <h2>Rule Editor</h2>
-        <form id="rule-form">
-          <label for="id">Rule ID</label>
-          <input id="id" required placeholder="tenant-org-scope-required" />
-          <label for="title">Title</label>
-          <input id="title" required placeholder="Tenant data must be organization scoped" />
-          <label for="description">Description</label>
-          <textarea id="description" required></textarea>
-          <div class="split">
-            <div>
-              <label for="severity">Severity</label>
-              <select id="severity">
-                <option value="5">critical</option>
-                <option value="4">high</option>
-                <option value="3">medium</option>
-                <option value="2">low</option>
-                <option value="1">info</option>
-              </select>
-            </div>
-            <div>
-              <label for="signal">Typed Security Signal</label>
-              <select id="signal">
-                <option value="1">tenant access without trusted scope</option>
-                <option value="2">protected access without auth context</option>
-                <option value="3">secret literal</option>
-                <option value="4">dynamic SQL with untrusted input</option>
-                <option value="5">untrusted outbound destination</option>
-                <option value="6">privilege mutation without audit</option>
-                <option value="7">unsigned webhook</option>
-                <option value="8">password persistence without KDF</option>
-                <option value="9">public credential flow without rate limit</option>
-                <option value="10">destructive operation</option>
-                <option value="11">Rust unsafe without safety contract</option>
-                <option value="12">Rust panic in request path</option>
-                <option value="13">Rust command with untrusted argument</option>
-                <option value="14">Rust weak RNG for secret</option>
-                <option value="15">Rust untrusted path</option>
-                <option value="16">Rust panic in library API</option>
-                <option value="17">Rust blocking lock across await</option>
-                <option value="18">Rust unvalidated external deserialization</option>
-              </select>
-            </div>
-          </div>
-          <label for="tags">Tags, comma separated</label>
-          <input id="tags" placeholder="security, tenancy" />
-          <label for="evidence">Required Evidence, one per line</label>
-          <textarea id="evidence"></textarea>
-          <label for="remediation">Remediation, one per line</label>
-          <textarea id="remediation"></textarea>
-          <div class="toolbar" style="margin-top: 12px">
-            <button type="submit">Save Draft Rule</button>
-            <button type="button" class="secondary" id="new-rule">New</button>
-          </div>
-        </form>
-        <h2 style="margin-top: 24px">Plan Preview</h2>
-        <textarea id="plan">Add a new customer endpoint that reads projects from the database.</textarea>
-        <div class="toolbar" style="margin-top: 10px">
-          <button id="evaluate">Evaluate</button>
-          <span class="muted">Uses the active published ruleset</span>
+    <header class="app-header">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">R</span><h1>Room Control Plane</h1></div>
+      <div class="header-meta"><span id="connection" class="connection">Not connected</span><span id="active-summary">Draft control plane</span></div>
+      <details class="credentials">
+        <summary>Credentials</summary>
+        <div class="credential-panel">
+          <label for="admin-token">Admin token</label><input id="admin-token" type="password" autocomplete="off" placeholder="Kept in memory only" />
+          <label for="agent-token">Agent token</label><input id="agent-token" type="password" autocomplete="off" placeholder="Kept in memory only" />
+          <div class="toolbar" style="margin-top:12px"><button id="connect">Connect</button><button class="quiet" id="refresh">Refresh</button></div>
         </div>
-        <pre class="result" id="result"></pre>
+      </details>
+      <button id="publish">Publish ruleset</button>
+    </header>
+
+    <section class="summary-strip" aria-label="Control plane summary">
+      <div class="summary-item"><div class="summary-label">Draft rules</div><div class="summary-value" id="rule-count">0</div></div>
+      <div class="summary-item"><div class="summary-label">Learned policies</div><div class="summary-value" id="candidate-count">0</div></div>
+      <div class="summary-item"><div class="summary-label">Review findings</div><div class="summary-value" id="finding-count">0</div></div>
+      <div class="summary-item"><div class="summary-label">Reviewer cost avoided</div><div class="summary-value" id="cost-saved">$0.00</div></div>
+      <div class="summary-item"><div class="summary-label">Tokens avoided</div><div class="summary-value" id="tokens-saved">0</div></div>
+    </section>
+
+    <main class="workspace">
+      <section class="catalog" aria-labelledby="catalog-title">
+        <div class="catalog-head">
+          <div class="toolbar" style="justify-content:space-between"><div><h2 id="catalog-title">Policy catalog</h2><span class="muted">Draft rules and learned policy candidates</span></div><button class="secondary" id="new-rule">New rule</button></div>
+          <div class="catalog-tools">
+            <div><label class="sr-only" for="search">Search policies</label><input id="search" type="search" placeholder="Search ID, title, or owner" /></div>
+            <div><label class="sr-only" for="stage-filter">Rollout stage</label><select id="stage-filter"><option value="all">All stages</option><option value="1">Draft</option><option value="2">Shadow</option><option value="3">Warn</option><option value="4">Block</option><option value="5">Paused</option><option value="6">Rolled back</option></select></div>
+            <div><label class="sr-only" for="severity-filter">Severity</label><select id="severity-filter"><option value="all">All severity</option><option value="5">Critical</option><option value="4">High</option><option value="3">Medium</option><option value="2">Low</option><option value="1">Info</option></select></div>
+            <button class="secondary" id="infer">Infer policies</button>
+          </div>
+          <div class="segmented" role="group" aria-label="Catalog view" style="margin-top:10px"><button data-view="all" class="active">All</button><button data-view="rules">Draft rules</button><button data-view="learned">Learned</button><button data-view="protected">Protected</button></div>
+        </div>
+        <ul id="catalog-list" class="catalog-list" role="listbox" aria-labelledby="catalog-title"></ul>
       </section>
-      <section>
-        <h2>Draft Rules</h2>
-        <table>
-          <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Tags</th><th></th></tr></thead>
-          <tbody id="rules"></tbody>
-        </table>
+
+      <section class="inspector" aria-labelledby="inspector-title">
+        <div class="inspector-head">
+          <div class="inspector-title"><div><h2 id="inspector-title">Select a policy</h2><div id="inspector-subtitle" class="muted">Review its typed contract, evidence, replay, and rollout.</div></div><span id="inspector-badge"></span></div>
+        </div>
+        <nav class="tabs" role="tablist" aria-label="Policy details"><button id="tab-policy" role="tab" aria-controls="inspector-body" aria-selected="true" tabindex="0" data-tab="policy" class="active">Policy</button><button id="tab-provenance" role="tab" aria-controls="inspector-body" aria-selected="false" tabindex="-1" data-tab="provenance">Provenance</button><button id="tab-replay" role="tab" aria-controls="inspector-body" aria-selected="false" tabindex="-1" data-tab="replay">Replay</button><button id="tab-rollout" role="tab" aria-controls="inspector-body" aria-selected="false" tabindex="-1" data-tab="rollout">Rollout</button><button id="tab-activity" role="tab" aria-controls="inspector-body" aria-selected="false" tabindex="-1" data-tab="activity">Activity</button><button id="tab-system" role="tab" aria-controls="inspector-body" aria-selected="false" tabindex="-1" data-tab="system">MCP &amp; evaluate</button></nav>
+        <div id="inspector-body" class="inspector-body" role="tabpanel" aria-labelledby="tab-policy"><div class="empty">Choose a policy from the catalog or create a new rule.</div></div>
+        <div class="inspector-footer"><div id="status" class="status" role="status" aria-live="polite"></div><div id="footer-actions" class="toolbar"></div></div>
       </section>
     </main>
+
+    <dialog id="protected-dialog" aria-labelledby="protected-title">
+      <div class="dialog-head"><h2 id="protected-title">Human approval required</h2><div id="protected-copy" class="muted"></div></div>
+      <form method="dialog" id="protected-form">
+        <div class="dialog-body"><p class="muted">The server requires an authenticated human-operator credential; this confirmation cannot grant that capability.</p><label for="approval-phrase">Type APPROVE to continue</label><input id="approval-phrase" required autocomplete="off" /><input id="protected-target" type="hidden" /></div>
+        <div class="dialog-actions"><button value="cancel" class="quiet">Cancel</button><button value="confirm" id="protected-confirm" disabled>Approve transition</button></div>
+      </form>
+    </dialog>
+
     <script>
-      const state = { rules: [] };
+      const state = { rules: [], candidates: [], findings: [], audit: [], mcpPolicy: null, selected: null, tab: "policy", view: "all", replayByCandidate: new Map(), pendingTransition: null };
       const $ = id => document.getElementById(id);
-      const severityName = value => ["", "info", "low", "medium", "high", "critical"][value] || "unspecified";
-      const lineList = value => value.split("\n").map(v => v.trim()).filter(Boolean);
-      const csv = value => value.split(",").map(v => v.trim()).filter(Boolean);
+      const severityNames = ["unspecified", "info", "low", "medium", "high", "critical"];
+      const rolloutNames = ["unspecified", "draft", "shadow", "warn", "block", "paused", "rolled back"];
+      const claimNames = ["unspecified", "authorization boundary", "state transition", "protocol contract", "guardrail coverage", "operational truth", "security boundary", "negative test gap"];
+      const artifactNames = ["unspecified", "deterministic check", "semantic analyzer", "architecture policy", "one-off finding"];
+      const outcomeNames = ["unspecified", "fix committed", "thread resolved", "rejected", "merged", "reverted", "regression", "positive reaction", "negative reaction"];
+      const adjudicationNames = ["unspecified", "valid generalizable", "valid one-off", "invalid", "needs evidence"];
+      const signalNames = ["unspecified", "tenant access without trusted scope", "protected access without auth context", "secret literal", "dynamic SQL with untrusted input", "untrusted outbound destination", "privilege mutation without audit", "unsigned webhook", "password persistence without KDF", "public credential flow without rate limit", "destructive operation", "Rust unsafe without safety contract", "Rust panic in request path", "Rust command with untrusted argument", "Rust weak RNG for secret", "Rust untrusted path", "Rust panic in library API", "Rust blocking lock across await", "Rust unvalidated external deserialization", "review authorization boundary", "review state transition", "review protocol contract", "review guardrail coverage", "review operational truth", "review security boundary", "review negative test gap"];
+      const lineList = value => value.split("\n").map(item => item.trim()).filter(Boolean);
+      const csv = value => value.split(",").map(item => item.trim()).filter(Boolean);
+      const escapeHTML = value => String(value ?? "").replace(/[&<>"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char]));
+      const formatMoney = micros => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number(micros || 0) / 1000000);
+      const formatNumber = value => new Intl.NumberFormat().format(Number(value || 0));
+      const formatPercent = basisPoints => `${(Number(basisPoints || 0) / 100).toFixed(1)}%`;
+      const formatDate = value => value ? new Date(value).toLocaleString() : "Not recorded";
       const authFetch = (url, options = {}, role = "admin") => {
         const token = $(role === "agent" ? "agent-token" : "admin-token").value.trim();
         const headers = new Headers(options.headers || {});
         if (token) headers.set("authorization", `Bearer ${token}`);
         return fetch(url, { ...options, headers });
       };
-
-      function fillForm(rule) {
-        $("id").value = rule?.id || "";
-        $("title").value = rule?.title || "";
-        $("description").value = rule?.description || "";
-        $("severity").value = String(rule?.severity || 5);
-        $("signal").value = String(rule?.triggers?.[0]?.signal || 1);
-        $("tags").value = (rule?.tags || []).join(", ");
-        $("evidence").value = (rule?.requiredEvidence || []).join("\n");
-        $("remediation").value = (rule?.remediation || []).join("\n");
+      async function apiJSON(url, options = {}, role = "admin") {
+        const response = await authFetch(url, options, role);
+        const text = await response.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
+        if (!response.ok) throw new Error(data.message || data.error || `${response.status} ${response.statusText}`);
+        return data;
+      }
+      const postJSON = (url, body = {}, role = "admin") => apiJSON(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, role);
+      const putJSON = (url, body = {}, role = "admin") => apiJSON(url, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, role);
+      function setStatus(message, error = false) { $("status").textContent = message; $("status").style.color = error ? "var(--danger)" : "var(--muted)"; }
+      async function task(label, operation) {
+        setStatus(`${label}…`);
+        try { const result = await operation(); setStatus(`${label} complete`); return result; }
+        catch (error) { setStatus(`${label}: ${error.message}`, true); throw error; }
       }
 
+      function catalogItems() {
+        const rules = state.rules.map(rule => ({ kind: "rule", id: rule.id, title: rule.title, severity: rule.severity, owner: rule.owner, rule }));
+        const candidates = state.candidates.map(candidate => ({ kind: "candidate", id: candidate.id, title: candidate.proposedRule?.title || candidate.id, severity: candidate.proposedRule?.severity || 0, owner: candidate.createdBy, candidate }));
+        const query = $("search").value.trim().toLowerCase();
+        const severity = $("severity-filter").value;
+        const stage = $("stage-filter").value;
+        return [...rules, ...candidates].filter(item => {
+          if (state.view === "rules" && item.kind !== "rule") return false;
+          if (state.view === "learned" && item.kind !== "candidate") return false;
+          if (state.view === "protected" && !item.candidate?.protectedOrgPolicy) return false;
+          if (severity !== "all" && String(item.severity) !== severity) return false;
+          if (stage !== "all" && String(item.candidate?.rolloutStage || 1) !== stage) return false;
+          return !query || [item.id, item.title, item.owner].some(value => String(value || "").toLowerCase().includes(query));
+        });
+      }
+      function renderCatalog() {
+        const items = catalogItems();
+        const selectedIndex = items.findIndex(item => state.selected?.kind === item.kind && state.selected?.id === item.id);
+        const focusableIndex = selectedIndex >= 0 ? selectedIndex : 0;
+        $("catalog-list").innerHTML = items.length ? items.map((item, index) => {
+          const candidate = item.candidate;
+          const metrics = candidate?.metrics || {};
+          const selected = state.selected?.kind === item.kind && state.selected?.id === item.id;
+          return `<li class="catalog-row${selected ? " selected" : ""}" role="option" data-kind="${item.kind}" data-id="${escapeHTML(item.id)}" tabindex="${index === focusableIndex ? 0 : -1}" aria-selected="${selected}">
+            <span class="severity-rail s${Number(item.severity || 0)}"></span>
+            <div><div class="row-title">${escapeHTML(item.title || item.id)} ${item.kind === "candidate" ? '<span class="badge learned">Learned</span>' : '<span class="badge">Draft rule</span>'}</div>
+            <div class="row-subtitle mono">${escapeHTML(item.id)} · ${escapeHTML(item.kind === "candidate" ? claimNames[candidate.claimKind] : signalNames[item.rule?.triggers?.[0]?.signal])}</div>
+            <div class="row-metrics">${item.kind === "candidate" ? `<span>${formatNumber(metrics.supportCount)} support</span><span>${formatPercent(metrics.precisionBasisPoints)} precision</span><span>${formatNumber(metrics.estimatedReviewerTokensAvoided)} tokens saved</span>` : `<span>${escapeHTML(severityNames[item.severity])}</span><span>${escapeHTML(item.owner || "unowned")}</span>`}</div></div>
+            <div class="row-side">${candidate ? `<span class="badge stage-${candidate.rolloutStage || 1}">${escapeHTML(rolloutNames[candidate.rolloutStage || 0])}</span>${candidate.protectedOrgPolicy ? '<div style="margin-top:7px"><span class="badge human-only">Human only</span></div>' : ""}` : ""}</div>
+          </li>`;
+        }).join("") : '<li class="empty" role="presentation">No policies match this view.</li>';
+      }
+      function updateSummary() {
+        const totals = state.candidates.reduce((sum, item) => ({ cost: sum.cost + Number(item.metrics?.estimatedReviewerCostAvoidedMicros || 0), tokens: sum.tokens + Number(item.metrics?.estimatedReviewerTokensAvoided || 0) }), { cost: 0, tokens: 0 });
+        $("rule-count").textContent = formatNumber(state.rules.length);
+        $("candidate-count").textContent = formatNumber(state.candidates.length);
+        $("finding-count").textContent = formatNumber(state.findings.length);
+        $("cost-saved").textContent = formatMoney(totals.cost);
+        $("tokens-saved").textContent = formatNumber(totals.tokens);
+      }
+      function selectItem(kind, id) {
+        state.selected = { kind, id };
+        state.tab = "policy";
+        renderCatalog(); renderInspector();
+      }
+      function syncTabs() {
+        document.querySelectorAll("[role=tab]").forEach(button => {
+          const selected = button.dataset.tab === state.tab;
+          button.classList.toggle("active", selected);
+          button.setAttribute("aria-selected", String(selected));
+          button.tabIndex = selected ? 0 : -1;
+        });
+        $("inspector-body").setAttribute("aria-labelledby", `tab-${state.tab}`);
+      }
+      function selectTab(tab, focus = false) {
+        state.tab = tab;
+        syncTabs();
+        renderInspector();
+        if (focus) $(`tab-${tab}`).focus();
+      }
+      const selectedRule = () => state.selected?.kind === "rule" ? state.rules.find(rule => rule.id === state.selected.id) : state.candidates.find(item => item.id === state.selected?.id)?.proposedRule;
+      const selectedCandidate = () => state.selected?.kind === "candidate" ? state.candidates.find(item => item.id === state.selected.id) : null;
+      function signalOptions(selected) { return signalNames.slice(1).map((name, index) => `<option value="${index + 1}" ${Number(selected) === index + 1 ? "selected" : ""}>${escapeHTML(name)}</option>`).join(""); }
+      function policyForm(rule = {}) {
+        return `<form id="rule-form"><div class="panel"><h3>Typed rule contract</h3><label for="id">Rule ID</label><input id="id" required value="${escapeHTML(rule.id || "")}" placeholder="tenant-org-scope-required" />
+          <label for="title">Title</label><input id="title" required value="${escapeHTML(rule.title || "")}" />
+          <label for="description">Description</label><textarea id="description" required>${escapeHTML(rule.description || "")}</textarea>
+          <div class="field-grid"><div><label for="severity">Severity</label><select id="severity">${severityNames.slice(1).map((name, index) => `<option value="${index + 1}" ${Number(rule.severity || 5) === index + 1 ? "selected" : ""}>${name}</option>`).join("")}</select></div><div><label for="signal">Typed security signal</label><select id="signal">${signalOptions(rule.triggers?.[0]?.signal || 1)}</select></div></div>
+          <label for="tags">Tags, comma separated</label><input id="tags" value="${escapeHTML((rule.tags || []).join(", "))}" />
+          <label for="evidence">Required evidence, one per line</label><textarea id="evidence">${escapeHTML((rule.requiredEvidence || []).join("\n"))}</textarea>
+          <label for="remediation">Remediation, one per line</label><textarea id="remediation">${escapeHTML((rule.remediation || []).join("\n"))}</textarea>
+          <label for="scope-paths">Path scope, one per line</label><textarea id="scope-paths">${escapeHTML((rule.scope?.paths || []).join("\n"))}</textarea>
+        </div></form>`;
+      }
+      function renderInspector() {
+        syncTabs();
+        const candidate = selectedCandidate();
+        const rule = selectedRule();
+        if (!state.selected || !rule) { $("inspector-title").textContent = "Select a policy"; $("inspector-subtitle").textContent = "Review its typed contract, evidence, replay, and rollout."; $("inspector-badge").innerHTML = ""; $("inspector-body").innerHTML = '<div class="empty">Choose a policy from the catalog or create a new rule.</div>'; $("footer-actions").innerHTML = ""; return; }
+        $("inspector-title").textContent = rule.title || rule.id;
+        $("inspector-subtitle").textContent = candidate ? `${claimNames[candidate.claimKind]} · ${artifactNames[candidate.artifactKind]}` : `Draft rule · ${severityNames[rule.severity]}`;
+        $("inspector-badge").innerHTML = candidate?.protectedOrgPolicy ? '<span class="badge human-only">Human-exclusive controls</span>' : "";
+        if (state.tab === "policy") renderPolicyTab(rule, candidate);
+        if (state.tab === "provenance") renderProvenanceTab(candidate);
+        if (state.tab === "replay") renderReplayTab(candidate);
+        if (state.tab === "rollout") renderRolloutTab(candidate);
+        if (state.tab === "activity") renderActivityTab(candidate, rule);
+        if (state.tab === "system") renderSystemTab();
+      }
+      function renderPolicyTab(rule, candidate) {
+        $("inspector-body").innerHTML = policyForm(rule);
+        $("footer-actions").innerHTML = `<button id="save-rule">${candidate ? "Save as draft rule" : "Save draft rule"}</button>${!candidate ? '<button class="danger" id="delete-rule">Delete</button>' : ""}`;
+        $("rule-form").onsubmit = saveRule;
+        $("save-rule").onclick = saveRule;
+        if ($("delete-rule")) $("delete-rule").onclick = () => deleteRule(rule.id);
+      }
+      function relatedFindings(candidate) { const ids = new Set(candidate?.sourceFindingIds || []); return state.findings.filter(item => ids.has(item.id)); }
+      function renderProvenanceTab(candidate) {
+        if (!candidate) { $("inspector-body").innerHTML = '<div class="panel"><h3>Rule provenance</h3><p class="muted">Manual draft. Owner and timestamps are retained in the typed rule.</p></div>'; $("footer-actions").innerHTML = ""; return; }
+        const findings = relatedFindings(candidate);
+        $("inspector-body").innerHTML = `<div class="panel"><h3>Candidate provenance</h3><dl class="definition"><dt>Created by</dt><dd>${escapeHTML(candidate.createdBy || "unknown")}</dd><dt>Created</dt><dd>${escapeHTML(formatDate(candidate.createdAt))}</dd><dt>Claim kind</dt><dd>${escapeHTML(claimNames[candidate.claimKind])}</dd><dt>Artifact kind</dt><dd>${escapeHTML(artifactNames[candidate.artifactKind])}</dd><dt>Confidence floor</dt><dd>${escapeHTML(formatPercent(candidate.minimumConfidenceBasisPoints))}</dd><dt>Source findings</dt><dd>${formatNumber(candidate.sourceFindingIds?.length)}</dd></dl></div>
+          <div class="panel"><h3>Finding evidence</h3>${findings.length ? findings.map(finding => `<div style="padding:10px 0;border-bottom:1px solid var(--line)"><strong>${escapeHTML(claimNames[finding.claimKind])}</strong><div>${escapeHTML(finding.invariant)}</div><div class="muted mono">${escapeHTML(finding.source?.repository || "unknown repo")} · PR ${escapeHTML(finding.source?.pullRequestNumber || "—")} · ${escapeHTML(finding.source?.headSha || "unknown SHA")}</div><div class="row-metrics"><span>${formatPercent(finding.confidenceBasisPoints)} confidence</span><span>${formatMoney(finding.reviewerCostMicros)} review cost</span><span>${formatNumber(Number(finding.reviewerInputTokens || 0) + Number(finding.reviewerOutputTokens || 0))} tokens</span></div><div class="muted">Outcomes: ${escapeHTML((finding.outcomes || []).map(item => outcomeNames[item.kind]).join(", ") || "none")} · Adjudications: ${escapeHTML((finding.adjudications || []).map(item => adjudicationNames[item.verdict]).join(", ") || "none")}</div></div>`).join("") : '<p class="muted">No source finding payloads are available for this candidate.</p>'}</div>`;
+        $("footer-actions").innerHTML = "";
+      }
+      function metricsMarkup(metrics = {}) { return `<div class="metric-grid"><div class="metric"><span class="muted">Support</span><strong>${formatNumber(metrics.supportCount)}</strong></div><div class="metric"><span class="muted">Precision</span><strong>${formatPercent(metrics.precisionBasisPoints)}</strong></div><div class="metric"><span class="muted">Recall</span><strong>${formatPercent(metrics.recallBasisPoints)}</strong></div><div class="metric"><span class="muted">True positive</span><strong>${formatNumber(metrics.truePositiveCount)}</strong></div><div class="metric"><span class="muted">False positive</span><strong>${formatNumber(metrics.falsePositiveCount)}</strong></div><div class="metric"><span class="muted">False negative</span><strong>${formatNumber(metrics.falseNegativeCount)}</strong></div><div class="metric"><span class="muted">Cost avoided</span><strong>${formatMoney(metrics.estimatedReviewerCostAvoidedMicros)}</strong></div><div class="metric"><span class="muted">Tokens avoided</span><strong>${formatNumber(metrics.estimatedReviewerTokensAvoided)}</strong></div><div class="metric"><span class="muted">Accepted / rejected</span><strong>${formatNumber(metrics.acceptedCount)} / ${formatNumber(metrics.rejectedCount)}</strong></div></div>`; }
+      function renderReplayTab(candidate) {
+        if (!candidate) { $("inspector-body").innerHTML = '<div class="empty">Replay is available for learned policy candidates.</div>'; $("footer-actions").innerHTML = ""; return; }
+        const replay = state.replayByCandidate.get(candidate.id);
+        $("inspector-body").innerHTML = `<div class="panel"><h3>Replay intelligence</h3>${metricsMarkup(replay?.metrics || candidate.metrics)}${replay ? `<p class="muted" style="margin-top:12px">Replay ${escapeHTML(replay.id)} completed ${escapeHTML(formatDate(replay.completedAt))} across ${formatNumber(replay.cases?.length)} typed cases.</p>` : '<p class="muted" style="margin-top:12px">Metrics reflect the latest persisted candidate evidence. Run replay to refresh case-level truth.</p>'}</div>${replay?.cases?.length ? `<div class="panel"><h3>Replay cases</h3><table style="width:100%;border-collapse:collapse"><thead><tr><th>Finding</th><th>Expected</th><th>Actual</th><th>Confidence</th></tr></thead><tbody>${replay.cases.map(item => `<tr><td class="mono">${escapeHTML(item.findingId)}</td><td>${item.expectedMatch ? "match" : "no match"}</td><td>${item.actualMatch ? "match" : "no match"}</td><td>${formatPercent(item.confidenceBasisPoints)}</td></tr>`).join("")}</tbody></table></div>` : ""}`;
+        $("footer-actions").innerHTML = '<button id="run-replay">Run replay</button><button class="secondary" id="tune-policy">Tune from replay</button>';
+        $("run-replay").onclick = () => replayCandidate(candidate.id);
+        $("tune-policy").onclick = () => tuneCandidate(candidate.id);
+      }
+      function renderRolloutTab(candidate) {
+        if (!candidate) { $("inspector-body").innerHTML = '<div class="empty">Rollout stages apply to learned policy candidates.</div>'; $("footer-actions").innerHTML = ""; return; }
+        $("inspector-body").innerHTML = `<div class="panel"><h3>Rollout state</h3><div style="display:flex;gap:6px;flex-wrap:wrap">${rolloutNames.slice(1).map((name, index) => `<span class="badge stage-${index + 1}" style="opacity:${candidate.rolloutStage === index + 1 ? 1 : .42}">${escapeHTML(name)}</span>`).join("")}</div><p class="muted" style="margin-top:14px">Transitions use the typed rollout stage. Organization-protected policies require a recorded human actor and approval.</p>${metricsMarkup(candidate.metrics)}</div>`;
+        const transitions = ({ 1: [2, 5, 6], 2: [3, 5, 6], 3: [4, 5, 6], 4: [5, 6], 5: [6], 6: [] })[candidate.rolloutStage] || [];
+        $("footer-actions").innerHTML = transitions.map(stage => {
+          const humanOnly = stage >= 4 || (candidate.protectedOrgPolicy && stage === 3);
+          return `<button class="${humanOnly ? "secondary" : "quiet"} transition-button" data-stage="${stage}" data-human-only="${humanOnly}">${humanOnly ? "Human: " : ""}${escapeHTML(rolloutNames[stage])}</button>`;
+        }).join("");
+        document.querySelectorAll(".transition-button").forEach(button => button.onclick = () => requestTransition(candidate, Number(button.dataset.stage), button.dataset.humanOnly === "true"));
+      }
+      function renderActivityTab(candidate, rule) {
+        const related = state.audit.filter(event => candidate ? event.policyCandidateId === candidate.id : (event.matchedRuleIds || []).includes(rule?.id));
+        $("inspector-body").innerHTML = `<div class="panel"><h3>Audit activity</h3><ul class="timeline">${related.length ? related.map(event => `<li><strong>Audit kind ${escapeHTML(event.kind)}</strong><div class="muted">${escapeHTML(formatDate(event.occurredAt))} · ${escapeHTML(event.subjectId || "system")}</div><div class="mono muted">${escapeHTML(event.id || "")}</div></li>`).join("") : '<li class="muted">No matching audit events in the current window.</li>'}</ul></div>`;
+        $("footer-actions").innerHTML = "";
+      }
+      function renderSystemTab() {
+        const policy = state.mcpPolicy || {};
+        $("inspector-body").innerHTML = `<div class="panel"><h3>MCP policy</h3><div class="field-grid"><div><label for="mcp-mode">Mode</label><select id="mcp-mode"><option value="1" ${policy.mode===1?"selected":""}>Disabled</option><option value="2" ${policy.mode===2?"selected":""}>Allowlist</option><option value="3" ${policy.mode===3?"selected":""}>Blocklist</option></select></div><div><label for="mcp-selectors">Selectors (server/tool per line)</label><textarea id="mcp-selectors">${escapeHTML((policy.selectors || []).map(item => `${item.serverId}/${item.toolName}`).join("\n"))}</textarea></div></div><label><input id="mcp-deny-unknown" type="checkbox" style="width:auto" ${policy.denyUnknownIdentity ? "checked" : ""} /> Deny unknown identity</label><label><input id="mcp-audit-allowed" type="checkbox" style="width:auto" ${policy.auditAllowed ? "checked" : ""} /> Audit allowed calls</label></div>
+          <div class="panel"><h3>Plan preview</h3><label for="plan">Plan</label><textarea id="plan">Add a new customer endpoint that reads projects from the database.</textarea><button id="evaluate" style="margin-top:10px">Evaluate active ruleset</button><pre class="result" id="result">Evaluation output appears here.</pre></div>`;
+        $("footer-actions").innerHTML = '<button id="save-mcp">Save MCP policy</button>';
+        $("evaluate").onclick = evaluate;
+        $("save-mcp").onclick = saveMCPPolicy;
+      }
+
+      function fillForm(rule) { if (!rule) return; for (const [id, value] of [["id", rule.id], ["title", rule.title], ["description", rule.description]]) if ($(id)) $(id).value = value || ""; }
       function formRule() {
         const id = $("id").value.trim();
-        const existing = state.rules.find(rule => rule.id === id);
-        return {
-          id,
-          title: $("title").value.trim(),
-          description: $("description").value.trim(),
-          severity: Number($("severity").value),
-          scope: existing?.scope,
-          tags: csv($("tags").value),
-          enabled: true,
-          triggers: [{ signal: Number($("signal").value), phases: [1, 2], minimumConfidenceBasisPoints: 8000 }],
-          requiredCoverage: [Number($("signal").value)],
-          requiredEvidence: lineList($("evidence").value),
-          remediation: lineList($("remediation").value)
-        };
+        const existing = state.rules.find(rule => rule.id === id) || selectedRule() || {};
+        const signal = Number($("signal").value);
+        const hasExistingTriggers = Array.isArray(existing.triggers) && existing.triggers.length > 0;
+        const triggers = hasExistingTriggers
+          ? existing.triggers.map((trigger, index) => index === 0 ? { ...trigger, signal } : { ...trigger })
+          : [{ signal, phases: [1, 2], minimumConfidenceBasisPoints: 8000 }];
+        const rule = { ...existing, id, title: $("title").value.trim(), description: $("description").value.trim(), severity: Number($("severity").value), scope: { ...(existing.scope || {}), paths: lineList($("scope-paths").value) }, tags: csv($("tags").value), enabled: existing.enabled ?? true, triggers, requiredEvidence: lineList($("evidence").value), remediation: lineList($("remediation").value) };
+        if (!Array.isArray(existing.requiredCoverage)) rule.requiredCoverage = [signal];
+        return rule;
       }
-
-      async function refresh() {
-        const response = await authFetch("/api/rules");
-        const data = await response.json();
-        state.rules = data.rules || [];
-        $("rules").innerHTML = "";
-        for (const rule of state.rules) {
-          const tr = document.createElement("tr");
-          const severity = severityName(rule.severity);
-          for (const value of [rule.id, severity, rule.title, (rule.tags || []).join(", ")]) {
-            const cell = document.createElement("td");
-            cell.textContent = value;
-            tr.appendChild(cell);
-          }
-          tr.children[1].className = severity;
-          const actions = document.createElement("td");
-          actions.className = "rule-actions";
-          const edit = document.createElement("button");
-          edit.className = "secondary";
-          edit.textContent = "Edit";
-          edit.onclick = () => fillForm(rule);
-          const del = document.createElement("button");
-          del.className = "danger";
-          del.textContent = "Delete";
-          del.onclick = () => deleteRule(rule.id);
-          actions.append(edit, del);
-          tr.append(actions);
-          $("rules").appendChild(tr);
-        }
-      }
-
       async function saveRule(event) {
-        event.preventDefault();
+        event?.preventDefault();
         const rule = formRule();
-        const response = await authFetch("/api/rules", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ rule })
-        });
-        $("result").textContent = JSON.stringify(await response.json(), null, 2);
-        await refresh();
+        const exists = state.rules.some(item => item.id === rule.id);
+        await task("Save rule", async () => { await apiJSON("/api/rules", { method: exists ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rule }) }); await refresh(); selectItem("rule", rule.id); });
+      }
+      async function deleteRule(id) { if (!confirm(`Delete draft rule ${id}?`)) return; await task("Delete rule", async () => { await apiJSON(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" }); state.selected = null; await refresh(); }); }
+      async function evaluate() { const data = await task("Evaluate plan", () => postJSON("/api/evaluate", { phase: 1, plan: $("plan").value }, "agent")); $("result").textContent = JSON.stringify(data, null, 2); }
+      async function saveMCPPolicy() {
+        const selectors = lineList($("mcp-selectors").value).map(value => { const [serverId, ...toolParts] = value.split("/"); return { serverId, toolName: toolParts.join("/") }; }).filter(item => item.serverId && item.toolName);
+        const policy = { ...(state.mcpPolicy || {}), mode: Number($("mcp-mode").value), selectors, denyUnknownIdentity: $("mcp-deny-unknown").checked, auditAllowed: $("mcp-audit-allowed").checked };
+        await task("Save MCP policy", async () => { const data = await putJSON("/api/mcp-policy", { policy }); state.mcpPolicy = data.policy; renderSystemTab(); });
+      }
+      async function inferPolicies() { await task("Infer policies", async () => { await postJSON("/api/policy-infer", { minimumSupport: 2 }); await refresh(); }); }
+      async function replayCandidate(id) { const data = await task("Run replay", () => postJSON(`/api/policy-candidates/${encodeURIComponent(id)}/replay`)); state.replayByCandidate.set(id, data.replay); await refreshCandidates(); renderInspector(); }
+      async function tuneCandidate(id) {
+        const candidate = state.candidates.find(item => item.id === id);
+        await task("Tune policy", async () => { await postJSON(`/api/policy-candidates/${encodeURIComponent(id)}/tune`, { expectedUpdatedAt: candidate?.updatedAt }); await refreshCandidates(); renderInspector(); });
+      }
+      function requestTransition(candidate, stage, humanOnly) {
+        state.pendingTransition = { candidateId: candidate.id, stage, expectedUpdatedAt: candidate.updatedAt };
+        if (!humanOnly) { transitionCandidate(false); return; }
+        $("protected-copy").textContent = `Transition ${candidate.id} from ${rolloutNames[candidate.rolloutStage]} to ${rolloutNames[stage]}. This protected control records explicit human approval.`;
+        $("approval-phrase").value = ""; $("protected-confirm").disabled = true; $("protected-dialog").showModal();
+      }
+      async function transitionCandidate(humanApproved = true) {
+        const pending = state.pendingTransition;
+        if (!pending) return;
+        await task("Transition policy", async () => { await postJSON(`/api/policy-candidates/${encodeURIComponent(pending.candidateId)}/transition`, { targetStage: pending.stage, humanApproved, expectedUpdatedAt: pending.expectedUpdatedAt }); await refreshCandidates(); renderInspector(); });
+      }
+      async function refreshCandidates() { const data = await apiJSON("/api/policy-candidates"); state.candidates = data.candidates || []; updateSummary(); renderCatalog(); }
+      async function refresh() {
+        const requests = [
+          apiJSON("/api/rules").then(data => { state.rules = data.rules || []; }),
+          apiJSON("/api/policy-candidates").then(data => { state.candidates = data.candidates || []; }),
+          apiJSON("/api/review-findings").then(data => { state.findings = data.findings || []; }),
+          apiJSON("/api/audit").then(data => { state.audit = data.events || []; }),
+          apiJSON("/api/mcp-policy").then(data => { state.mcpPolicy = data.policy || null; })
+        ];
+        const results = await Promise.allSettled(requests);
+        const failures = results.filter(result => result.status === "rejected");
+        $("connection").classList.toggle("online", failures.length < requests.length);
+        $("connection").textContent = failures.length ? `${requests.length - failures.length}/${requests.length} sources connected` : "Connected";
+        updateSummary(); renderCatalog(); renderInspector();
+        if (failures.length) setStatus(failures.map(item => item.reason.message).join(" · "), true); else setStatus("Control plane refreshed");
       }
 
-      async function deleteRule(id) {
-        const response = await authFetch(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
-        $("result").textContent = JSON.stringify(await response.json(), null, 2);
-        fillForm(null);
-        await refresh();
-      }
-
-      async function evaluate() {
-        const response = await authFetch("/api/evaluate", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ phase: 1, plan: $("plan").value })
-        }, "agent");
-        $("result").textContent = JSON.stringify(await response.json(), null, 2);
-      }
-
-      $("rule-form").onsubmit = saveRule;
-      $("new-rule").onclick = () => fillForm(null);
+      document.querySelectorAll("[data-view]").forEach(button => button.onclick = () => { state.view = button.dataset.view; document.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("active", item === button)); renderCatalog(); });
+      document.querySelectorAll("[data-tab]").forEach(button => button.onclick = () => selectTab(button.dataset.tab));
+      document.querySelector("[role=tablist]").addEventListener("keydown", event => {
+        if (!event.target.matches("[role=tab]") || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const tabs = [...document.querySelectorAll("[role=tab]")];
+        const current = tabs.indexOf(event.target);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+        selectTab(tabs[next].dataset.tab, true);
+      });
+      $("catalog-list").addEventListener("click", event => { const row = event.target.closest("[data-kind]"); if (row) selectItem(row.dataset.kind, row.dataset.id); });
+      $("catalog-list").addEventListener("keydown", event => {
+        if (!event.target.matches("[role=option]")) return;
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectItem(event.target.dataset.kind, event.target.dataset.id); $("catalog-list").querySelector('[aria-selected="true"]')?.focus(); return; }
+        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const options = [...$("catalog-list").querySelectorAll("[role=option]")];
+        const current = options.indexOf(event.target);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+        const option = options[next];
+        selectItem(option.dataset.kind, option.dataset.id);
+        $("catalog-list").querySelector('[aria-selected="true"]')?.focus();
+      });
+      ["search", "stage-filter", "severity-filter"].forEach(id => $(id).addEventListener(id === "search" ? "input" : "change", renderCatalog));
+      $("new-rule").onclick = () => { state.selected = { kind: "rule", id: "" }; $("inspector-title").textContent = "New draft rule"; $("inspector-subtitle").textContent = "Define a typed policy contract"; $("inspector-badge").innerHTML = ""; $("inspector-body").innerHTML = policyForm({ severity: 4, enabled: true }); $("footer-actions").innerHTML = '<button id="save-rule">Save draft rule</button>'; $("rule-form").onsubmit = saveRule; $("save-rule").onclick = saveRule; };
+      $("infer").onclick = inferPolicies;
+      $("connect").onclick = refresh;
       $("refresh").onclick = refresh;
-      $("evaluate").onclick = evaluate;
-      $("publish").onclick = async () => {
-        $("result").textContent = JSON.stringify(await (await authFetch("/api/publish", { method: "POST" })).json(), null, 2);
-        await refresh();
-      };
-      $("admin-token").onchange = () => refresh().then(() => { if (state.rules[0]) fillForm(state.rules[0]); });
+      $("publish").onclick = async () => { await task("Publish ruleset", async () => { const data = await postJSON("/api/publish"); $("active-summary").textContent = `Active v${data.ruleset?.version || "?"} · ${(data.ruleset?.hash || "").slice(0, 10)}`; await refresh(); }); };
+      $("approval-phrase").addEventListener("input", () => { $("protected-confirm").disabled = $("approval-phrase").value !== "APPROVE"; });
+      $("protected-form").addEventListener("submit", event => { if (event.submitter?.value === "confirm") transitionCandidate(); });
     </script>
   </body>
 </html>

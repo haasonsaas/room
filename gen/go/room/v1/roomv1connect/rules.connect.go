@@ -68,6 +68,33 @@ const (
 	// RuleAdminServiceListAuditEventsProcedure is the fully-qualified name of the RuleAdminService's
 	// ListAuditEvents RPC.
 	RuleAdminServiceListAuditEventsProcedure = "/room.v1.RuleAdminService/ListAuditEvents"
+	// RuleAdminServiceIngestReviewFindingProcedure is the fully-qualified name of the
+	// RuleAdminService's IngestReviewFinding RPC.
+	RuleAdminServiceIngestReviewFindingProcedure = "/room.v1.RuleAdminService/IngestReviewFinding"
+	// RuleAdminServiceRecordReviewOutcomeProcedure is the fully-qualified name of the
+	// RuleAdminService's RecordReviewOutcome RPC.
+	RuleAdminServiceRecordReviewOutcomeProcedure = "/room.v1.RuleAdminService/RecordReviewOutcome"
+	// RuleAdminServiceAdjudicateReviewFindingProcedure is the fully-qualified name of the
+	// RuleAdminService's AdjudicateReviewFinding RPC.
+	RuleAdminServiceAdjudicateReviewFindingProcedure = "/room.v1.RuleAdminService/AdjudicateReviewFinding"
+	// RuleAdminServiceListReviewFindingsProcedure is the fully-qualified name of the RuleAdminService's
+	// ListReviewFindings RPC.
+	RuleAdminServiceListReviewFindingsProcedure = "/room.v1.RuleAdminService/ListReviewFindings"
+	// RuleAdminServiceInferPolicyCandidatesProcedure is the fully-qualified name of the
+	// RuleAdminService's InferPolicyCandidates RPC.
+	RuleAdminServiceInferPolicyCandidatesProcedure = "/room.v1.RuleAdminService/InferPolicyCandidates"
+	// RuleAdminServiceListPolicyCandidatesProcedure is the fully-qualified name of the
+	// RuleAdminService's ListPolicyCandidates RPC.
+	RuleAdminServiceListPolicyCandidatesProcedure = "/room.v1.RuleAdminService/ListPolicyCandidates"
+	// RuleAdminServiceRunPolicyReplayProcedure is the fully-qualified name of the RuleAdminService's
+	// RunPolicyReplay RPC.
+	RuleAdminServiceRunPolicyReplayProcedure = "/room.v1.RuleAdminService/RunPolicyReplay"
+	// RuleAdminServiceTransitionPolicyCandidateProcedure is the fully-qualified name of the
+	// RuleAdminService's TransitionPolicyCandidate RPC.
+	RuleAdminServiceTransitionPolicyCandidateProcedure = "/room.v1.RuleAdminService/TransitionPolicyCandidate"
+	// RuleAdminServiceTunePolicyCandidateProcedure is the fully-qualified name of the
+	// RuleAdminService's TunePolicyCandidate RPC.
+	RuleAdminServiceTunePolicyCandidateProcedure = "/room.v1.RuleAdminService/TunePolicyCandidate"
 	// AgentRulesServiceGetActiveRulesetProcedure is the fully-qualified name of the AgentRulesService's
 	// GetActiveRuleset RPC.
 	AgentRulesServiceGetActiveRulesetProcedure = "/room.v1.AgentRulesService/GetActiveRuleset"
@@ -101,6 +128,15 @@ type RuleAdminServiceClient interface {
 	GetMcpPolicy(context.Context, *connect.Request[v1.GetMcpPolicyRequest]) (*connect.Response[v1.GetMcpPolicyResponse], error)
 	UpdateMcpPolicy(context.Context, *connect.Request[v1.UpdateMcpPolicyRequest]) (*connect.Response[v1.UpdateMcpPolicyResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	IngestReviewFinding(context.Context, *connect.Request[v1.IngestReviewFindingRequest]) (*connect.Response[v1.IngestReviewFindingResponse], error)
+	RecordReviewOutcome(context.Context, *connect.Request[v1.RecordReviewOutcomeRequest]) (*connect.Response[v1.RecordReviewOutcomeResponse], error)
+	AdjudicateReviewFinding(context.Context, *connect.Request[v1.AdjudicateReviewFindingRequest]) (*connect.Response[v1.AdjudicateReviewFindingResponse], error)
+	ListReviewFindings(context.Context, *connect.Request[v1.ListReviewFindingsRequest]) (*connect.Response[v1.ListReviewFindingsResponse], error)
+	InferPolicyCandidates(context.Context, *connect.Request[v1.InferPolicyCandidatesRequest]) (*connect.Response[v1.InferPolicyCandidatesResponse], error)
+	ListPolicyCandidates(context.Context, *connect.Request[v1.ListPolicyCandidatesRequest]) (*connect.Response[v1.ListPolicyCandidatesResponse], error)
+	RunPolicyReplay(context.Context, *connect.Request[v1.RunPolicyReplayRequest]) (*connect.Response[v1.RunPolicyReplayResponse], error)
+	TransitionPolicyCandidate(context.Context, *connect.Request[v1.TransitionPolicyCandidateRequest]) (*connect.Response[v1.TransitionPolicyCandidateResponse], error)
+	TunePolicyCandidate(context.Context, *connect.Request[v1.TunePolicyCandidateRequest]) (*connect.Response[v1.TunePolicyCandidateResponse], error)
 }
 
 // NewRuleAdminServiceClient constructs a client for the room.v1.RuleAdminService service. By
@@ -180,22 +216,85 @@ func NewRuleAdminServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(ruleAdminServiceMethods.ByName("ListAuditEvents")),
 			connect.WithClientOptions(opts...),
 		),
+		ingestReviewFinding: connect.NewClient[v1.IngestReviewFindingRequest, v1.IngestReviewFindingResponse](
+			httpClient,
+			baseURL+RuleAdminServiceIngestReviewFindingProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("IngestReviewFinding")),
+			connect.WithClientOptions(opts...),
+		),
+		recordReviewOutcome: connect.NewClient[v1.RecordReviewOutcomeRequest, v1.RecordReviewOutcomeResponse](
+			httpClient,
+			baseURL+RuleAdminServiceRecordReviewOutcomeProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("RecordReviewOutcome")),
+			connect.WithClientOptions(opts...),
+		),
+		adjudicateReviewFinding: connect.NewClient[v1.AdjudicateReviewFindingRequest, v1.AdjudicateReviewFindingResponse](
+			httpClient,
+			baseURL+RuleAdminServiceAdjudicateReviewFindingProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("AdjudicateReviewFinding")),
+			connect.WithClientOptions(opts...),
+		),
+		listReviewFindings: connect.NewClient[v1.ListReviewFindingsRequest, v1.ListReviewFindingsResponse](
+			httpClient,
+			baseURL+RuleAdminServiceListReviewFindingsProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("ListReviewFindings")),
+			connect.WithClientOptions(opts...),
+		),
+		inferPolicyCandidates: connect.NewClient[v1.InferPolicyCandidatesRequest, v1.InferPolicyCandidatesResponse](
+			httpClient,
+			baseURL+RuleAdminServiceInferPolicyCandidatesProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("InferPolicyCandidates")),
+			connect.WithClientOptions(opts...),
+		),
+		listPolicyCandidates: connect.NewClient[v1.ListPolicyCandidatesRequest, v1.ListPolicyCandidatesResponse](
+			httpClient,
+			baseURL+RuleAdminServiceListPolicyCandidatesProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("ListPolicyCandidates")),
+			connect.WithClientOptions(opts...),
+		),
+		runPolicyReplay: connect.NewClient[v1.RunPolicyReplayRequest, v1.RunPolicyReplayResponse](
+			httpClient,
+			baseURL+RuleAdminServiceRunPolicyReplayProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("RunPolicyReplay")),
+			connect.WithClientOptions(opts...),
+		),
+		transitionPolicyCandidate: connect.NewClient[v1.TransitionPolicyCandidateRequest, v1.TransitionPolicyCandidateResponse](
+			httpClient,
+			baseURL+RuleAdminServiceTransitionPolicyCandidateProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("TransitionPolicyCandidate")),
+			connect.WithClientOptions(opts...),
+		),
+		tunePolicyCandidate: connect.NewClient[v1.TunePolicyCandidateRequest, v1.TunePolicyCandidateResponse](
+			httpClient,
+			baseURL+RuleAdminServiceTunePolicyCandidateProcedure,
+			connect.WithSchema(ruleAdminServiceMethods.ByName("TunePolicyCandidate")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // ruleAdminServiceClient implements RuleAdminServiceClient.
 type ruleAdminServiceClient struct {
-	createRule       *connect.Client[v1.CreateRuleRequest, v1.CreateRuleResponse]
-	updateRule       *connect.Client[v1.UpdateRuleRequest, v1.UpdateRuleResponse]
-	deleteRule       *connect.Client[v1.DeleteRuleRequest, v1.DeleteRuleResponse]
-	listRules        *connect.Client[v1.ListRulesRequest, v1.ListRulesResponse]
-	previewRuleset   *connect.Client[v1.PreviewRulesetRequest, v1.PreviewRulesetResponse]
-	publishRuleset   *connect.Client[v1.PublishRulesetRequest, v1.PublishRulesetResponse]
-	rollbackRuleset  *connect.Client[v1.RollbackRulesetRequest, v1.RollbackRulesetResponse]
-	getActiveRuleset *connect.Client[v1.RuleAdminServiceGetActiveRulesetRequest, v1.RuleAdminServiceGetActiveRulesetResponse]
-	getMcpPolicy     *connect.Client[v1.GetMcpPolicyRequest, v1.GetMcpPolicyResponse]
-	updateMcpPolicy  *connect.Client[v1.UpdateMcpPolicyRequest, v1.UpdateMcpPolicyResponse]
-	listAuditEvents  *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	createRule                *connect.Client[v1.CreateRuleRequest, v1.CreateRuleResponse]
+	updateRule                *connect.Client[v1.UpdateRuleRequest, v1.UpdateRuleResponse]
+	deleteRule                *connect.Client[v1.DeleteRuleRequest, v1.DeleteRuleResponse]
+	listRules                 *connect.Client[v1.ListRulesRequest, v1.ListRulesResponse]
+	previewRuleset            *connect.Client[v1.PreviewRulesetRequest, v1.PreviewRulesetResponse]
+	publishRuleset            *connect.Client[v1.PublishRulesetRequest, v1.PublishRulesetResponse]
+	rollbackRuleset           *connect.Client[v1.RollbackRulesetRequest, v1.RollbackRulesetResponse]
+	getActiveRuleset          *connect.Client[v1.RuleAdminServiceGetActiveRulesetRequest, v1.RuleAdminServiceGetActiveRulesetResponse]
+	getMcpPolicy              *connect.Client[v1.GetMcpPolicyRequest, v1.GetMcpPolicyResponse]
+	updateMcpPolicy           *connect.Client[v1.UpdateMcpPolicyRequest, v1.UpdateMcpPolicyResponse]
+	listAuditEvents           *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	ingestReviewFinding       *connect.Client[v1.IngestReviewFindingRequest, v1.IngestReviewFindingResponse]
+	recordReviewOutcome       *connect.Client[v1.RecordReviewOutcomeRequest, v1.RecordReviewOutcomeResponse]
+	adjudicateReviewFinding   *connect.Client[v1.AdjudicateReviewFindingRequest, v1.AdjudicateReviewFindingResponse]
+	listReviewFindings        *connect.Client[v1.ListReviewFindingsRequest, v1.ListReviewFindingsResponse]
+	inferPolicyCandidates     *connect.Client[v1.InferPolicyCandidatesRequest, v1.InferPolicyCandidatesResponse]
+	listPolicyCandidates      *connect.Client[v1.ListPolicyCandidatesRequest, v1.ListPolicyCandidatesResponse]
+	runPolicyReplay           *connect.Client[v1.RunPolicyReplayRequest, v1.RunPolicyReplayResponse]
+	transitionPolicyCandidate *connect.Client[v1.TransitionPolicyCandidateRequest, v1.TransitionPolicyCandidateResponse]
+	tunePolicyCandidate       *connect.Client[v1.TunePolicyCandidateRequest, v1.TunePolicyCandidateResponse]
 }
 
 // CreateRule calls room.v1.RuleAdminService.CreateRule.
@@ -253,6 +352,51 @@ func (c *ruleAdminServiceClient) ListAuditEvents(ctx context.Context, req *conne
 	return c.listAuditEvents.CallUnary(ctx, req)
 }
 
+// IngestReviewFinding calls room.v1.RuleAdminService.IngestReviewFinding.
+func (c *ruleAdminServiceClient) IngestReviewFinding(ctx context.Context, req *connect.Request[v1.IngestReviewFindingRequest]) (*connect.Response[v1.IngestReviewFindingResponse], error) {
+	return c.ingestReviewFinding.CallUnary(ctx, req)
+}
+
+// RecordReviewOutcome calls room.v1.RuleAdminService.RecordReviewOutcome.
+func (c *ruleAdminServiceClient) RecordReviewOutcome(ctx context.Context, req *connect.Request[v1.RecordReviewOutcomeRequest]) (*connect.Response[v1.RecordReviewOutcomeResponse], error) {
+	return c.recordReviewOutcome.CallUnary(ctx, req)
+}
+
+// AdjudicateReviewFinding calls room.v1.RuleAdminService.AdjudicateReviewFinding.
+func (c *ruleAdminServiceClient) AdjudicateReviewFinding(ctx context.Context, req *connect.Request[v1.AdjudicateReviewFindingRequest]) (*connect.Response[v1.AdjudicateReviewFindingResponse], error) {
+	return c.adjudicateReviewFinding.CallUnary(ctx, req)
+}
+
+// ListReviewFindings calls room.v1.RuleAdminService.ListReviewFindings.
+func (c *ruleAdminServiceClient) ListReviewFindings(ctx context.Context, req *connect.Request[v1.ListReviewFindingsRequest]) (*connect.Response[v1.ListReviewFindingsResponse], error) {
+	return c.listReviewFindings.CallUnary(ctx, req)
+}
+
+// InferPolicyCandidates calls room.v1.RuleAdminService.InferPolicyCandidates.
+func (c *ruleAdminServiceClient) InferPolicyCandidates(ctx context.Context, req *connect.Request[v1.InferPolicyCandidatesRequest]) (*connect.Response[v1.InferPolicyCandidatesResponse], error) {
+	return c.inferPolicyCandidates.CallUnary(ctx, req)
+}
+
+// ListPolicyCandidates calls room.v1.RuleAdminService.ListPolicyCandidates.
+func (c *ruleAdminServiceClient) ListPolicyCandidates(ctx context.Context, req *connect.Request[v1.ListPolicyCandidatesRequest]) (*connect.Response[v1.ListPolicyCandidatesResponse], error) {
+	return c.listPolicyCandidates.CallUnary(ctx, req)
+}
+
+// RunPolicyReplay calls room.v1.RuleAdminService.RunPolicyReplay.
+func (c *ruleAdminServiceClient) RunPolicyReplay(ctx context.Context, req *connect.Request[v1.RunPolicyReplayRequest]) (*connect.Response[v1.RunPolicyReplayResponse], error) {
+	return c.runPolicyReplay.CallUnary(ctx, req)
+}
+
+// TransitionPolicyCandidate calls room.v1.RuleAdminService.TransitionPolicyCandidate.
+func (c *ruleAdminServiceClient) TransitionPolicyCandidate(ctx context.Context, req *connect.Request[v1.TransitionPolicyCandidateRequest]) (*connect.Response[v1.TransitionPolicyCandidateResponse], error) {
+	return c.transitionPolicyCandidate.CallUnary(ctx, req)
+}
+
+// TunePolicyCandidate calls room.v1.RuleAdminService.TunePolicyCandidate.
+func (c *ruleAdminServiceClient) TunePolicyCandidate(ctx context.Context, req *connect.Request[v1.TunePolicyCandidateRequest]) (*connect.Response[v1.TunePolicyCandidateResponse], error) {
+	return c.tunePolicyCandidate.CallUnary(ctx, req)
+}
+
 // RuleAdminServiceHandler is an implementation of the room.v1.RuleAdminService service.
 type RuleAdminServiceHandler interface {
 	CreateRule(context.Context, *connect.Request[v1.CreateRuleRequest]) (*connect.Response[v1.CreateRuleResponse], error)
@@ -266,6 +410,15 @@ type RuleAdminServiceHandler interface {
 	GetMcpPolicy(context.Context, *connect.Request[v1.GetMcpPolicyRequest]) (*connect.Response[v1.GetMcpPolicyResponse], error)
 	UpdateMcpPolicy(context.Context, *connect.Request[v1.UpdateMcpPolicyRequest]) (*connect.Response[v1.UpdateMcpPolicyResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	IngestReviewFinding(context.Context, *connect.Request[v1.IngestReviewFindingRequest]) (*connect.Response[v1.IngestReviewFindingResponse], error)
+	RecordReviewOutcome(context.Context, *connect.Request[v1.RecordReviewOutcomeRequest]) (*connect.Response[v1.RecordReviewOutcomeResponse], error)
+	AdjudicateReviewFinding(context.Context, *connect.Request[v1.AdjudicateReviewFindingRequest]) (*connect.Response[v1.AdjudicateReviewFindingResponse], error)
+	ListReviewFindings(context.Context, *connect.Request[v1.ListReviewFindingsRequest]) (*connect.Response[v1.ListReviewFindingsResponse], error)
+	InferPolicyCandidates(context.Context, *connect.Request[v1.InferPolicyCandidatesRequest]) (*connect.Response[v1.InferPolicyCandidatesResponse], error)
+	ListPolicyCandidates(context.Context, *connect.Request[v1.ListPolicyCandidatesRequest]) (*connect.Response[v1.ListPolicyCandidatesResponse], error)
+	RunPolicyReplay(context.Context, *connect.Request[v1.RunPolicyReplayRequest]) (*connect.Response[v1.RunPolicyReplayResponse], error)
+	TransitionPolicyCandidate(context.Context, *connect.Request[v1.TransitionPolicyCandidateRequest]) (*connect.Response[v1.TransitionPolicyCandidateResponse], error)
+	TunePolicyCandidate(context.Context, *connect.Request[v1.TunePolicyCandidateRequest]) (*connect.Response[v1.TunePolicyCandidateResponse], error)
 }
 
 // NewRuleAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -341,6 +494,60 @@ func NewRuleAdminServiceHandler(svc RuleAdminServiceHandler, opts ...connect.Han
 		connect.WithSchema(ruleAdminServiceMethods.ByName("ListAuditEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ruleAdminServiceIngestReviewFindingHandler := connect.NewUnaryHandler(
+		RuleAdminServiceIngestReviewFindingProcedure,
+		svc.IngestReviewFinding,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("IngestReviewFinding")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceRecordReviewOutcomeHandler := connect.NewUnaryHandler(
+		RuleAdminServiceRecordReviewOutcomeProcedure,
+		svc.RecordReviewOutcome,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("RecordReviewOutcome")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceAdjudicateReviewFindingHandler := connect.NewUnaryHandler(
+		RuleAdminServiceAdjudicateReviewFindingProcedure,
+		svc.AdjudicateReviewFinding,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("AdjudicateReviewFinding")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceListReviewFindingsHandler := connect.NewUnaryHandler(
+		RuleAdminServiceListReviewFindingsProcedure,
+		svc.ListReviewFindings,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("ListReviewFindings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceInferPolicyCandidatesHandler := connect.NewUnaryHandler(
+		RuleAdminServiceInferPolicyCandidatesProcedure,
+		svc.InferPolicyCandidates,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("InferPolicyCandidates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceListPolicyCandidatesHandler := connect.NewUnaryHandler(
+		RuleAdminServiceListPolicyCandidatesProcedure,
+		svc.ListPolicyCandidates,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("ListPolicyCandidates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceRunPolicyReplayHandler := connect.NewUnaryHandler(
+		RuleAdminServiceRunPolicyReplayProcedure,
+		svc.RunPolicyReplay,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("RunPolicyReplay")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceTransitionPolicyCandidateHandler := connect.NewUnaryHandler(
+		RuleAdminServiceTransitionPolicyCandidateProcedure,
+		svc.TransitionPolicyCandidate,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("TransitionPolicyCandidate")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ruleAdminServiceTunePolicyCandidateHandler := connect.NewUnaryHandler(
+		RuleAdminServiceTunePolicyCandidateProcedure,
+		svc.TunePolicyCandidate,
+		connect.WithSchema(ruleAdminServiceMethods.ByName("TunePolicyCandidate")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/room.v1.RuleAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RuleAdminServiceCreateRuleProcedure:
@@ -365,6 +572,24 @@ func NewRuleAdminServiceHandler(svc RuleAdminServiceHandler, opts ...connect.Han
 			ruleAdminServiceUpdateMcpPolicyHandler.ServeHTTP(w, r)
 		case RuleAdminServiceListAuditEventsProcedure:
 			ruleAdminServiceListAuditEventsHandler.ServeHTTP(w, r)
+		case RuleAdminServiceIngestReviewFindingProcedure:
+			ruleAdminServiceIngestReviewFindingHandler.ServeHTTP(w, r)
+		case RuleAdminServiceRecordReviewOutcomeProcedure:
+			ruleAdminServiceRecordReviewOutcomeHandler.ServeHTTP(w, r)
+		case RuleAdminServiceAdjudicateReviewFindingProcedure:
+			ruleAdminServiceAdjudicateReviewFindingHandler.ServeHTTP(w, r)
+		case RuleAdminServiceListReviewFindingsProcedure:
+			ruleAdminServiceListReviewFindingsHandler.ServeHTTP(w, r)
+		case RuleAdminServiceInferPolicyCandidatesProcedure:
+			ruleAdminServiceInferPolicyCandidatesHandler.ServeHTTP(w, r)
+		case RuleAdminServiceListPolicyCandidatesProcedure:
+			ruleAdminServiceListPolicyCandidatesHandler.ServeHTTP(w, r)
+		case RuleAdminServiceRunPolicyReplayProcedure:
+			ruleAdminServiceRunPolicyReplayHandler.ServeHTTP(w, r)
+		case RuleAdminServiceTransitionPolicyCandidateProcedure:
+			ruleAdminServiceTransitionPolicyCandidateHandler.ServeHTTP(w, r)
+		case RuleAdminServiceTunePolicyCandidateProcedure:
+			ruleAdminServiceTunePolicyCandidateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -416,6 +641,42 @@ func (UnimplementedRuleAdminServiceHandler) UpdateMcpPolicy(context.Context, *co
 
 func (UnimplementedRuleAdminServiceHandler) ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.ListAuditEvents is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) IngestReviewFinding(context.Context, *connect.Request[v1.IngestReviewFindingRequest]) (*connect.Response[v1.IngestReviewFindingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.IngestReviewFinding is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) RecordReviewOutcome(context.Context, *connect.Request[v1.RecordReviewOutcomeRequest]) (*connect.Response[v1.RecordReviewOutcomeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.RecordReviewOutcome is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) AdjudicateReviewFinding(context.Context, *connect.Request[v1.AdjudicateReviewFindingRequest]) (*connect.Response[v1.AdjudicateReviewFindingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.AdjudicateReviewFinding is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) ListReviewFindings(context.Context, *connect.Request[v1.ListReviewFindingsRequest]) (*connect.Response[v1.ListReviewFindingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.ListReviewFindings is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) InferPolicyCandidates(context.Context, *connect.Request[v1.InferPolicyCandidatesRequest]) (*connect.Response[v1.InferPolicyCandidatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.InferPolicyCandidates is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) ListPolicyCandidates(context.Context, *connect.Request[v1.ListPolicyCandidatesRequest]) (*connect.Response[v1.ListPolicyCandidatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.ListPolicyCandidates is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) RunPolicyReplay(context.Context, *connect.Request[v1.RunPolicyReplayRequest]) (*connect.Response[v1.RunPolicyReplayResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.RunPolicyReplay is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) TransitionPolicyCandidate(context.Context, *connect.Request[v1.TransitionPolicyCandidateRequest]) (*connect.Response[v1.TransitionPolicyCandidateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.TransitionPolicyCandidate is not implemented"))
+}
+
+func (UnimplementedRuleAdminServiceHandler) TunePolicyCandidate(context.Context, *connect.Request[v1.TunePolicyCandidateRequest]) (*connect.Response[v1.TunePolicyCandidateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("room.v1.RuleAdminService.TunePolicyCandidate is not implemented"))
 }
 
 // AgentRulesServiceClient is a client for the room.v1.AgentRulesService service.

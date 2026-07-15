@@ -85,7 +85,7 @@ func run(ctx context.Context, args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: roomctl rules | sync-rules | watch-rules | publish | hook <prompt|pre-tool|pre-mcp|post-tool> | token issue --id ID --role admin|agent [--workspace ID --repository REPO --agent ID] [--hook-provider none|claude_code|codex|cursor | --mcp-proxy]")
+	return fmt.Errorf("usage: roomctl rules | sync-rules | watch-rules | publish | hook <prompt|pre-tool|pre-mcp|post-tool> | token issue --id ID --role admin|reviewer|agent [--human-operator] [--workspace ID --repository REPO --agent ID] [--hook-provider none|claude_code|codex|cursor | --mcp-proxy]")
 }
 
 func issueToken(cfg config.Config, args []string) error {
@@ -94,17 +94,18 @@ func issueToken(cfg config.Config, args []string) error {
 	}
 	set := flag.NewFlagSet("token issue", flag.ContinueOnError)
 	id := set.String("id", "", "credential id")
-	role := set.String("role", "agent", "admin or agent")
+	role := set.String("role", "agent", "admin, reviewer, or agent")
 	workspace := set.String("workspace", "", "exact workspace scope")
 	repository := set.String("repository", "", "exact repository scope")
 	agent := set.String("agent", "", "exact agent identity")
 	hookProvider := set.String("hook-provider", string(auth.HookProviderNone), "trusted hook provider: none, claude_code, codex, or cursor")
 	mcpProxy := set.Bool("mcp-proxy", false, "authorize a trusted MCP proxy transport")
+	humanOperator := set.Bool("human-operator", false, "authorize human-exclusive protected controls (admin only)")
 	output := set.String("output", "", "private file for the one-time token")
 	if err := set.Parse(args[1:]); err != nil {
 		return err
 	}
-	principal := auth.Principal{ID: *id, Role: auth.Role(*role), Scope: auth.Scope{WorkspaceID: *workspace, Repository: *repository, AgentID: *agent, HookProvider: auth.HookProvider(*hookProvider), MCPProxy: *mcpProxy}}
+	principal := auth.Principal{ID: *id, Role: auth.Role(*role), Scope: auth.Scope{WorkspaceID: *workspace, Repository: *repository, AgentID: *agent, HookProvider: auth.HookProvider(*hookProvider), MCPProxy: *mcpProxy}, HumanOperator: *humanOperator}
 	token, err := auth.IssueOrUpdateToken(cfg.CredentialFile, principal)
 	if err != nil {
 		return err

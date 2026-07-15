@@ -11,6 +11,7 @@ MCP identities; and records durable audit events.
 - Scoped opaque bearer credentials with separate admin and agent roles.
 - A strict external-analyzer boundary: policy never classifies prompt, plan, diff, title, or display text.
 - SQLite persistence for ruleset versions, MCP policy, and append-only audit events.
+- A review-intelligence catalog that turns typed review claims and durable outcomes into replayed, staged policy candidates.
 - Lifecycle hooks that fail closed unless `ROOM_HOOK_FAIL_OPEN=true` is explicitly set.
 
 ## Local setup
@@ -20,7 +21,10 @@ shown once; the credential registry stores only SHA-256 digests.
 
 ```bash
 go run ./cmd/roomctl token issue \
-  --id local-admin --role admin --output .room/admin.token
+  --id local-admin --role admin --human-operator --output .room/admin.token
+
+go run ./cmd/roomctl token issue \
+  --id review-automation --role reviewer --output .room/reviewer.token
 
 go run ./cmd/roomctl token issue \
   --id local-agent --role agent \
@@ -44,6 +48,19 @@ a loopback listener with `ROOM_AUTH_MODE=disabled`.
 
 Open `http://127.0.0.1:8787` and paste the admin token into the in-memory token
 field. The dashboard never persists tokens.
+
+The Rules catalog includes learned candidates beside authored rules. Review
+findings are ingested with a typed claim kind, source identity, confidence, and
+cost metadata. Fixes, resolutions, reactions, merges, reverts, regressions, and
+agent adjudications are recorded as separate durable evidence. Room can then
+infer candidates, replay them over the stored corpus, tune their confidence
+threshold, and advance them through draft, shadow, warn, and block stages.
+Protected organization-wide blocking policies always require explicit human
+approval; pause and rollback remain available as emergency controls.
+Review automation should use the least-privilege `reviewer` credential. It can
+ingest evidence, infer, replay, tune, and advance eligible non-protected staged
+policies, but it cannot directly edit or publish arbitrary rulesets, change MCP
+trust policy, or exercise human-only controls.
 
 Run the MCP sidecar separately:
 

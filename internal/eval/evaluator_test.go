@@ -39,6 +39,27 @@ func TestCompleteCoverageWithoutSignalAllows(t *testing.T) {
 	}
 }
 
+func TestRolloutStageControlsDecisionWithoutChangingMatch(t *testing.T) {
+	tests := []struct {
+		stage roomv1.RolloutStage
+		want  roomv1.Decision
+	}{
+		{roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW, roomv1.Decision_DECISION_ALLOW},
+		{roomv1.RolloutStage_ROLLOUT_STAGE_WARN, roomv1.Decision_DECISION_WARN},
+		{roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK, roomv1.Decision_DECISION_DENY},
+	}
+	for _, tt := range tests {
+		t.Run(tt.stage.String(), func(t *testing.T) {
+			ruleset := testRuleset(roomv1.SignalKind_SIGNAL_KIND_REVIEW_SECURITY_BOUNDARY, roomv1.Severity_SEVERITY_CRITICAL)
+			ruleset.Rules[0].RolloutStage = tt.stage
+			result := NewPolicy([]*roomv1.AnalyzerIdentity{testIdentity}, false).Evaluate(ruleset, &roomv1.EvaluationContext{}, completeReport(roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF, roomv1.SignalKind_SIGNAL_KIND_REVIEW_SECURITY_BOUNDARY))
+			if result.GetDecision() != tt.want || len(result.GetMatches()) != 1 || result.GetMatches()[0].GetRolloutStage() != tt.stage {
+				t.Fatalf("stage=%s decision=%s matches=%+v", tt.stage, result.GetDecision(), result.GetMatches())
+			}
+		})
+	}
+}
+
 func TestScopeMatchesLanguageAndFrameworkSelectors(t *testing.T) {
 	tests := []struct {
 		name    string
