@@ -317,7 +317,7 @@ func TestAnalyzePlanElicitsTypedResolutionAndAuditsAcceptance(t *testing.T) {
 	if err != nil || len(events) != 2 {
 		t.Fatalf("elicitation audits = %d, err %v", len(events), err)
 	}
-	if events[0].GetMcpElicitation().GetResolution() != roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_RUN_REQUIRED_CHECKS || events[1].GetMcpElicitation().GetAction() != roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED {
+	if events[0].GetMcpElicitation().GetResolution() != roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_RUN_REQUIRED_CHECKS || events[0].GetMcpElicitation().GetOfferAuditEventId() != events[1].GetId() || events[1].GetMcpElicitation().GetAction() != roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED {
 		t.Fatalf("audit receipts = %+v", events)
 	}
 }

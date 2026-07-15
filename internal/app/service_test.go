@@ -75,25 +75,38 @@ func TestRecordMcpElicitationBindsAuditToAuthenticatedAgent(t *testing.T) {
 	receipt := &roomv1.McpElicitationReceipt{
 		Id: "elicitation-1", EvaluationId: "evaluation-1", EvaluationAuditEventId: evaluationAuditID,
 		Mode: roomv1.McpElicitationMode_MCP_ELICITATION_MODE_FORM, Purpose: roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_EVALUATION_RESOLUTION,
-		Action: roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ACCEPT, Resolution: roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_RUN_REQUIRED_CHECKS,
+		Action:     roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED,
 		OccurredAt: timestamppb.Now(),
 	}
-	response, err := service.RecordMcpElicitation(ctx, connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: receipt}))
+	offerResponse, err := service.RecordMcpElicitation(ctx, connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: receipt}))
 	if err != nil {
-		t.Fatalf("record elicitation: %v", err)
+		t.Fatalf("record elicitation offer: %v", err)
 	}
-	if response.Msg.GetAuditEventId() == "" {
-		t.Fatal("record elicitation omitted audit id")
+	final := proto.Clone(receipt).(*roomv1.McpElicitationReceipt)
+	final.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ACCEPT
+	final.Resolution = roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_RUN_REQUIRED_CHECKS
+	if _, err := service.RecordMcpElicitation(ctx, connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: final})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("terminal receipt without offer code = %s, want invalid argument", connect.CodeOf(err))
+	}
+	forged := proto.Clone(final).(*roomv1.McpElicitationReceipt)
+	forged.OfferAuditEventId = evaluationAuditID
+	if _, err := service.RecordMcpElicitation(ctx, connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: forged})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("terminal receipt with forged offer code = %s, want permission denied", connect.CodeOf(err))
+	}
+	final.OfferAuditEventId = offerResponse.Msg.GetAuditEventId()
+	response, err := service.RecordMcpElicitation(ctx, connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: final}))
+	if err != nil || response.Msg.GetAuditEventId() == "" {
+		t.Fatalf("record bound terminal elicitation: response %+v, err %v", response, err)
 	}
 	events, err := database.ListAudit(10, roomv1.AuditEventKind_AUDIT_EVENT_KIND_MCP_ELICITATION)
-	if err != nil || len(events) != 1 {
+	if err != nil || len(events) != 2 {
 		t.Fatalf("elicitation audits = %d, err %v", len(events), err)
 	}
 	event := events[0]
 	if event.GetSubjectId() != principal.ID || event.GetWorkspaceId() != principal.Scope.WorkspaceID || event.GetRepository() != principal.Scope.Repository || event.GetAgentType() != principal.Scope.AgentID {
 		t.Fatalf("audit scope = %+v", event)
 	}
-	if event.GetMcpElicitation().GetId() != receipt.GetId() {
+	if event.GetMcpElicitation().GetId() != receipt.GetId() || event.GetMcpElicitation().GetOfferAuditEventId() != offerResponse.Msg.GetAuditEventId() {
 		t.Fatalf("audit receipt = %+v", event.GetMcpElicitation())
 	}
 }
@@ -207,7 +220,7 @@ func TestValidateMcpElicitationReceiptEnforcesClosedResolutionContract(t *testin
 	valid := &roomv1.McpElicitationReceipt{
 		Id: "elicitation", EvaluationId: "evaluation", EvaluationAuditEventId: "evaluation-audit",
 		Mode: roomv1.McpElicitationMode_MCP_ELICITATION_MODE_FORM, Purpose: roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_EVALUATION_RESOLUTION,
-		Action: roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ACCEPT, Resolution: roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_REVISE,
+		Action: roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ACCEPT, Resolution: roomv1.McpResolutionAction_MCP_RESOLUTION_ACTION_REVISE, OfferAuditEventId: "offer-audit",
 	}
 	if err := validateMcpElicitationReceipt(valid); err != nil {
 		t.Fatalf("valid accepted evaluation resolution rejected: %v", err)

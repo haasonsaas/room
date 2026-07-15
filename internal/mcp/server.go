@@ -367,6 +367,7 @@ func (h *Handler) elicitEvaluationResolution(ctx context.Context, request *mcpsd
 		return err
 	}
 	elicitation.OfferAuditEventID = offerOutput.AuditEventID
+	receipt.OfferAuditEventId = offerOutput.AuditEventID
 	response, elicitErr := request.Session.Elicit(ctx, &mcpsdk.ElicitParams{
 		Mode:    "form",
 		Message: "Room requires a typed next step before this evaluation can be resolved.",
