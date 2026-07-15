@@ -166,3 +166,19 @@ func TestLoadTokenRequiresPrivateFile(t *testing.T) {
 		t.Fatalf("token = %q, err = %v", token, err)
 	}
 }
+
+func TestLoadTokenFileIgnoresRoomToken(t *testing.T) {
+	t.Setenv("ROOM_TOKEN", "inherited-token")
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte("file-token\n"), 0o600); err != nil {
+		t.Fatalf("write token: %v", err)
+	}
+
+	token, err := LoadTokenFile(path)
+	if err != nil {
+		t.Fatalf("load token file: %v", err)
+	}
+	if token != "file-token" {
+		t.Fatalf("token = %q, want file-token", token)
+	}
+}

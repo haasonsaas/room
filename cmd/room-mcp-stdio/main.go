@@ -25,7 +25,7 @@ func run(ctx context.Context) error {
 	if err := cfg.ValidateMCPServer(); err != nil {
 		return fmt.Errorf("invalid MCP configuration: %w", err)
 	}
-	token, err := config.LoadToken(cfg.TokenFile)
+	token, err := config.LoadTokenFile(cfg.TokenFile)
 	if err != nil {
 		return fmt.Errorf("load Room token: %w", err)
 	}

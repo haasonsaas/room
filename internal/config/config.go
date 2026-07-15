@@ -208,6 +208,13 @@ func LoadToken(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("ROOM_TOKEN_FILE or ROOM_TOKEN is required")
 	}
+	return LoadTokenFile(path)
+}
+
+func LoadTokenFile(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", errors.New("ROOM_TOKEN_FILE is required")
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return "", err
