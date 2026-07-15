@@ -200,6 +200,55 @@ enum ReviewClaimKind {
   REVIEW_CLAIM_KIND_NEGATIVE_TEST_GAP = 7;
 }
 
+enum ReviewEvidenceKind {
+  REVIEW_EVIDENCE_KIND_UNSPECIFIED = 0;
+  REVIEW_EVIDENCE_KIND_SOURCE_LOCATION = 1;
+  REVIEW_EVIDENCE_KIND_SYMBOL_TRACE = 2;
+  REVIEW_EVIDENCE_KIND_CONTRACT = 3;
+  REVIEW_EVIDENCE_KIND_COMMAND_RESULT = 4;
+  REVIEW_EVIDENCE_KIND_REPLAY_FIXTURE = 5;
+  REVIEW_EVIDENCE_KIND_GENERATED_PROVENANCE = 6;
+}
+
+enum ReviewVerifierKind {
+  REVIEW_VERIFIER_KIND_UNSPECIFIED = 0;
+  REVIEW_VERIFIER_KIND_DETERMINISTIC = 1;
+  REVIEW_VERIFIER_KIND_SEMANTIC_SCOUT = 2;
+}
+
+enum ReviewVerificationStatus {
+  REVIEW_VERIFICATION_STATUS_UNSPECIFIED = 0;
+  REVIEW_VERIFICATION_STATUS_VERIFIED = 1;
+  REVIEW_VERIFICATION_STATUS_REJECTED = 2;
+  REVIEW_VERIFICATION_STATUS_INDETERMINATE = 3;
+}
+
+enum ReviewVerificationReason {
+  REVIEW_VERIFICATION_REASON_UNSPECIFIED = 0;
+  REVIEW_VERIFICATION_REASON_UNTRUSTED_VERIFIER = 1;
+  REVIEW_VERIFICATION_REASON_VERIFIER_IDENTITY_MISMATCH = 2;
+  REVIEW_VERIFICATION_REASON_CLAIM_NOT_COVERED = 3;
+  REVIEW_VERIFICATION_REASON_NONDETERMINISTIC_VERIFIER = 4;
+  REVIEW_VERIFICATION_REASON_HYPOTHESIS_DIGEST_MISMATCH = 5;
+  REVIEW_VERIFICATION_REASON_ARTIFACT_DIGEST_MISMATCH = 6;
+  REVIEW_VERIFICATION_REASON_IMPACT_SLICE_DIGEST_MISMATCH = 7;
+  REVIEW_VERIFICATION_REASON_EXECUTION_INPUT_DIGEST_MISMATCH = 8;
+  REVIEW_VERIFICATION_REASON_EVIDENCE_INVALID = 9;
+  REVIEW_VERIFICATION_REASON_HYPOTHESIS_REJECTED = 10;
+  REVIEW_VERIFICATION_REASON_VERIFIER_UNAVAILABLE = 11;
+  REVIEW_VERIFICATION_REASON_VERIFIER_TIMEOUT = 12;
+  REVIEW_VERIFICATION_REASON_CONFLICTING_RESULTS = 13;
+  REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT = 14;
+}
+
+enum ReviewCompilationStatus {
+  REVIEW_COMPILATION_STATUS_UNSPECIFIED = 0;
+  REVIEW_COMPILATION_STATUS_VERIFIED = 1;
+  REVIEW_COMPILATION_STATUS_REJECTED = 2;
+  REVIEW_COMPILATION_STATUS_INDETERMINATE = 3;
+  REVIEW_COMPILATION_STATUS_INVALID = 4;
+}
+
 enum ReviewOutcomeKind {
   REVIEW_OUTCOME_KIND_UNSPECIFIED = 0;
   REVIEW_OUTCOME_KIND_FIX_COMMITTED = 1;
@@ -532,6 +581,66 @@ message ReviewFinding {
   int64 reviewer_output_tokens = 17;
   google.protobuf.Timestamp created_at = 18;
   google.protobuf.Timestamp updated_at = 19;
+}
+
+message ReviewHypothesis {
+  string id = 1;
+  ReviewSource source = 2;
+  ReviewClaimKind claim_kind = 3;
+  bytes artifact_sha256 = 4;
+  bytes impact_slice_sha256 = 5;
+  repeated string affected_paths = 6;
+  repeated SourceLocation affected_locations = 7;
+  string invariant = 8;
+  repeated string preconditions = 9;
+  repeated string causal_path = 10;
+  string impact = 11;
+  repeated string remediation = 12;
+  AnalyzerIdentity producer = 13;
+  Severity severity = 14;
+  uint32 confidence_basis_points = 15;
+  google.protobuf.Timestamp created_at = 16;
+}
+
+message ReviewEvidenceRef {
+  string id = 1;
+  ReviewEvidenceKind kind = 2;
+  bytes content_sha256 = 3;
+  SourceLocation location = 4;
+  string command = 5;
+  string description = 6;
+}
+
+message ReviewVerifierIdentity {
+  AnalyzerIdentity analyzer = 1;
+  ReviewVerifierKind kind = 2;
+  repeated ReviewClaimKind covered_claims = 3;
+}
+
+message ReviewVerificationReceipt {
+  string id = 1;
+  ReviewVerifierIdentity verifier = 2;
+  bytes hypothesis_sha256 = 3;
+  bytes artifact_sha256 = 4;
+  bytes impact_slice_sha256 = 5;
+  bytes execution_input_sha256 = 6;
+  ReviewVerificationStatus status = 7;
+  ReviewVerificationReason reason = 8;
+  repeated ReviewEvidenceRef evidence = 9;
+  google.protobuf.Timestamp completed_at = 10;
+}
+
+message VerifiedReviewFinding {
+  string id = 1;
+  ReviewHypothesis hypothesis = 2;
+  ReviewVerificationReceipt receipt = 3;
+  bytes evidence_set_sha256 = 4;
+}
+
+message ReviewCompilationResult {
+  ReviewCompilationStatus status = 1;
+  ReviewVerificationReason reason = 2;
+  VerifiedReviewFinding finding = 3;
 }
 
 message PolicyMetrics {
