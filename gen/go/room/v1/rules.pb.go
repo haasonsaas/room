@@ -3339,6 +3339,7 @@ type McpElicitationReceipt struct {
 	EvaluationAuditEventId     string                 `protobuf:"bytes,10,opt,name=evaluation_audit_event_id,json=evaluationAuditEventId,proto3" json:"evaluation_audit_event_id,omitempty"`
 	TargetRolloutStage         RolloutStage           `protobuf:"varint,11,opt,name=target_rollout_stage,json=targetRolloutStage,proto3,enum=room.v1.RolloutStage" json:"target_rollout_stage,omitempty"`
 	ExpectedCandidateUpdatedAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=expected_candidate_updated_at,json=expectedCandidateUpdatedAt,proto3" json:"expected_candidate_updated_at,omitempty"`
+	OfferAuditEventId          string                 `protobuf:"bytes,13,opt,name=offer_audit_event_id,json=offerAuditEventId,proto3" json:"offer_audit_event_id,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -3455,6 +3456,13 @@ func (x *McpElicitationReceipt) GetExpectedCandidateUpdatedAt() *timestamppb.Tim
 		return x.ExpectedCandidateUpdatedAt
 	}
 	return nil
+}
+
+func (x *McpElicitationReceipt) GetOfferAuditEventId() string {
+	if x != nil {
+		return x.OfferAuditEventId
+	}
+	return ""
 }
 
 type ReviewSource struct {
@@ -7235,7 +7243,7 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x13policy_candidate_id\x18\x11 \x01(\tR\x11policyCandidateId\x12,\n" +
 	"\x12evidence_record_id\x18\x12 \x01(\tR\x10evidenceRecordId\x12G\n" +
 	"\x0fmcp_elicitation\x18\x13 \x01(\v2\x1e.room.v1.McpElicitationReceiptR\x0emcpElicitation\x12#\n" +
-	"\revaluation_id\x18\x14 \x01(\tR\fevaluationId\"\xaa\x05\n" +
+	"\revaluation_id\x18\x14 \x01(\tR\fevaluationId\"\xdb\x05\n" +
 	"\x15McpElicitationReceipt\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\revaluation_id\x18\x02 \x01(\tR\fevaluationId\x12.\n" +
@@ -7252,7 +7260,8 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x19evaluation_audit_event_id\x18\n" +
 	" \x01(\tR\x16evaluationAuditEventId\x12G\n" +
 	"\x14target_rollout_stage\x18\v \x01(\x0e2\x15.room.v1.RolloutStageR\x12targetRolloutStage\x12]\n" +
-	"\x1dexpected_candidate_updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x1aexpectedCandidateUpdatedAt\"\xe2\x01\n" +
+	"\x1dexpected_candidate_updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x1aexpectedCandidateUpdatedAt\x12/\n" +
+	"\x14offer_audit_event_id\x18\r \x01(\tR\x11offerAuditEventId\"\xe2\x01\n" +
 	"\fReviewSource\x12\x1e\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tR\n" +

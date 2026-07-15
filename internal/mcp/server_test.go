@@ -374,6 +374,18 @@ func TestOpenPolicyControlUsesURLWithoutMutatingCandidate(t *testing.T) {
 	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "room-test", Version: "test"}, &mcpsdk.ClientOptions{
 		ElicitationHandler: func(_ context.Context, request *mcpsdk.ElicitRequest) (*mcpsdk.ElicitResult, error) {
 			elicited = request.Params
+			updated, err := ruleStore.PolicyCandidate(candidate.GetId())
+			if err != nil {
+				return nil, err
+			}
+			updated.UpdatedAt = nil
+			updated.MinimumConfidenceBasisPoints = 8500
+			for _, trigger := range updated.GetProposedRule().GetTriggers() {
+				trigger.MinimumConfidenceBasisPoints = 8500
+			}
+			if _, err := ruleStore.UpsertPolicyCandidate(updated); err != nil {
+				return nil, err
+			}
 			return &mcpsdk.ElicitResult{Action: "accept"}, nil
 		},
 		Capabilities: &mcpsdk.ClientCapabilities{Elicitation: &mcpsdk.ElicitationCapabilities{URL: &mcpsdk.URLElicitationCapabilities{}}},
@@ -398,7 +410,7 @@ func TestOpenPolicyControlUsesURLWithoutMutatingCandidate(t *testing.T) {
 	if err := json.Unmarshal(data, &output); err != nil {
 		t.Fatalf("decode tool output: %v", err)
 	}
-	if output.Elicitation == nil || output.Elicitation.Action != "accept" || output.Elicitation.AuditEventID == "" {
+	if output.Elicitation == nil || output.Elicitation.Action != "accept" || output.Elicitation.AuditEventID == "" || output.Elicitation.OfferAuditEventID == "" {
 		t.Fatalf("policy control output = %+v", output.Elicitation)
 	}
 	stored, err := ruleStore.PolicyCandidate(candidate.GetId())
@@ -412,7 +424,7 @@ func TestOpenPolicyControlUsesURLWithoutMutatingCandidate(t *testing.T) {
 		t.Fatalf("connect client without URL elicitation: %v", err)
 	}
 	defer unsupportedSession.Close()
-	unsupportedResult, err := unsupportedSession.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_open_policy_control", Arguments: map[string]any{"candidate_id": candidate.GetId(), "target_rollout_stage": "block", "expected_updated_at": candidate.GetUpdatedAt().AsTime().Format(time.RFC3339Nano)}})
+	unsupportedResult, err := unsupportedSession.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_open_policy_control", Arguments: map[string]any{"candidate_id": candidate.GetId(), "target_rollout_stage": "block", "expected_updated_at": stored.GetUpdatedAt().AsTime().Format(time.RFC3339Nano)}})
 	if err != nil || unsupportedResult.IsError {
 		t.Fatalf("unsupported URL fallback: result %+v, err %v", unsupportedResult, err)
 	}

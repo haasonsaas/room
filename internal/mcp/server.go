@@ -326,6 +326,7 @@ func (h *Handler) openPolicyControl(ctx context.Context, request *mcpsdk.CallToo
 		return nil, toolOutput{}, err
 	}
 	elicitation.OfferAuditEventID = offerOutput.AuditEventID
+	receipt.OfferAuditEventId = offerOutput.AuditEventID
 	response, elicitErr := request.Session.Elicit(ctx, &mcpsdk.ElicitParams{Mode: "url", Message: "Open Room to complete this human-only policy action with an authenticated human-operator credential.", URL: handoffURL, ElicitationID: id})
 	if elicitErr != nil || response == nil {
 		receipt.Action = roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_ERROR

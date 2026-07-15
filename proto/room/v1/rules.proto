@@ -479,6 +479,7 @@ message McpElicitationReceipt {
   string evaluation_audit_event_id = 10;
   RolloutStage target_rollout_stage = 11;
   google.protobuf.Timestamp expected_candidate_updated_at = 12;
+  string offer_audit_event_id = 13;
 }
 
 message ReviewSource {
