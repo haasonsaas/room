@@ -55,8 +55,8 @@ cost metadata. Fixes, resolutions, reactions, merges, reverts, regressions, and
 agent adjudications are recorded as separate durable evidence. Room can then
 infer candidates, replay them over the stored corpus, tune their confidence
 threshold, and advance them through draft, shadow, warn, and block stages.
-Protected organization-wide blocking policies always require explicit human
-approval; pause and rollback remain available as emergency controls.
+All blocking policies require an authenticated human operator and explicit
+approval; pause and rollback remain human-only emergency controls.
 Review automation should use the least-privilege `reviewer` credential. It can
 ingest evidence, infer, replay, tune, and advance eligible non-protected staged
 policies, but it cannot directly edit or publish arbitrary rulesets, change MCP

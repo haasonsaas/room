@@ -740,8 +740,8 @@ func validateRolloutTransition(candidate *roomv1.PolicyCandidate, target roomv1.
 	if target == roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK && (metrics.GetPrecisionBasisPoints() < 9500 || metrics.GetRecallBasisPoints() < 8000 || metrics.GetFalsePositiveCount() != 0) {
 		return fmt.Errorf("block rollout requires at least 95%% precision, 80%% recall, and zero false positives")
 	}
-	if target == roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK && candidate.GetProtectedOrgPolicy() && !humanAuthorized {
-		return fmt.Errorf("a human-operator credential and explicit confirmation are required for protected org-wide blocking policies")
+	if target == roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK && !humanAuthorized {
+		return fmt.Errorf("a human-operator credential and explicit confirmation are required for blocking policies")
 	}
 	return nil
 }

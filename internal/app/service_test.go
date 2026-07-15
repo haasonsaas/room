@@ -336,6 +336,11 @@ func TestProtectedOrgPolicyRequiresHumanApprovalToBlock(t *testing.T) {
 	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK, true, replay); err != nil {
 		t.Fatalf("approved transition rejected: %v", err)
 	}
+	candidate.ProtectedOrgPolicy = false
+	replay.PolicyCandidateSha256, _ = intelligence.CandidateDigest(candidate)
+	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_BLOCK, false, replay); err == nil {
+		t.Fatal("repository-scoped policy advanced to blocking without human approval")
+	}
 	if err := validateRolloutTransition(candidate, roomv1.RolloutStage_ROLLOUT_STAGE_SHADOW, true, replay); err == nil {
 		t.Fatal("backward non-rollback transition accepted")
 	}
