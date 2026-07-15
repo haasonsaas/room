@@ -53,6 +53,9 @@ type Principal struct {
 	Role          Role
 	Scope         Scope
 	HumanOperator bool
+	// LocalAuth is trusted server metadata set only by the loopback-only,
+	// authentication-disabled middleware. It is never populated from a token.
+	LocalAuth bool
 }
 
 type principalContextKey struct{}

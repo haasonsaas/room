@@ -299,9 +299,9 @@ func protectedRolesHandler(settings options, roles []auth.Role, next http.Handle
 
 func localPrincipalMiddleware(role auth.Role, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		principal := auth.Principal{ID: "local-admin", Role: role, HumanOperator: true}
+		principal := auth.Principal{ID: "local-admin", Role: role, HumanOperator: true, LocalAuth: true}
 		if role == auth.RoleAgent {
-			principal = auth.Principal{ID: "local-agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "local", Repository: "local", AgentID: "local-agent"}}
+			principal = auth.Principal{ID: "local-agent", Role: auth.RoleAgent, LocalAuth: true, Scope: auth.Scope{WorkspaceID: "local", Repository: "local", AgentID: "local-agent"}}
 		}
 		next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), principal)))
 	})

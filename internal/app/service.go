@@ -276,8 +276,8 @@ func (s *Service) RecordMcpElicitation(ctx context.Context, req *connect.Request
 			if repositoryErr != nil {
 				return nil, connect.NewError(connect.CodeFailedPrecondition, repositoryErr)
 			}
-			localHumanAdmin := principal.Role == auth.RoleAdmin && principal.HumanOperator && principal.Scope.Repository == ""
-			if repository != principal.Scope.Repository && !localHumanAdmin {
+			localUnscopedPrincipal := principal.LocalAuth || (principal.Role == auth.RoleAdmin && principal.HumanOperator && principal.Scope.Repository == "")
+			if repository != principal.Scope.Repository && !localUnscopedPrincipal {
 				return nil, connect.NewError(connect.CodePermissionDenied, errors.New("policy candidate is outside the authenticated repository scope"))
 			}
 			if receipt.GetExpectedCandidateUpdatedAt() == nil || !proto.Equal(receipt.GetExpectedCandidateUpdatedAt(), candidate.GetUpdatedAt()) {

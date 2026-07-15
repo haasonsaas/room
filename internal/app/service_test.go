@@ -193,6 +193,11 @@ func TestRecordMcpPolicyControlElicitationRequiresCurrentScopedCandidate(t *test
 	if connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("cross-repository policy handoff code = %s, want permission denied", connect.CodeOf(err))
 	}
+	localPrincipal := auth.Principal{ID: "local-agent", Role: auth.RoleAgent, LocalAuth: true, Scope: auth.Scope{WorkspaceID: "local", Repository: "local", AgentID: "local-agent"}}
+	localResponse, err := service.RecordMcpElicitation(auth.WithPrincipal(context.Background(), localPrincipal), connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: receipt}))
+	if err != nil || localResponse.Msg.GetAuditEventId() == "" {
+		t.Fatalf("record auth-disabled cross-repository handoff: response %+v, err %v", localResponse, err)
+	}
 	principal.Scope.Repository = "repo"
 	stale := proto.Clone(receipt).(*roomv1.McpElicitationReceipt)
 	stale.ExpectedCandidateUpdatedAt = timestamppb.New(stored.GetUpdatedAt().AsTime().Add(-time.Second))

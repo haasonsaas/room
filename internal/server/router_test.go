@@ -324,8 +324,8 @@ func TestLocalAuthMiddlewareUsesDeclaredRouteRole(t *testing.T) {
 		role auth.Role
 		want auth.Principal
 	}{
-		{name: "admin", role: auth.RoleAdmin, want: auth.Principal{ID: "local-admin", Role: auth.RoleAdmin, HumanOperator: true}},
-		{name: "agent", role: auth.RoleAgent, want: auth.Principal{ID: "local-agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "local", Repository: "local", AgentID: "local-agent"}}},
+		{name: "admin", role: auth.RoleAdmin, want: auth.Principal{ID: "local-admin", Role: auth.RoleAdmin, HumanOperator: true, LocalAuth: true}},
+		{name: "agent", role: auth.RoleAgent, want: auth.Principal{ID: "local-agent", Role: auth.RoleAgent, LocalAuth: true, Scope: auth.Scope{WorkspaceID: "local", Repository: "local", AgentID: "local-agent"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
