@@ -89,6 +89,24 @@ func VerifiedFindingID(hypothesisDigest []byte, verifier *roomv1.ReviewVerifierI
 }
 
 func canonicalHypothesis(value *roomv1.ReviewHypothesis) (*roomv1.ReviewHypothesis, error) {
+	copyValue, err := normalizedHypothesis(value)
+	if err != nil {
+		return nil, err
+	}
+	copyValue.Id = ""
+	copyValue.Source.ReviewCommentId = ""
+	copyValue.Source.ReviewerId = ""
+	copyValue.Source.Provider = ""
+	copyValue.Invariant = ""
+	copyValue.Impact = ""
+	copyValue.Remediation = nil
+	copyValue.Severity = roomv1.Severity_SEVERITY_UNSPECIFIED
+	copyValue.ConfidenceBasisPoints = 0
+	copyValue.CreatedAt = nil
+	return copyValue, nil
+}
+
+func normalizedHypothesis(value *roomv1.ReviewHypothesis) (*roomv1.ReviewHypothesis, error) {
 	if value == nil {
 		return nil, errors.New("hypothesis is required")
 	}
@@ -150,16 +168,6 @@ func canonicalHypothesis(value *roomv1.ReviewHypothesis) (*roomv1.ReviewHypothes
 		}
 	}
 
-	copyValue.Id = ""
-	copyValue.Source.ReviewCommentId = ""
-	copyValue.Source.ReviewerId = ""
-	copyValue.Source.Provider = ""
-	copyValue.Invariant = ""
-	copyValue.Impact = ""
-	copyValue.Remediation = nil
-	copyValue.Severity = roomv1.Severity_SEVERITY_UNSPECIFIED
-	copyValue.ConfidenceBasisPoints = 0
-	copyValue.CreatedAt = nil
 	return copyValue, nil
 }
 
@@ -191,7 +199,7 @@ func canonicalReceipt(value *roomv1.ReviewVerificationReceipt) (*roomv1.ReviewVe
 	if _, ok := roomv1.ReviewVerificationReason_name[int32(copyValue.GetReason())]; !ok {
 		return nil, errors.New("verification reason is invalid")
 	}
-	evidence, err := canonicalEvidence(copyValue.GetEvidence())
+	evidence, err := normalizedEvidence(copyValue.GetEvidence(), false)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +212,10 @@ func canonicalReceipt(value *roomv1.ReviewVerificationReceipt) (*roomv1.ReviewVe
 }
 
 func canonicalEvidence(values []*roomv1.ReviewEvidenceRef) ([]*roomv1.ReviewEvidenceRef, error) {
+	return normalizedEvidence(values, true)
+}
+
+func normalizedEvidence(values []*roomv1.ReviewEvidenceRef, excludeDescription bool) ([]*roomv1.ReviewEvidenceRef, error) {
 	byID := make(map[string]*roomv1.ReviewEvidenceRef, len(values))
 	for index, value := range values {
 		if value == nil {
@@ -238,7 +250,10 @@ func canonicalEvidence(values []*roomv1.ReviewEvidenceRef) ([]*roomv1.ReviewEvid
 				return nil, fmt.Errorf("evidence %q command is required", copyValue.GetId())
 			}
 		}
-		copyValue.Description = ""
+		copyValue.Description = strings.TrimSpace(copyValue.GetDescription())
+		if excludeDescription {
+			copyValue.Description = ""
+		}
 		if previous := byID[copyValue.GetId()]; previous != nil {
 			if !proto.Equal(previous, copyValue) {
 				return nil, fmt.Errorf("evidence id %q is reused with conflicting content", copyValue.GetId())
@@ -330,6 +345,11 @@ func canonicalPath(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" || strings.Contains(value, "\\") || path.IsAbs(value) {
 		return "", errors.New("repository-relative slash path is required")
+	}
+	for _, segment := range strings.Split(value, "/") {
+		if segment == ".." {
+			return "", errors.New("repository path traversal is forbidden")
+		}
 	}
 	canonical := path.Clean(value)
 	if canonical == "." || canonical == ".." || strings.HasPrefix(canonical, "../") {

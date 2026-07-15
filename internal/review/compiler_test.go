@@ -90,6 +90,7 @@ func TestHypothesisDigestRejectsInvalidAuthorityFields(t *testing.T) {
 		{name: "short impact slice", mutate: func(h *roomv1.ReviewHypothesis) { h.ImpactSliceSha256 = []byte{1} }},
 		{name: "absolute path", mutate: func(h *roomv1.ReviewHypothesis) { h.AffectedPaths = []string{"/etc/passwd"} }},
 		{name: "traversal path", mutate: func(h *roomv1.ReviewHypothesis) { h.AffectedPaths = []string{"../secret"} }},
+		{name: "internal traversal path", mutate: func(h *roomv1.ReviewHypothesis) { h.AffectedPaths = []string{"api/../secret"} }},
 		{name: "invalid location", mutate: func(h *roomv1.ReviewHypothesis) { h.AffectedLocations[0].EndLine = 1 }},
 		{name: "missing producer", mutate: func(h *roomv1.ReviewHypothesis) { h.Producer = nil }},
 		{name: "short producer config", mutate: func(h *roomv1.ReviewHypothesis) { h.Producer.ConfigSha256 = []byte{1} }},
@@ -277,6 +278,271 @@ func TestGoldenAuthorizationBoundary(t *testing.T) {
 	if !slices.Equal(actual, expected) {
 		t.Fatalf("golden digests = %v, want %v", actual, expected)
 	}
+}
+
+func TestCompilerVerifiedFinding(t *testing.T) {
+	hypothesis, receipt, compiler := compilerFixture(t)
+	originalHypothesis := proto.Clone(hypothesis).(*roomv1.ReviewHypothesis)
+	originalReceipt := proto.Clone(receipt).(*roomv1.ReviewVerificationReceipt)
+	expectedEvidenceDigest, err := EvidenceSetDigest(receipt.GetEvidence())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := compiler.Compile(hypothesis, receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.GetStatus() != roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_VERIFIED {
+		t.Fatalf("status = %s", result.GetStatus())
+	}
+	if result.GetReason() != roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_UNSPECIFIED {
+		t.Fatalf("reason = %s", result.GetReason())
+	}
+	finding := result.GetFinding()
+	if finding == nil || len(finding.GetId()) != sha256.Size*2 {
+		t.Fatalf("finding = %+v", finding)
+	}
+	if !bytes.Equal(finding.GetEvidenceSetSha256(), expectedEvidenceDigest) {
+		t.Fatal("evidence digest mismatch")
+	}
+	if finding.GetHypothesis().GetInvariant() != hypothesis.GetInvariant() || finding.GetReceipt().GetEvidence()[0].GetDescription() == "" {
+		t.Fatal("verified finding discarded presentation provenance")
+	}
+	if finding.GetHypothesis().GetId() == "" || finding.GetReceipt().GetId() == "" {
+		t.Fatal("canonical hypothesis or receipt id is missing")
+	}
+	if !proto.Equal(hypothesis, originalHypothesis) || !proto.Equal(receipt, originalReceipt) {
+		t.Fatal("Compile mutated its inputs")
+	}
+
+	presentation := proto.Clone(hypothesis).(*roomv1.ReviewHypothesis)
+	presentation.Invariant = "same structured claim, clearer explanation"
+	presentation.Impact = "clearer impact"
+	presentation.Remediation = []string{"clearer remediation"}
+	presentation.ConfidenceBasisPoints = 8000
+	presentationResult, err := compiler.Compile(presentation, receipt)
+	if err != nil || presentationResult.GetStatus() != roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_VERIFIED {
+		t.Fatalf("presentation-only compile = %+v, %v", presentationResult, err)
+	}
+	if presentationResult.GetFinding().GetId() != finding.GetId() {
+		t.Fatal("presentation-only rewrite changed finding identity")
+	}
+
+	identified := proto.Clone(hypothesis).(*roomv1.ReviewHypothesis)
+	identified.Id = finding.GetHypothesis().GetId()
+	identifiedReceipt := proto.Clone(receipt).(*roomv1.ReviewVerificationReceipt)
+	identifiedReceipt.Id = finding.GetReceipt().GetId()
+	identifiedResult, err := compiler.Compile(identified, identifiedReceipt)
+	if err != nil || identifiedResult.GetStatus() != roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_VERIFIED {
+		t.Fatalf("canonical caller ids compile = %+v, %v", identifiedResult, err)
+	}
+}
+
+func TestCompilerRejectsBrokenBindings(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		setup  func(*testing.T, *roomv1.ReviewHypothesis, *roomv1.ReviewVerificationReceipt) *Compiler
+		mutate func(*roomv1.ReviewHypothesis, *roomv1.ReviewVerificationReceipt)
+		status roomv1.ReviewCompilationStatus
+		reason roomv1.ReviewVerificationReason
+	}{
+		{name: "unknown verifier", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.Verifier.Analyzer.Id = "unknown"
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_UNTRUSTED_VERIFIER},
+		{name: "version mismatch", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.Verifier.Analyzer.Version = "2"
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_IDENTITY_MISMATCH},
+		{name: "config mismatch", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.Verifier.Analyzer.ConfigSha256 = digestByte(0x88)
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_IDENTITY_MISMATCH},
+		{name: "kind mismatch", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.Verifier.Kind = roomv1.ReviewVerifierKind_REVIEW_VERIFIER_KIND_SEMANTIC_SCOUT
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_IDENTITY_MISMATCH},
+		{name: "coverage mismatch", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.Verifier.CoveredClaims = r.Verifier.CoveredClaims[:1]
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_IDENTITY_MISMATCH},
+		{name: "trusted semantic scout", setup: semanticCompiler, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_NONDETERMINISTIC_VERIFIER},
+		{name: "claim not covered", setup: uncoveredCompiler, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INDETERMINATE, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_CLAIM_NOT_COVERED},
+		{name: "hypothesis digest", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.HypothesisSha256 = digestByte(0x77)
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_HYPOTHESIS_DIGEST_MISMATCH},
+		{name: "caller hypothesis id", mutate: func(h *roomv1.ReviewHypothesis, _ *roomv1.ReviewVerificationReceipt) { h.Id = "wrong" }, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_HYPOTHESIS_DIGEST_MISMATCH},
+		{name: "artifact digest", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.ArtifactSha256 = digestByte(0x77)
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_ARTIFACT_DIGEST_MISMATCH},
+		{name: "impact slice digest", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.ImpactSliceSha256 = digestByte(0x77)
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_IMPACT_SLICE_DIGEST_MISMATCH},
+		{name: "execution input digest", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.ExecutionInputSha256 = digestByte(0x77)
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_EXECUTION_INPUT_DIGEST_MISMATCH},
+		{name: "execution input missing", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) { r.ExecutionInputSha256 = nil }, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_EXECUTION_INPUT_DIGEST_MISMATCH},
+		{name: "evidence invalid", mutate: func(_ *roomv1.ReviewHypothesis, r *roomv1.ReviewVerificationReceipt) {
+			r.Evidence[0].ContentSha256 = nil
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_EVIDENCE_INVALID},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			hypothesis, receipt, compiler := compilerFixture(t)
+			if test.setup != nil {
+				compiler = test.setup(t, hypothesis, receipt)
+			}
+			if test.mutate != nil {
+				test.mutate(hypothesis, receipt)
+			}
+			result, err := compiler.Compile(hypothesis, receipt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.GetStatus() != test.status || result.GetReason() != test.reason || result.GetFinding() != nil {
+				t.Fatalf("Compile() = %+v, want status=%s reason=%s no finding", result, test.status, test.reason)
+			}
+		})
+	}
+}
+
+func TestCompilerStatusContracts(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*roomv1.ReviewVerificationReceipt)
+		status roomv1.ReviewCompilationStatus
+		reason roomv1.ReviewVerificationReason
+	}{
+		{name: "verified without evidence", mutate: func(r *roomv1.ReviewVerificationReceipt) { r.Evidence = nil }, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_EVIDENCE_INVALID},
+		{name: "verified with reason", mutate: func(r *roomv1.ReviewVerificationReceipt) {
+			r.Reason = roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_TIMEOUT
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT},
+		{name: "rejected", mutate: func(r *roomv1.ReviewVerificationReceipt) {
+			r.Status = roomv1.ReviewVerificationStatus_REVIEW_VERIFICATION_STATUS_REJECTED
+			r.Reason = roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_HYPOTHESIS_REJECTED
+			r.Evidence = nil
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_REJECTED, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_HYPOTHESIS_REJECTED},
+		{name: "rejected wrong reason", mutate: func(r *roomv1.ReviewVerificationReceipt) {
+			r.Status = roomv1.ReviewVerificationStatus_REVIEW_VERIFICATION_STATUS_REJECTED
+			r.Reason = roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_TIMEOUT
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT},
+		{name: "unavailable", mutate: func(r *roomv1.ReviewVerificationReceipt) {
+			r.Status = roomv1.ReviewVerificationStatus_REVIEW_VERIFICATION_STATUS_INDETERMINATE
+			r.Reason = roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_UNAVAILABLE
+			r.Evidence = nil
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INDETERMINATE, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_UNAVAILABLE},
+		{name: "timeout", mutate: func(r *roomv1.ReviewVerificationReceipt) {
+			r.Status = roomv1.ReviewVerificationStatus_REVIEW_VERIFICATION_STATUS_INDETERMINATE
+			r.Reason = roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_TIMEOUT
+			r.Evidence = nil
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INDETERMINATE, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_TIMEOUT},
+		{name: "conflict", mutate: func(r *roomv1.ReviewVerificationReceipt) {
+			r.Status = roomv1.ReviewVerificationStatus_REVIEW_VERIFICATION_STATUS_INDETERMINATE
+			r.Reason = roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_CONFLICTING_RESULTS
+			r.Evidence = nil
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INDETERMINATE, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_CONFLICTING_RESULTS},
+		{name: "indeterminate wrong reason", mutate: func(r *roomv1.ReviewVerificationReceipt) {
+			r.Status = roomv1.ReviewVerificationStatus_REVIEW_VERIFICATION_STATUS_INDETERMINATE
+			r.Reason = roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_HYPOTHESIS_REJECTED
+		}, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT},
+		{name: "unknown status", mutate: func(r *roomv1.ReviewVerificationReceipt) { r.Status = roomv1.ReviewVerificationStatus(99) }, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT},
+		{name: "unknown reason", mutate: func(r *roomv1.ReviewVerificationReceipt) { r.Reason = roomv1.ReviewVerificationReason(99) }, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT},
+		{name: "caller receipt id mismatch", mutate: func(r *roomv1.ReviewVerificationReceipt) { r.Id = "wrong" }, status: roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID, reason: roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			hypothesis, receipt, compiler := compilerFixture(t)
+			test.mutate(receipt)
+			result, err := compiler.Compile(hypothesis, receipt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.GetStatus() != test.status || result.GetReason() != test.reason || result.GetFinding() != nil {
+				t.Fatalf("Compile() = %+v, want status=%s reason=%s no finding", result, test.status, test.reason)
+			}
+		})
+	}
+}
+
+func TestCompilerMissingInputs(t *testing.T) {
+	_, receipt, compiler := compilerFixture(t)
+	result, err := compiler.Compile(nil, receipt)
+	if err != nil || result.GetStatus() != roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INVALID || result.GetReason() != roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_MALFORMED_CONTRACT {
+		t.Fatalf("nil hypothesis result = %+v, err = %v", result, err)
+	}
+	hypothesis, _, compiler := compilerFixture(t)
+	result, err = compiler.Compile(hypothesis, nil)
+	if err != nil || result.GetStatus() != roomv1.ReviewCompilationStatus_REVIEW_COMPILATION_STATUS_INDETERMINATE || result.GetReason() != roomv1.ReviewVerificationReason_REVIEW_VERIFICATION_REASON_VERIFIER_UNAVAILABLE {
+		t.Fatalf("nil receipt result = %+v, err = %v", result, err)
+	}
+	if _, err := NewCompiler(nil); err == nil {
+		t.Fatal("NewCompiler(nil) error = nil")
+	}
+}
+
+func compilerFixture(t *testing.T) (*roomv1.ReviewHypothesis, *roomv1.ReviewVerificationReceipt, *Compiler) {
+	t.Helper()
+	hypothesis := canonicalTestHypothesis()
+	hypothesisDigest, err := HypothesisDigest(hypothesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifierIdentity := canonicalTestVerifier()
+	executionDigest, err := ExecutionInputDigest(hypothesisDigest, hypothesis.GetArtifactSha256(), hypothesis.GetImpactSliceSha256(), verifierIdentity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := canonicalTestReceipt(hypothesisDigest, executionDigest)
+	registry, err := NewRegistry(verifierIdentity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiler, err := NewCompiler(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hypothesis, receipt, compiler
+}
+
+func semanticCompiler(t *testing.T, hypothesis *roomv1.ReviewHypothesis, receipt *roomv1.ReviewVerificationReceipt) *Compiler {
+	t.Helper()
+	semantic := proto.Clone(receipt.GetVerifier()).(*roomv1.ReviewVerifierIdentity)
+	semantic.Kind = roomv1.ReviewVerifierKind_REVIEW_VERIFIER_KIND_SEMANTIC_SCOUT
+	receipt.Verifier = semantic
+	hypothesisDigest, err := HypothesisDigest(hypothesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt.ExecutionInputSha256, err = ExecutionInputDigest(hypothesisDigest, hypothesis.GetArtifactSha256(), hypothesis.GetImpactSliceSha256(), semantic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := NewRegistry(semantic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiler, err := NewCompiler(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return compiler
+}
+
+func uncoveredCompiler(t *testing.T, hypothesis *roomv1.ReviewHypothesis, receipt *roomv1.ReviewVerificationReceipt) *Compiler {
+	t.Helper()
+	uncovered := verifier("evalops.authorization-verifier", roomv1.ReviewVerifierKind_REVIEW_VERIFIER_KIND_DETERMINISTIC, roomv1.ReviewClaimKind_REVIEW_CLAIM_KIND_SECURITY_BOUNDARY)
+	receipt.Verifier = proto.Clone(uncovered).(*roomv1.ReviewVerifierIdentity)
+	hypothesisDigest, err := HypothesisDigest(hypothesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt.ExecutionInputSha256, err = ExecutionInputDigest(hypothesisDigest, hypothesis.GetArtifactSha256(), hypothesis.GetImpactSliceSha256(), uncovered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := NewRegistry(uncovered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiler, err := NewCompiler(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return compiler
 }
 
 func canonicalTestHypothesis() *roomv1.ReviewHypothesis {

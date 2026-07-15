@@ -52,3 +52,12 @@ and known legacy heuristic rules are converted to typed signal rules.
 Review findings, candidates, replay runs, and tuning decisions live in dedicated
 indexed tables as deterministic protobuf payloads with SHA-256 digests; outcome
 and adjudication additions are validated and persisted through typed store APIs.
+
+Review discovery and review authority are separate. A scout or reviewer may emit
+a typed `ReviewHypothesis`, but it remains advisory until an exact trusted
+deterministic verifier returns a receipt bound to the hypothesis, repository
+artifact, impact slice, execution input, declared claim coverage, and
+content-addressed evidence. The pure review compiler returns verified, rejected,
+indeterminate, or invalid; only a verified finding is eligible for later policy
+integration. Model identity, confidence, agreement, and presentation prose never
+grant verifier authority.
