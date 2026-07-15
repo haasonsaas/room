@@ -259,6 +259,9 @@ func (s *Service) RecordMcpElicitation(ctx context.Context, req *connect.Request
 		if evaluationAudit == nil || evaluationAudit.GetKind() != roomv1.AuditEventKind_AUDIT_EVENT_KIND_EVALUATION || evaluationAudit.GetEvaluationId() != receipt.GetEvaluationId() || !auditScopeMatchesPrincipal(evaluationAudit, principal) {
 			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("evaluation audit is not bound to the authenticated agent scope"))
 		}
+		if !blockingEvaluationDecision(evaluationAudit.GetDecision()) || !evaluationAudit.GetMcpElicitationEligible() {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("evaluation is not eligible for MCP resolution elicitation"))
+		}
 	}
 	if receipt.GetPurpose() == roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_POLICY_CONTROL {
 		if !terminalMcpElicitationAction(receipt.GetAction()) {
@@ -397,6 +400,30 @@ func elicitationOfferMatchesReceipt(event *roomv1.AuditEvent, receipt *roomv1.Mc
 
 func auditScopeMatchesPrincipal(event *roomv1.AuditEvent, principal auth.Principal) bool {
 	return event.GetSubjectId() == principal.ID && event.GetWorkspaceId() == principal.Scope.WorkspaceID && event.GetRepository() == principal.Scope.Repository && event.GetAgentType() == principal.Scope.AgentID
+}
+
+func blockingEvaluationDecision(decision roomv1.Decision) bool {
+	switch decision {
+	case roomv1.Decision_DECISION_DENY, roomv1.Decision_DECISION_NEEDS_CHANGES, roomv1.Decision_DECISION_INDETERMINATE:
+		return true
+	default:
+		return false
+	}
+}
+
+func mcpElicitationEligible(result *roomv1.EvaluationResult) bool {
+	if result == nil || !blockingEvaluationDecision(result.GetDecision()) {
+		return false
+	}
+	if len(result.GetRequiredChecks()) > 0 || len(result.GetGaps()) > 0 {
+		return true
+	}
+	for _, match := range result.GetMatches() {
+		if len(match.GetRequiredEvidence()) > 0 || len(match.GetRemediation()) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) ReportEvaluation(ctx context.Context, req *connect.Request[roomv1.ReportEvaluationRequest]) (*connect.Response[roomv1.ReportEvaluationResponse], error) {
@@ -837,7 +864,7 @@ func scopedRuleset(source *roomv1.RulesetVersion, principal auth.Principal) *roo
 }
 
 func evaluationEvent(principal auth.Principal, phase roomv1.AnalysisPhase, result *roomv1.EvaluationResult) *roomv1.AuditEvent {
-	event := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_EVALUATION, OccurredAt: timestamppb.Now(), SubjectId: principal.ID, WorkspaceId: principal.Scope.WorkspaceID, Repository: principal.Scope.Repository, AgentType: principal.Scope.AgentID, RulesetId: result.GetRulesetId(), RulesetVersion: result.GetRulesetVersion(), RulesetHash: result.GetRulesetHash(), Decision: result.GetDecision(), HighestSeverity: result.GetHighestSeverity(), AnalysisStatus: result.GetAnalysisStatus(), EvaluationId: result.GetEvaluationId()}
+	event := &roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_EVALUATION, OccurredAt: timestamppb.Now(), SubjectId: principal.ID, WorkspaceId: principal.Scope.WorkspaceID, Repository: principal.Scope.Repository, AgentType: principal.Scope.AgentID, RulesetId: result.GetRulesetId(), RulesetVersion: result.GetRulesetVersion(), RulesetHash: result.GetRulesetHash(), Decision: result.GetDecision(), HighestSeverity: result.GetHighestSeverity(), AnalysisStatus: result.GetAnalysisStatus(), EvaluationId: result.GetEvaluationId(), McpElicitationEligible: mcpElicitationEligible(result)}
 	for _, match := range result.GetMatches() {
 		event.MatchedRuleIds = append(event.MatchedRuleIds, match.GetRuleId())
 	}

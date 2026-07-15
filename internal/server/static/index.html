@@ -201,6 +201,10 @@
       const formatNumber = value => new Intl.NumberFormat().format(Number(value || 0));
       const formatPercent = basisPoints => `${(Number(basisPoints || 0) / 100).toFixed(1)}%`;
       const formatDate = value => value ? new Date(value).toLocaleString() : "Not recorded";
+      const timestampRevision = value => {
+        const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/.exec(String(value || ""));
+        return match ? `${match[1]}.${(match[2] || "").padEnd(9, "0")}Z` : null;
+      };
       const authFetch = (url, options = {}, role = "admin") => {
         const token = $(role === "agent" ? "agent-token" : "admin-token").value.trim();
         const headers = new Headers(options.headers || {});
@@ -394,7 +398,8 @@
         await task("Tune policy", async () => { await postJSON(`/api/policy-candidates/${encodeURIComponent(id)}/tune`, { expectedUpdatedAt: candidate?.updatedAt }); await refreshCandidates(); renderInspector(); });
       }
       function requestTransition(candidate, stage, humanOnly) {
-        state.pendingTransition = { candidateId: candidate.id, stage, expectedUpdatedAt: candidate.updatedAt };
+        const offered = state.policyControlDeepLink?.candidateID === candidate.id ? state.policyControlDeepLink.expectedCandidateUpdatedAt : candidate.updatedAt;
+        state.pendingTransition = { candidateId: candidate.id, stage, expectedUpdatedAt: offered };
         if (!humanOnly) { transitionCandidate(false); return; }
         $("protected-copy").textContent = `Transition ${candidate.id} from ${rolloutNames[candidate.rolloutStage]} to ${rolloutNames[stage]}. This protected control records explicit human approval.`;
         $("approval-phrase").value = ""; $("protected-confirm").disabled = true; $("protected-dialog").showModal();
@@ -412,12 +417,21 @@
         if (!candidate) { setStatus(`Policy control candidate ${candidateID} was not found`, true); return; }
         const target = params.get("target");
         const allowedTargets = new Set(["block", "paused", "rolled_back"]);
-        state.policyControlDeepLink = { candidateID: candidate.id, target: allowedTargets.has(target) ? target : null };
+        const expectedCandidateUpdatedAt = params.get("expected_candidate_updated_at");
+        const expectedRevision = timestampRevision(expectedCandidateUpdatedAt);
+        const loadedRevision = timestampRevision(candidate.updatedAt);
+        state.policyControlDeepLink = { candidateID: candidate.id, target: allowedTargets.has(target) ? target : null, expectedCandidateUpdatedAt: expectedRevision ? expectedCandidateUpdatedAt : null };
         state.selected = { kind: "candidate", id: candidate.id };
         state.tab = "rollout";
         renderCatalog(); renderInspector();
         const targetCopy = state.policyControlDeepLink.target ? ` Review the requested ${state.policyControlDeepLink.target.replace("_", " ")} transition.` : "";
-        setStatus(`Policy control opened for ${candidate.id}.${targetCopy} Opening this link did not change policy.`);
+        if (!expectedRevision) {
+          setStatus(`Policy control link for ${candidate.id} is missing a valid audited candidate revision. Opening this link did not change policy.`, true);
+        } else if (expectedRevision !== loadedRevision) {
+          setStatus(`Policy control link for ${candidate.id} is stale: the audited candidate revision differs from the loaded candidate. Any transition will retain the offered revision so server CAS can reject the stale action. Opening this link did not change policy.`, true);
+        } else {
+          setStatus(`Policy control opened for ${candidate.id}.${targetCopy} Opening this link did not change policy.`);
+        }
       }
       async function refreshCandidates() { const data = await apiJSON("/api/policy-candidates"); state.candidates = data.candidates || []; updateSummary(); renderCatalog(); }
       async function refresh() {

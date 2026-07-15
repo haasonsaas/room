@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -395,7 +396,8 @@ func TestOpenPolicyControlUsesURLWithoutMutatingCandidate(t *testing.T) {
 		t.Fatalf("connect MCP client: %v", err)
 	}
 	defer session.Close()
-	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_open_policy_control", Arguments: map[string]any{"candidate_id": candidate.GetId(), "target_rollout_stage": "block", "expected_updated_at": candidate.GetUpdatedAt().AsTime().Format(time.RFC3339Nano)}})
+	expectedUpdatedAt := candidate.GetUpdatedAt().AsTime().Format(time.RFC3339Nano)
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "room_open_policy_control", Arguments: map[string]any{"candidate_id": candidate.GetId(), "target_rollout_stage": "block", "expected_updated_at": expectedUpdatedAt}})
 	if err != nil {
 		t.Fatalf("call room_open_policy_control: %v", err)
 	}
@@ -405,6 +407,17 @@ func TestOpenPolicyControlUsesURLWithoutMutatingCandidate(t *testing.T) {
 	if elicited == nil || elicited.Mode != "url" || !strings.HasPrefix(elicited.URL, "https://room.example.test/control") || strings.Contains(strings.ToLower(elicited.URL), "token") {
 		t.Fatalf("URL elicitation = %+v", elicited)
 	}
+	handoff, err := url.Parse(elicited.URL)
+	if err != nil {
+		t.Fatalf("parse policy handoff URL: %v", err)
+	}
+	fragment, err := url.ParseQuery(handoff.Fragment)
+	if err != nil {
+		t.Fatalf("parse policy handoff fragment: %v", err)
+	}
+	if got := fragment.Get("expected_candidate_updated_at"); got != expectedUpdatedAt {
+		t.Fatalf("handoff expected_candidate_updated_at = %q, want audited revision %q", got, expectedUpdatedAt)
+	}
 	data, _ := json.Marshal(result.StructuredContent)
 	var output toolOutput
 	if err := json.Unmarshal(data, &output); err != nil {
@@ -412,6 +425,20 @@ func TestOpenPolicyControlUsesURLWithoutMutatingCandidate(t *testing.T) {
 	}
 	if output.Elicitation == nil || output.Elicitation.Action != "accept" || output.Elicitation.AuditEventID == "" || output.Elicitation.OfferAuditEventID == "" {
 		t.Fatalf("policy control output = %+v", output.Elicitation)
+	}
+	audits, err := ruleStore.ListAudit(10, roomv1.AuditEventKind_AUDIT_EVENT_KIND_MCP_ELICITATION)
+	if err != nil {
+		t.Fatalf("list policy handoff audits: %v", err)
+	}
+	var auditedExpectedUpdatedAt string
+	for _, audit := range audits {
+		if audit.GetMcpElicitation().GetAction() == roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED {
+			auditedExpectedUpdatedAt = audit.GetMcpElicitation().GetExpectedCandidateUpdatedAt().AsTime().Format(time.RFC3339Nano)
+			break
+		}
+	}
+	if auditedExpectedUpdatedAt == "" || fragment.Get("expected_candidate_updated_at") != auditedExpectedUpdatedAt {
+		t.Fatalf("handoff revision %q does not match audited offered revision %q", fragment.Get("expected_candidate_updated_at"), auditedExpectedUpdatedAt)
 	}
 	stored, err := ruleStore.PolicyCandidate(candidate.GetId())
 	if err != nil || stored.GetRolloutStage() != roomv1.RolloutStage_ROLLOUT_STAGE_DRAFT {

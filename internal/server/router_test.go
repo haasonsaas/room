@@ -85,7 +85,7 @@ func TestDashboardSupportsNonMutatingPolicyControlDeepLinks(t *testing.T) {
 		t.Fatalf("read dashboard: %v", err)
 	}
 	html := string(body)
-	for _, contract := range []string{"location.hash", "applyPolicyControlDeepLink", "Opening this link did not change policy", `state.selected = { kind: "candidate", id: candidate.id }`, `state.tab = "rollout"`} {
+	for _, contract := range []string{"location.hash", "applyPolicyControlDeepLink", "expected_candidate_updated_at", "expectedCandidateUpdatedAt", "is stale", "server CAS can reject the stale action", "Opening this link did not change policy", `state.selected = { kind: "candidate", id: candidate.id }`, `state.tab = "rollout"`} {
 		if !strings.Contains(html, contract) {
 			t.Fatalf("dashboard missing deep-link contract %q", contract)
 		}
@@ -98,6 +98,15 @@ func TestDashboardSupportsNonMutatingPolicyControlDeepLinks(t *testing.T) {
 	handler := html[start : start+end]
 	if strings.Contains(handler, "transitionCandidate(") || strings.Contains(handler, "requestTransition(") || strings.Contains(handler, "showModal(") {
 		t.Fatal("deep-link handler must not trigger a policy mutation or approval dialog")
+	}
+	transitionStart := strings.Index(html, "function requestTransition")
+	transitionEnd := strings.Index(html[transitionStart:], "async function transitionCandidate")
+	if transitionStart < 0 || transitionEnd < 0 {
+		t.Fatal("could not isolate policy transition request builder")
+	}
+	transitionBuilder := html[transitionStart : transitionStart+transitionEnd]
+	if !strings.Contains(transitionBuilder, "state.policyControlDeepLink?.candidateID === candidate.id") || !strings.Contains(transitionBuilder, "expectedUpdatedAt: offered") {
+		t.Fatal("deep-linked transition must retain the audited offered candidate revision")
 	}
 }
 

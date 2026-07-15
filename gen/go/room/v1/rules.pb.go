@@ -3130,29 +3130,30 @@ func (x *EvaluationResult) GetEvaluationId() string {
 }
 
 type AuditEvent struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Kind              AuditEventKind         `protobuf:"varint,2,opt,name=kind,proto3,enum=room.v1.AuditEventKind" json:"kind,omitempty"`
-	OccurredAt        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
-	SubjectId         string                 `protobuf:"bytes,4,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"`
-	WorkspaceId       string                 `protobuf:"bytes,5,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Repository        string                 `protobuf:"bytes,6,opt,name=repository,proto3" json:"repository,omitempty"`
-	AgentType         string                 `protobuf:"bytes,7,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
-	RulesetId         string                 `protobuf:"bytes,8,opt,name=ruleset_id,json=rulesetId,proto3" json:"ruleset_id,omitempty"`
-	RulesetVersion    int32                  `protobuf:"varint,9,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
-	RulesetHash       string                 `protobuf:"bytes,10,opt,name=ruleset_hash,json=rulesetHash,proto3" json:"ruleset_hash,omitempty"`
-	Decision          Decision               `protobuf:"varint,11,opt,name=decision,proto3,enum=room.v1.Decision" json:"decision,omitempty"`
-	HighestSeverity   Severity               `protobuf:"varint,12,opt,name=highest_severity,json=highestSeverity,proto3,enum=room.v1.Severity" json:"highest_severity,omitempty"`
-	AnalysisStatus    AnalysisStatus         `protobuf:"varint,13,opt,name=analysis_status,json=analysisStatus,proto3,enum=room.v1.AnalysisStatus" json:"analysis_status,omitempty"`
-	McpInvocation     *McpInvocation         `protobuf:"bytes,14,opt,name=mcp_invocation,json=mcpInvocation,proto3" json:"mcp_invocation,omitempty"`
-	ReasonCode        string                 `protobuf:"bytes,15,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
-	MatchedRuleIds    []string               `protobuf:"bytes,16,rep,name=matched_rule_ids,json=matchedRuleIds,proto3" json:"matched_rule_ids,omitempty"`
-	PolicyCandidateId string                 `protobuf:"bytes,17,opt,name=policy_candidate_id,json=policyCandidateId,proto3" json:"policy_candidate_id,omitempty"`
-	EvidenceRecordId  string                 `protobuf:"bytes,18,opt,name=evidence_record_id,json=evidenceRecordId,proto3" json:"evidence_record_id,omitempty"`
-	McpElicitation    *McpElicitationReceipt `protobuf:"bytes,19,opt,name=mcp_elicitation,json=mcpElicitation,proto3" json:"mcp_elicitation,omitempty"`
-	EvaluationId      string                 `protobuf:"bytes,20,opt,name=evaluation_id,json=evaluationId,proto3" json:"evaluation_id,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Kind                   AuditEventKind         `protobuf:"varint,2,opt,name=kind,proto3,enum=room.v1.AuditEventKind" json:"kind,omitempty"`
+	OccurredAt             *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	SubjectId              string                 `protobuf:"bytes,4,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"`
+	WorkspaceId            string                 `protobuf:"bytes,5,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Repository             string                 `protobuf:"bytes,6,opt,name=repository,proto3" json:"repository,omitempty"`
+	AgentType              string                 `protobuf:"bytes,7,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
+	RulesetId              string                 `protobuf:"bytes,8,opt,name=ruleset_id,json=rulesetId,proto3" json:"ruleset_id,omitempty"`
+	RulesetVersion         int32                  `protobuf:"varint,9,opt,name=ruleset_version,json=rulesetVersion,proto3" json:"ruleset_version,omitempty"`
+	RulesetHash            string                 `protobuf:"bytes,10,opt,name=ruleset_hash,json=rulesetHash,proto3" json:"ruleset_hash,omitempty"`
+	Decision               Decision               `protobuf:"varint,11,opt,name=decision,proto3,enum=room.v1.Decision" json:"decision,omitempty"`
+	HighestSeverity        Severity               `protobuf:"varint,12,opt,name=highest_severity,json=highestSeverity,proto3,enum=room.v1.Severity" json:"highest_severity,omitempty"`
+	AnalysisStatus         AnalysisStatus         `protobuf:"varint,13,opt,name=analysis_status,json=analysisStatus,proto3,enum=room.v1.AnalysisStatus" json:"analysis_status,omitempty"`
+	McpInvocation          *McpInvocation         `protobuf:"bytes,14,opt,name=mcp_invocation,json=mcpInvocation,proto3" json:"mcp_invocation,omitempty"`
+	ReasonCode             string                 `protobuf:"bytes,15,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	MatchedRuleIds         []string               `protobuf:"bytes,16,rep,name=matched_rule_ids,json=matchedRuleIds,proto3" json:"matched_rule_ids,omitempty"`
+	PolicyCandidateId      string                 `protobuf:"bytes,17,opt,name=policy_candidate_id,json=policyCandidateId,proto3" json:"policy_candidate_id,omitempty"`
+	EvidenceRecordId       string                 `protobuf:"bytes,18,opt,name=evidence_record_id,json=evidenceRecordId,proto3" json:"evidence_record_id,omitempty"`
+	McpElicitation         *McpElicitationReceipt `protobuf:"bytes,19,opt,name=mcp_elicitation,json=mcpElicitation,proto3" json:"mcp_elicitation,omitempty"`
+	EvaluationId           string                 `protobuf:"bytes,20,opt,name=evaluation_id,json=evaluationId,proto3" json:"evaluation_id,omitempty"`
+	McpElicitationEligible bool                   `protobuf:"varint,21,opt,name=mcp_elicitation_eligible,json=mcpElicitationEligible,proto3" json:"mcp_elicitation_eligible,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AuditEvent) Reset() {
@@ -3323,6 +3324,13 @@ func (x *AuditEvent) GetEvaluationId() string {
 		return x.EvaluationId
 	}
 	return ""
+}
+
+func (x *AuditEvent) GetMcpElicitationEligible() bool {
+	if x != nil {
+		return x.McpElicitationEligible
+	}
+	return false
 }
 
 type McpElicitationReceipt struct {
@@ -7213,7 +7221,7 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	" \x03(\v2\x18.room.v1.AnalyzerReceiptR\x10analyzerReceipts\x12*\n" +
 	"\x04gaps\x18\v \x03(\v2\x16.room.v1.EvaluationGapR\x04gaps\x12!\n" +
 	"\finput_sha256\x18\f \x01(\fR\vinputSha256\x12#\n" +
-	"\revaluation_id\x18\r \x01(\tR\fevaluationId\"\xf7\x06\n" +
+	"\revaluation_id\x18\r \x01(\tR\fevaluationId\"\xb1\a\n" +
 	"\n" +
 	"AuditEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
@@ -7243,7 +7251,8 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\x13policy_candidate_id\x18\x11 \x01(\tR\x11policyCandidateId\x12,\n" +
 	"\x12evidence_record_id\x18\x12 \x01(\tR\x10evidenceRecordId\x12G\n" +
 	"\x0fmcp_elicitation\x18\x13 \x01(\v2\x1e.room.v1.McpElicitationReceiptR\x0emcpElicitation\x12#\n" +
-	"\revaluation_id\x18\x14 \x01(\tR\fevaluationId\"\xdb\x05\n" +
+	"\revaluation_id\x18\x14 \x01(\tR\fevaluationId\x128\n" +
+	"\x18mcp_elicitation_eligible\x18\x15 \x01(\bR\x16mcpElicitationEligible\"\xdb\x05\n" +
 	"\x15McpElicitationReceipt\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\revaluation_id\x18\x02 \x01(\tR\fevaluationId\x12.\n" +

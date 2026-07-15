@@ -68,7 +68,7 @@ func TestRecordMcpElicitationBindsAuditToAuthenticatedAgent(t *testing.T) {
 	service := New(database)
 	principal := auth.Principal{ID: "trusted-agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "trusted-workspace", Repository: "trusted-repo", AgentID: "codex-1"}}
 	ctx := auth.WithPrincipal(context.Background(), principal)
-	evaluationAuditID, err := database.AppendAudit(&roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_EVALUATION, SubjectId: principal.ID, WorkspaceId: principal.Scope.WorkspaceID, Repository: principal.Scope.Repository, AgentType: principal.Scope.AgentID, EvaluationId: "evaluation-1"})
+	evaluationAuditID, err := database.AppendAudit(&roomv1.AuditEvent{Kind: roomv1.AuditEventKind_AUDIT_EVENT_KIND_EVALUATION, SubjectId: principal.ID, WorkspaceId: principal.Scope.WorkspaceID, Repository: principal.Scope.Repository, AgentType: principal.Scope.AgentID, EvaluationId: "evaluation-1", Decision: roomv1.Decision_DECISION_NEEDS_CHANGES, McpElicitationEligible: true})
 	if err != nil {
 		t.Fatalf("append evaluation audit: %v", err)
 	}
@@ -108,6 +108,50 @@ func TestRecordMcpElicitationBindsAuditToAuthenticatedAgent(t *testing.T) {
 	}
 	if event.GetMcpElicitation().GetId() != receipt.GetId() || event.GetMcpElicitation().GetOfferAuditEventId() != offerResponse.Msg.GetAuditEventId() {
 		t.Fatalf("audit receipt = %+v", event.GetMcpElicitation())
+	}
+}
+
+func TestRecordMcpElicitationRequiresServerProvenEvaluationEligibility(t *testing.T) {
+	database, err := store.Open(filepath.Join(t.TempDir(), "room.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := New(database)
+	principal := auth.Principal{ID: "agent", Role: auth.RoleAgent, Scope: auth.Scope{WorkspaceID: "workspace", Repository: "repo", AgentID: "codex"}}
+	ctx := auth.WithPrincipal(context.Background(), principal)
+	tests := []struct {
+		name     string
+		result   *roomv1.EvaluationResult
+		wantCode connect.Code
+	}{
+		{name: "allow with trigger-like typed fields", result: &roomv1.EvaluationResult{EvaluationId: "allow-evaluation", Decision: roomv1.Decision_DECISION_ALLOW, RequiredChecks: []string{"required check"}}, wantCode: connect.CodeFailedPrecondition},
+		{name: "blocking without typed next step", result: &roomv1.EvaluationResult{EvaluationId: "triggerless-evaluation", Decision: roomv1.Decision_DECISION_DENY}, wantCode: connect.CodeFailedPrecondition},
+		{name: "eligible blocking", result: &roomv1.EvaluationResult{EvaluationId: "eligible-evaluation", Decision: roomv1.Decision_DECISION_NEEDS_CHANGES, Matches: []*roomv1.RuleMatch{{RequiredEvidence: []string{"test receipt"}}}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			event := evaluationEvent(principal, roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN, test.result)
+			auditID, err := database.AppendAudit(event)
+			if err != nil {
+				t.Fatal(err)
+			}
+			receipt := &roomv1.McpElicitationReceipt{
+				Id: test.name, EvaluationId: test.result.GetEvaluationId(), EvaluationAuditEventId: auditID,
+				Mode: roomv1.McpElicitationMode_MCP_ELICITATION_MODE_FORM, Purpose: roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_EVALUATION_RESOLUTION,
+				Action: roomv1.McpElicitationAction_MCP_ELICITATION_ACTION_OFFERED,
+			}
+			response, err := service.RecordMcpElicitation(ctx, connect.NewRequest(&roomv1.RecordMcpElicitationRequest{Receipt: receipt}))
+			if test.wantCode != 0 {
+				if connect.CodeOf(err) != test.wantCode {
+					t.Fatalf("code = %s, want %s", connect.CodeOf(err), test.wantCode)
+				}
+				return
+			}
+			if err != nil || response.Msg.GetAuditEventId() == "" {
+				t.Fatalf("eligible receipt response = %+v, err %v", response, err)
+			}
+		})
 	}
 }
 

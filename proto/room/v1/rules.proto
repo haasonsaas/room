@@ -464,6 +464,7 @@ message AuditEvent {
   string evidence_record_id = 18;
   McpElicitationReceipt mcp_elicitation = 19;
   string evaluation_id = 20;
+  bool mcp_elicitation_eligible = 21;
 }
 
 message McpElicitationReceipt {

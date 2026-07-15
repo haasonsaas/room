@@ -304,11 +304,12 @@ func (h *Handler) openPolicyControl(ctx context.Context, request *mcpsdk.CallToo
 	if err != nil {
 		return nil, toolOutput{}, err
 	}
-	handoffURL, err := policyControlURL(h.controlPlaneURL, input.CandidateID, input.TargetRolloutStage)
+	expectedUpdatedAt := timestamppb.New(expected)
+	handoffURL, err := policyControlURL(h.controlPlaneURL, input.CandidateID, input.TargetRolloutStage, expectedUpdatedAt)
 	if err != nil {
 		return nil, toolOutput{}, err
 	}
-	receipt := &roomv1.McpElicitationReceipt{Id: id, PolicyCandidateId: input.CandidateID, Mode: roomv1.McpElicitationMode_MCP_ELICITATION_MODE_URL, Purpose: roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_POLICY_CONTROL, TargetRolloutStage: stage, ExpectedCandidateUpdatedAt: timestamppb.New(expected)}
+	receipt := &roomv1.McpElicitationReceipt{Id: id, PolicyCandidateId: input.CandidateID, Mode: roomv1.McpElicitationMode_MCP_ELICITATION_MODE_URL, Purpose: roomv1.McpElicitationPurpose_MCP_ELICITATION_PURPOSE_POLICY_CONTROL, TargetRolloutStage: stage, ExpectedCandidateUpdatedAt: expectedUpdatedAt}
 	elicitation := &elicitationOutput{Required: true, Mode: "url", Purpose: "policy_control", ElicitationID: id, HandoffURL: handoffURL}
 	output := toolOutput{Summary: "Room policy control requires an authenticated human operator. Opening the URL does not mutate policy.", Elicitation: elicitation}
 	if !supportsURLElicitation(request) {
@@ -456,12 +457,15 @@ func rolloutStage(value string) roomv1.RolloutStage {
 	}
 }
 
-func policyControlURL(base, candidateID, target string) (string, error) {
+func policyControlURL(base, candidateID, target string, expectedUpdatedAt *timestamppb.Timestamp) (string, error) {
 	parsed, err := url.Parse(base)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return "", errors.New("control plane URL is invalid")
 	}
-	parsed.Fragment = url.Values{"candidate": []string{candidateID}, "tab": []string{"rollout"}, "target": []string{target}}.Encode()
+	if expectedUpdatedAt == nil || expectedUpdatedAt.CheckValid() != nil {
+		return "", errors.New("expected candidate updated_at is invalid")
+	}
+	parsed.Fragment = url.Values{"candidate": []string{candidateID}, "expected_candidate_updated_at": []string{expectedUpdatedAt.AsTime().Format(time.RFC3339Nano)}, "tab": []string{"rollout"}, "target": []string{target}}.Encode()
 	return parsed.String(), nil
 }
 
