@@ -56,7 +56,9 @@ listener with `ROOM_AUTH_MODE=disabled`.
 ### Semgrep analyzer
 
 The Linux Semgrep adapter scans source snapshots with the OSS `semgrep-core`
-binary. The included rule detects Go HTTP input that reaches SQL query text.
+1.139.0 binary. Bundled rules cover recognized secret string literals in Go
+and Rust, selected Go SQL injection and outbound-destination flows, and
+untrusted Rust process arguments.
 
 ```bash
 go build -o ~/.local/bin/room-semgrep ./cmd/room-semgrep

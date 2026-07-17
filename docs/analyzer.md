@@ -77,13 +77,26 @@ list the same signals in `ROOM_ANALYZER_COVERED_SIGNALS`. A finding that names a
 undeclared signal or an invalid confidence produces a failed receipt. Findings
 without `room_signal` metadata are ignored.
 
+The bundled rules provide these coverage claims:
+
+| Signal | Language | Detection |
+| --- | --- | --- |
+| `SIGNAL_KIND_SECRET_LITERAL` | Go, Rust | String literals matching GitHub, OpenAI, or Slack token formats |
+| `SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT` | Go | Query, form, header, or path input reaching `database/sql` query text |
+| `SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION` | Go | Query, form, header, or path input reaching a package-level `net/http` request URL |
+| `SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT` | Rust | Process environment, argument, URI, or header input reaching `Command::new`, `arg`, or `args` |
+
+These rules model the listed source and sink families, not every framework API
+or validation function. The adapter uses Semgrep's private core interface and
+is pinned and integration-tested against `semgrep-core` 1.139.0.
+
 ```bash
 go build -o ~/.local/bin/room-semgrep ./cmd/room-semgrep
 
 ROOM_ANALYZER_EXECUTABLE="$HOME/.local/bin/room-semgrep"
-ROOM_ANALYZER_ARGS='["--semgrep-core","/absolute/path/to/semgrep-core","--config","/absolute/path/to/room/analyzers/semgrep/room.yml","--repository-root","/srv/repos/my-repository","--covered-signal","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT"]'
+ROOM_ANALYZER_ARGS='["--semgrep-core","/absolute/path/to/semgrep-core","--config","/absolute/path/to/room/analyzers/semgrep/room.yml","--repository-root","/srv/repos/my-repository","--covered-signal","SIGNAL_KIND_SECRET_LITERAL","--covered-signal","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","--covered-signal","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","--covered-signal","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT"]'
 ROOM_ANALYZER_CONFIG_FILE=/absolute/path/to/room/analyzers/semgrep/room.yml
-ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT"]'
+ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_SECRET_LITERAL","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT"]'
 ROOM_ANALYZER_ID=room.semgrep
 ROOM_ANALYZER_VERSION=1
 ```

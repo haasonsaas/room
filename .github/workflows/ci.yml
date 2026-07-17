@@ -26,3 +26,30 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
       - run: go test -race ./...
+
+  semgrep-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.x"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned Semgrep CE
+        run: |
+          python -m pip install pipx==1.8.0
+          python -m pipx install --python python semgrep==1.139.0
+      - name: Locate semgrep-core
+        id: semgrep
+        run: |
+          venvs="$(python -m pipx environment --value PIPX_LOCAL_VENVS)"
+          core="$(find "$venvs/semgrep" -type f -path '*/semgrep/bin/semgrep-core' -print -quit)"
+          test -x "$core"
+          test "$("$core" -version)" = "semgrep-core version: 1.139.0"
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+      - name: Run real semgrep-core tests
+        env:
+          ROOM_SEMGREP_CORE: ${{ steps.semgrep.outputs.core }}
+        run: go test -tags=semgrep_integration ./cmd/room-semgrep

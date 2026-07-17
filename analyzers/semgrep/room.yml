@@ -1,4 +1,17 @@
 rules:
+  - id: room.source.high-confidence-secret-literal
+    message: A string literal with a recognized credential token format is embedded in source.
+    severity: ERROR
+    languages: [go, rust]
+    metadata:
+      room_signal: SIGNAL_KIND_SECRET_LITERAL
+      room_confidence_basis_points: 9500
+    patterns:
+      - pattern: $SECRET
+      - metavariable-regex:
+          metavariable: $SECRET
+          regex: '^"(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{40,255}|sk-(?:proj-)?[A-Za-z0-9_-]{32,255}|xox[baprs]-[A-Za-z0-9-]{20,255})"$'
+
   - id: room.go.dynamic-sql-with-untrusted-input
     message: Untrusted HTTP input reaches the SQL query text.
     severity: ERROR
@@ -12,11 +25,66 @@ rules:
           - pattern: $REQ.URL.Query().Get(...)
           - pattern: $REQ.FormValue(...)
           - pattern: $REQ.PostFormValue(...)
+          - pattern: $REQ.Header.Get(...)
+          - pattern: $REQ.PathValue(...)
     pattern-sinks:
       - patterns:
           - pattern-either:
               - pattern: $DB.Query($QUERY, ...)
               - pattern: $DB.QueryContext($CTX, $QUERY, ...)
+              - pattern: $DB.QueryRow($QUERY, ...)
+              - pattern: $DB.QueryRowContext($CTX, $QUERY, ...)
               - pattern: $DB.Exec($QUERY, ...)
               - pattern: $DB.ExecContext($CTX, $QUERY, ...)
+              - pattern: $DB.Prepare($QUERY)
+              - pattern: $DB.PrepareContext($CTX, $QUERY)
           - focus-metavariable: $QUERY
+
+  - id: room.go.untrusted-outbound-destination
+    message: Untrusted HTTP input reaches an outbound request destination.
+    severity: ERROR
+    languages: [go]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.URL.Query().Get(...)
+          - pattern: $REQ.FormValue(...)
+          - pattern: $REQ.PostFormValue(...)
+          - pattern: $REQ.Header.Get(...)
+          - pattern: $REQ.PathValue(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: http.Get($URL)
+              - pattern: http.Post($URL, ...)
+              - pattern: http.PostForm($URL, ...)
+              - pattern: http.NewRequest($METHOD, $URL, ...)
+              - pattern: http.NewRequestWithContext($CTX, $METHOD, $URL, ...)
+          - focus-metavariable: $URL
+
+  - id: room.rust.command-with-untrusted-argument
+    message: Untrusted process or request input reaches a process command or argument.
+    severity: ERROR
+    languages: [rust]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: std::env::args().nth(...)
+          - pattern: std::env::var(...)
+          - pattern: $REQUEST.uri().query()
+          - pattern: $REQUEST.uri().path()
+          - pattern: $REQUEST.headers().get(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: std::process::Command::new($VALUE)
+              - pattern: Command::new($VALUE)
+              - pattern: $COMMAND.arg($VALUE)
+              - pattern: $COMMAND.args($VALUE)
+          - focus-metavariable: $VALUE
