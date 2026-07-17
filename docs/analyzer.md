@@ -84,19 +84,32 @@ The bundled rules provide these coverage claims:
 | `SIGNAL_KIND_SECRET_LITERAL` | Go, Rust | String literals matching GitHub, OpenAI, or Slack token formats |
 | `SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT` | Go | Query, form, header, or path input reaching `database/sql` query text |
 | `SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION` | Go | Query, form, header, or path input reaching a package-level `net/http` request URL |
-| `SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT` | Rust | Process environment, argument, URI, or header input reaching `Command::new`, `arg`, or `args` |
+| `SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH` | Rust | Hyper-style request URI or headers and Actix request values reaching `unwrap`, `expect`, or `panic` |
+| `SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT` | Rust | Process environment/arguments and Hyper- or Actix-style request values reaching `Command::new`, `arg`, or `args` |
+| `SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET` | Rust | Secret-like assignments derived from `fastrand` module/`Rng`, `rand::rngs::SmallRng`, `oorandom::{Rand32,Rand64}`, or `nanorand::{WyRand,Pcg64}` |
+| `SIGNAL_KIND_RUST_UNTRUSTED_PATH` | Rust | Process or request values reaching standard or Tokio filesystem reads, writes, metadata, creation, deletion, copy, or rename operations |
+| `SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT` | Rust | `lock`/`read`/`write` bindings using `unwrap` or `expect`, and `blocking_lock`/`blocking_read`/`blocking_write` bindings, followed by await without a matched explicit drop |
 
 These rules model the listed source and sink families, not every framework API
 or validation function. The adapter uses Semgrep's private core interface and
-is pinned and integration-tested against `semgrep-core` 1.139.0.
+is pinned and integration-tested against `semgrep-core` 1.139.0. For taint
+rules, a finding is retained when the added lines intersect either the reported
+sink or a source/intermediate location in the core's dataflow trace.
+
+The bundled Semgrep rules do not claim
+`SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT`,
+`SIGNAL_KIND_RUST_PANIC_IN_LIBRARY_API`, or
+`SIGNAL_KIND_RUST_UNVALIDATED_EXTERNAL_DESERIALIZATION`. The current rules do
+not model safety-comment absence, public-library API boundaries, or validation
+across definitions.
 
 ```bash
 go build -o ~/.local/bin/room-semgrep ./cmd/room-semgrep
 
 ROOM_ANALYZER_EXECUTABLE="$HOME/.local/bin/room-semgrep"
-ROOM_ANALYZER_ARGS='["--semgrep-core","/absolute/path/to/semgrep-core","--config","/absolute/path/to/room/analyzers/semgrep/room.yml","--repository-root","/srv/repos/my-repository","--covered-signal","SIGNAL_KIND_SECRET_LITERAL","--covered-signal","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","--covered-signal","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","--covered-signal","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT"]'
+ROOM_ANALYZER_ARGS='["--semgrep-core","/absolute/path/to/semgrep-core","--config","/absolute/path/to/room/analyzers/semgrep/room.yml","--repository-root","/srv/repos/my-repository","--covered-signal","SIGNAL_KIND_SECRET_LITERAL","--covered-signal","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","--covered-signal","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","--covered-signal","SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH","--covered-signal","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT","--covered-signal","SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET","--covered-signal","SIGNAL_KIND_RUST_UNTRUSTED_PATH","--covered-signal","SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT"]'
 ROOM_ANALYZER_CONFIG_FILE=/absolute/path/to/room/analyzers/semgrep/room.yml
-ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_SECRET_LITERAL","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT"]'
+ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_SECRET_LITERAL","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT","SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET","SIGNAL_KIND_RUST_UNTRUSTED_PATH","SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT"]'
 ROOM_ANALYZER_ID=room.semgrep
 ROOM_ANALYZER_VERSION=1
 ```
