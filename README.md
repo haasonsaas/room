@@ -32,15 +32,27 @@ go run ./cmd/roomctl token issue \
   --output .room/agent.token
 ```
 
-Configure a trusted analyzer executable, then start Room:
+Install [Semgrep Community Edition](https://semgrep.dev/docs/getting-started/),
+build the Linux adapter, and configure the repository it may scan:
 
 ```bash
-ROOM_ANALYZER_EXECUTABLE=/absolute/path/to/analyzer \
-ROOM_ANALYZER_ID=company.security-analyzer \
+go build -o ~/.local/bin/room-semgrep ./cmd/room-semgrep
+
+ROOM_ANALYZER_EXECUTABLE="$HOME/.local/bin/room-semgrep" \
+ROOM_ANALYZER_ARGS='["--semgrep-core","/absolute/path/to/semgrep-core","--config","/absolute/path/to/room/analyzers/semgrep/room.yml","--repository-root","/absolute/path/to/repository","--covered-signal","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT"]' \
+ROOM_ANALYZER_CONFIG_FILE=/absolute/path/to/room/analyzers/semgrep/room.yml \
+ROOM_ANALYZER_ID=room.semgrep \
 ROOM_ANALYZER_VERSION=1 \
-ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT"]' \
+ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT"]' \
 go run ./cmd/roomd
 ```
+
+The included rule detects Go HTTP input that reaches SQL query text. The
+adapter invokes the OSS `semgrep-core` binary directly so core parser and rule
+skips remain visible. It snapshots regular changed files beneath
+`--repository-root` and emits findings only when their source range intersects
+an added diff line. Plan evaluation remains indeterminate because Semgrep
+requires source files.
 
 Without an analyzer, evaluations return `INDETERMINATE`; enforcement callers
 block that result. For local development only, authentication may be disabled on

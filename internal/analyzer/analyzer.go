@@ -27,9 +27,10 @@ const defaultTimeout = 30 * time.Second
 
 // Input is the complete artifact passed to an analyzer.
 type Input struct {
-	Phase        roomv1.AnalysisPhase
-	Content      []byte
-	ChangedFiles []string
+	Phase            roomv1.AnalysisPhase
+	Content          []byte
+	ChangedFiles     []string
+	WorkingDirectory string
 }
 
 // Config identifies and launches one analyzer. Args are passed directly to the
@@ -138,15 +139,18 @@ func (w *boundedDrainWriter) Write(data []byte) (int, error) {
 func (w *boundedDrainWriter) Bytes() []byte { return w.buffer.Bytes() }
 
 type providerRequest struct {
-	Phase        string   `json:"phase"`
-	Content      []byte   `json:"content"`
-	ChangedFiles []string `json:"changed_files,omitempty"`
-	InputSHA256  string   `json:"input_sha256"`
+	Phase            string   `json:"phase"`
+	Content          []byte   `json:"content"`
+	ChangedFiles     []string `json:"changed_files,omitempty"`
+	WorkingDirectory string   `json:"working_directory,omitempty"`
+	ConfigSHA256     string   `json:"config_sha256"`
+	InputSHA256      string   `json:"input_sha256"`
 }
 
 type providerResponse struct {
 	Phase          string           `json:"phase"`
 	Status         string           `json:"status"`
+	ChangedFiles   []string         `json:"changed_files,omitempty"`
 	Languages      []string         `json:"languages,omitempty"`
 	Frameworks     []string         `json:"frameworks,omitempty"`
 	CoveredSignals []string         `json:"covered_signals"`
@@ -183,7 +187,8 @@ func (a *externalAnalyzer) Analyze(ctx context.Context, input Input) *roomv1.Ana
 
 	request := providerRequest{
 		Phase: input.Phase.String(), Content: input.Content,
-		ChangedFiles: append([]string(nil), input.ChangedFiles...), InputSHA256: hex.EncodeToString(digest[:]),
+		ChangedFiles: append([]string(nil), input.ChangedFiles...), WorkingDirectory: input.WorkingDirectory,
+		ConfigSHA256: hex.EncodeToString(a.identity.GetConfigSha256()), InputSHA256: hex.EncodeToString(digest[:]),
 	}
 	requestJSON, err := json.Marshal(request)
 	if err != nil {
@@ -222,6 +227,11 @@ func (a *externalAnalyzer) Analyze(ctx context.Context, input Input) *roomv1.Ana
 	if code != "" {
 		return a.failure(report, roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, code, digest[:])
 	}
+	changedFiles, code := normalizeChangedFiles(response.ChangedFiles)
+	if code != "" {
+		return a.failure(report, roomv1.AnalysisStatus_ANALYSIS_STATUS_INVALID, code, digest[:])
+	}
+	report.Artifact.ChangedFiles = changedFiles
 	report.Artifact.Languages = languages
 	report.Artifact.Frameworks = frameworks
 	report.Status = receipt.Status
@@ -242,6 +252,24 @@ func normalizeClassifications(values []string) ([]string, string) {
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return nil, "classification_invalid"
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+	sort.Strings(normalized)
+	return normalized, ""
+}
+
+func normalizeChangedFiles(values []string) ([]string, string) {
+	normalized := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, raw := range values {
+		value := filepath.ToSlash(filepath.Clean(raw))
+		if raw == "" || filepath.IsAbs(raw) || value != raw || value == "." || value == ".." || strings.HasPrefix(value, "../") || strings.ContainsAny(value, "\x00\r\n") {
+			return nil, "changed_files_invalid"
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return nil, "changed_files_invalid"
 		}
 		seen[value] = struct{}{}
 		normalized = append(normalized, value)
