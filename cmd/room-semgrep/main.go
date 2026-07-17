@@ -24,11 +24,12 @@ import (
 )
 
 const (
-	completeStatus    = "ANALYSIS_STATUS_COMPLETE"
-	partialStatus     = "ANALYSIS_STATUS_PARTIAL"
-	failedStatus      = "ANALYSIS_STATUS_FAILED"
-	unavailableStatus = "ANALYSIS_STATUS_UNAVAILABLE"
-	maxOutputBytes    = 16 << 20
+	completeStatus     = "ANALYSIS_STATUS_COMPLETE"
+	partialStatus      = "ANALYSIS_STATUS_PARTIAL"
+	failedStatus       = "ANALYSIS_STATUS_FAILED"
+	unavailableStatus  = "ANALYSIS_STATUS_UNAVAILABLE"
+	maxOutputBytes     = 16 << 20
+	semgrepCoreVersion = "1.139.0"
 )
 
 var hunkHeader = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$`)
@@ -97,8 +98,14 @@ type semgrepResult struct {
 		Line int `json:"line"`
 	} `json:"end"`
 	Extra struct {
-		Metadata map[string]any `json:"metadata"`
+		Metadata      map[string]any  `json:"metadata"`
+		DataflowTrace json.RawMessage `json:"dataflow_trace"`
 	} `json:"extra"`
+}
+
+type semgrepTraceRange struct {
+	Path       string
+	Start, End int
 }
 
 type diffArtifact struct {
@@ -123,6 +130,7 @@ type snapshot struct {
 	config      string
 	targetsFile string
 	targets     []string
+	lineCounts  map[string]int
 }
 
 type adapter struct {
@@ -330,7 +338,30 @@ func (a *adapter) analyze(ctx context.Context, request analyzerRequest) analyzer
 		if index := sort.SearchStrings(snapshot.targets, path); index >= len(snapshot.targets) || snapshot.targets[index] != path {
 			return failed(response, "semgrep_result_invalid")
 		}
-		if !rangeIntersects(artifact.added[path], result.Start.Line, result.End.Line) {
+		if result.End.Line > snapshot.lineCounts[path] {
+			return failed(response, "semgrep_result_invalid")
+		}
+		intersects := rangeIntersects(artifact.added[path], result.Start.Line, result.End.Line)
+		if len(result.Extra.DataflowTrace) != 0 {
+			traceRanges, err := semgrepTraceRanges(result.Extra.DataflowTrace)
+			if err != nil {
+				return failed(response, "semgrep_result_invalid")
+			}
+			for _, traceRange := range traceRanges {
+				tracePath, err := normalizedResultPath(snapshot.directory, traceRange.Path)
+				if err != nil {
+					return failed(response, "semgrep_result_invalid")
+				}
+				if index := sort.SearchStrings(snapshot.targets, tracePath); index >= len(snapshot.targets) || snapshot.targets[index] != tracePath {
+					return failed(response, "semgrep_result_invalid")
+				}
+				if traceRange.End > snapshot.lineCounts[tracePath] {
+					return failed(response, "semgrep_result_invalid")
+				}
+				intersects = intersects || rangeIntersects(artifact.added[tracePath], traceRange.Start, traceRange.End)
+			}
+		}
+		if !intersects {
 			continue
 		}
 		rawSignal, present := result.Extra.Metadata["room_signal"]
@@ -361,6 +392,132 @@ func (a *adapter) analyze(ctx context.Context, request analyzerRequest) analyzer
 	}
 	sort.Slice(response.Signals, func(i, j int) bool { return response.Signals[i].Fingerprint < response.Signals[j].Fingerprint })
 	return response
+}
+
+func semgrepTraceRanges(data []byte) ([]semgrepTraceRange, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return nil, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return nil, errors.New("dataflow trace must contain one JSON value")
+	}
+	trace, ok := value.(map[string]any)
+	if !ok {
+		return nil, errors.New("dataflow trace must be an object")
+	}
+	source, hasSource := trace["taint_source"]
+	sink, hasSink := trace["taint_sink"]
+	if !hasSource || !hasSink {
+		return nil, errors.New("dataflow trace must contain source and sink")
+	}
+	ranges := make([]semgrepTraceRange, 0, 3)
+	if err := collectSemgrepCallTrace(source, &ranges); err != nil {
+		return nil, err
+	}
+	if intermediate, present := trace["intermediate_vars"]; present {
+		values, ok := intermediate.([]any)
+		if !ok {
+			return nil, errors.New("dataflow trace intermediates must be an array")
+		}
+		for _, value := range values {
+			if err := collectSemgrepIntermediate(value, &ranges); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := collectSemgrepCallTrace(sink, &ranges); err != nil {
+		return nil, err
+	}
+	return ranges, nil
+}
+
+func collectSemgrepCallTrace(value any, ranges *[]semgrepTraceRange) error {
+	variant, ok := value.([]any)
+	if !ok || len(variant) != 2 {
+		return errors.New("invalid dataflow call trace")
+	}
+	kind, ok := variant[0].(string)
+	if !ok {
+		return errors.New("invalid dataflow call trace kind")
+	}
+	switch kind {
+	case "CliLoc":
+		return collectSemgrepLocAndContent(variant[1], ranges)
+	case "CliCall":
+		call, ok := variant[1].([]any)
+		if !ok || len(call) != 3 {
+			return errors.New("invalid dataflow call")
+		}
+		if err := collectSemgrepLocAndContent(call[0], ranges); err != nil {
+			return err
+		}
+		intermediates, ok := call[1].([]any)
+		if !ok {
+			return errors.New("invalid call intermediates")
+		}
+		for _, intermediate := range intermediates {
+			if err := collectSemgrepIntermediate(intermediate, ranges); err != nil {
+				return err
+			}
+		}
+		return collectSemgrepCallTrace(call[2], ranges)
+	default:
+		return errors.New("unknown dataflow call trace kind")
+	}
+}
+
+func collectSemgrepLocAndContent(value any, ranges *[]semgrepTraceRange) error {
+	locationAndContent, ok := value.([]any)
+	if !ok || len(locationAndContent) != 2 {
+		return errors.New("invalid dataflow location and content")
+	}
+	if _, ok := locationAndContent[1].(string); !ok {
+		return errors.New("invalid dataflow location content")
+	}
+	return collectSemgrepLocation(locationAndContent[0], ranges)
+}
+
+func collectSemgrepIntermediate(value any, ranges *[]semgrepTraceRange) error {
+	intermediate, ok := value.(map[string]any)
+	if !ok {
+		return errors.New("invalid dataflow intermediate")
+	}
+	if _, ok := intermediate["content"].(string); !ok {
+		return errors.New("invalid dataflow intermediate content")
+	}
+	return collectSemgrepLocation(intermediate["location"], ranges)
+}
+
+func collectSemgrepLocation(value any, ranges *[]semgrepTraceRange) error {
+	location, ok := value.(map[string]any)
+	if !ok {
+		return errors.New("invalid dataflow location")
+	}
+	path, pathOK := location["path"].(string)
+	start, startOK := semgrepTraceLine(location["start"])
+	end, endOK := semgrepTraceLine(location["end"])
+	if !pathOK || !startOK || !endOK || path == "" || start < 1 || end < start {
+		return errors.New("invalid dataflow trace location")
+	}
+	*ranges = append(*ranges, semgrepTraceRange{Path: path, Start: start, End: end})
+	return nil
+}
+
+func semgrepTraceLine(value any) (int, bool) {
+	position, ok := value.(map[string]any)
+	if !ok {
+		return 0, false
+	}
+	line, ok := position["line"].(json.Number)
+	if !ok {
+		return 0, false
+	}
+	parsed, err := strconv.Atoi(string(line))
+	return parsed, err == nil
 }
 
 func failed(response analyzerResponse, code string) analyzerResponse {
@@ -443,6 +600,7 @@ func (a *adapter) createSnapshot(request analyzerRequest, artifact diffArtifact)
 		postimages[path] = data
 	}
 	targets := make([]string, 0, len(artifact.added))
+	lineCounts := make(map[string]int, len(artifact.added))
 	for path := range artifact.added {
 		if !validRelativePath(path) {
 			return snapshot{}, errors.New("diff path is invalid")
@@ -451,8 +609,13 @@ func (a *adapter) createSnapshot(request analyzerRequest, artifact diffArtifact)
 		if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
 			return snapshot{}, err
 		}
-		if err := os.WriteFile(destination, postimages[path], 0o600); err != nil {
+		postimage := postimages[path]
+		if err := os.WriteFile(destination, postimage, 0o600); err != nil {
 			return snapshot{}, err
+		}
+		lineCounts[path] = bytes.Count(postimage, []byte{'\n'})
+		if len(postimage) > 0 && postimage[len(postimage)-1] != '\n' {
+			lineCounts[path]++
 		}
 		targets = append(targets, path)
 	}
@@ -475,7 +638,7 @@ func (a *adapter) createSnapshot(request analyzerRequest, artifact diffArtifact)
 		return snapshot{}, err
 	}
 	cleanup = false
-	return snapshot{directory: repository, config: configPath, targetsFile: targetsPath, targets: targets}, nil
+	return snapshot{directory: repository, config: configPath, targetsFile: targetsPath, targets: targets, lineCounts: lineCounts}, nil
 }
 
 func readRegularBeneath(rootFD int, path string) ([]byte, error) {
@@ -550,7 +713,7 @@ func (a *adapter) scan(ctx context.Context, snapshot snapshot) (semgrepReport, s
 }
 
 func validReportShape(report semgrepReport) bool {
-	return report.Version != "" && report.Results != nil && report.Errors != nil && len(*report.Errors) == 0 &&
+	return report.Version == semgrepCoreVersion && report.Results != nil && report.Errors != nil && len(*report.Errors) == 0 &&
 		report.Paths != nil && report.Paths.Scanned != nil && (report.Paths.Skipped == nil || len(*report.Paths.Skipped) == 0) &&
 		report.SkippedRules != nil && len(*report.SkippedRules) == 0
 }
@@ -788,8 +951,8 @@ func rangeIntersects(lines map[int]bool, start, end int) bool {
 	if start < 1 || end < start {
 		return false
 	}
-	for line := start; line <= end; line++ {
-		if lines[line] {
+	for line := range lines {
+		if line >= start && line <= end {
 			return true
 		}
 	}

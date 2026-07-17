@@ -15,10 +15,12 @@ var integrationSignals = []string{
 	"SIGNAL_KIND_SECRET_LITERAL",
 	"SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT",
 	"SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION",
+	"SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH",
 	"SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
+	"SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+	"SIGNAL_KIND_RUST_UNTRUSTED_PATH",
+	"SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT",
 }
-
-const semgrepCoreVersion = "1.139.0"
 
 func TestSemgrepCoreIntegration(t *testing.T) {
 	core, config := integrationPaths(t)
@@ -73,15 +75,212 @@ fn main() {
 			signal: "SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
 		},
 		{
-			name: "Rust request header command argument",
+			name: "Rust request path command argument",
 			path: "request_command.rs",
 			source: `use std::process::Command;
 fn handler(request: Request) {
-	let arg = request.headers().get("x-command").unwrap();
+	let arg = request.uri().path();
 	Command::new("tool").arg(arg).status();
 }
 `,
 			signal: "SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
+		},
+		{
+			name: "Rust request input panic",
+			path: "request_panic.rs",
+			source: `fn handler(request: Request) {
+	let value = request.headers().get("x-value");
+	value.expect("required header");
+}
+`,
+			signal: "SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH",
+		},
+		{
+			name: "Rust untrusted filesystem path",
+			path: "untrusted_path.rs",
+			source: `fn main() {
+	let path = std::env::args_os().nth(1).unwrap();
+	std::fs::read_to_string(path).unwrap();
+}
+`,
+			signal: "SIGNAL_KIND_RUST_UNTRUSTED_PATH",
+		},
+		{
+			name: "Rust blocking lock across await",
+			path: "blocking_lock.rs",
+			source: `async fn update(lock: Lock) {
+	let guard = lock.lock().unwrap();
+	work().await;
+	consume(guard);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT",
+		},
+		{
+			name: "Rust weak RNG for secret",
+			path: "weak_rng.rs",
+			source: `fn issue() {
+	let mut rng = rand::rngs::SmallRng::seed_from_u64(7);
+	let api_key = rng.gen::<u64>();
+}
+`,
+			signal: "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+		},
+		{
+			name: "Rust Actix request panic",
+			path: "actix_panic.rs",
+			source: `fn handler(request: HttpRequest) {
+	let value = request.match_info().get("account");
+	value.unwrap();
+}
+`,
+			signal: "SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH",
+		},
+		{
+			name: "Rust request path reaches Tokio filesystem",
+			path: "tokio_path.rs",
+			source: `async fn handler(request: Request) {
+	let path = request.uri().path();
+	tokio::fs::read(path).await;
+}
+`,
+			signal: "SIGNAL_KIND_RUST_UNTRUSTED_PATH",
+		},
+		{
+			name: "Rust blocking write guard across await",
+			path: "blocking_write.rs",
+			source: `async fn update(lock: Lock) {
+	let guard = lock.write().unwrap();
+	work().await;
+	consume(guard);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT",
+		},
+		{
+			name: "Rust fastrand secret",
+			path: "fastrand_secret.rs",
+			source: `fn issue() {
+	let session_token = fastrand::u64(..);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+		},
+		{
+			name: "Rust fastrand instance secret",
+			path: "fastrand_instance.rs",
+			source: `fn issue() {
+	let mut rng = fastrand::Rng::new();
+	let session_token = rng.u64(..);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+		},
+		{
+			name: "Rust imported SmallRng secret",
+			path: "imported_small_rng.rs",
+			source: `use rand::rngs::SmallRng;
+fn issue() {
+	let mut rng = SmallRng::seed_from_u64(7);
+	let api_key = rng.gen::<u64>();
+}
+`,
+			signal: "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+		},
+		{
+			name: "Rust oorandom secret",
+			path: "oorandom_secret.rs",
+			source: `fn issue() {
+	let mut rng = oorandom::Rand64::new(7);
+	let nonce = rng.rand_u64();
+}
+`,
+			signal: "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+		},
+		{
+			name: "Rust nanorand WyRand secret",
+			path: "nanorand_secret.rs",
+			source: `fn issue() {
+	let mut rng = nanorand::WyRand::new();
+	let session_token = rng.generate::<u64>();
+}
+`,
+			signal: "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+		},
+		{
+			name: "Rust mutable process command builder",
+			path: "command_builder.rs",
+			source: `fn run() {
+	let value = std::env::var("COMMAND_ARG").unwrap();
+	let mut command = std::process::Command::new("tool");
+	command.arg(value);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
+		},
+		{
+			name: "Rust untrusted process executable",
+			path: "command_program.rs",
+			source: `fn run() {
+	let program = std::env::var("PROGRAM").unwrap();
+	std::process::Command::new(program);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
+		},
+		{
+			name: "Rust Tokio process command builder",
+			path: "tokio_command.rs",
+			source: `fn run() {
+	let value = std::env::var("COMMAND_ARG").unwrap();
+	let mut command = tokio::process::Command::new("tool");
+	command.arg(value);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
+		},
+		{
+			name: "Rust imported std File path",
+			path: "imported_file.rs",
+			source: `use std::fs::File;
+fn load() {
+	let path = std::env::args_os().nth(1).unwrap();
+	File::open(path);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_UNTRUSTED_PATH",
+		},
+		{
+			name: "Rust aliased std fs path",
+			path: "aliased_fs.rs",
+			source: `use std::fs as filesystem;
+fn load() {
+	let path = std::env::args_os().nth(1).unwrap();
+	filesystem::read(path);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_UNTRUSTED_PATH",
+		},
+		{
+			name: "Rust tainted explicit panic",
+			path: "explicit_panic.rs",
+			source: `fn handler(request: Request) {
+	let account = request.uri().path();
+	panic!("invalid account: {}", account);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH",
+		},
+		{
+			name: "Rust blocking lock API across await",
+			path: "blocking_api.rs",
+			source: `async fn update(lock: Lock) {
+	let mut guard = lock.blocking_lock();
+	work().await;
+	consume(&mut guard);
+}
+`,
+			signal: "SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT",
 		},
 	}
 
@@ -140,6 +339,131 @@ fn main() {
 }
 `,
 		},
+		{
+			name: "fallible Rust request parsing",
+			path: "fallible_request.rs",
+			source: `fn handler(request: Request) -> Result<&Header, Error> {
+	let value = request.headers().get("x-value").ok_or(Error::MissingHeader)?;
+	Ok(value)
+}
+`,
+		},
+		{
+			name: "fixed Rust filesystem path",
+			path: "fixed_path.rs",
+			source: `fn load() {
+	std::fs::read_to_string("config/default.toml").unwrap();
+}
+`,
+		},
+		{
+			name: "Rust blocking guard dropped before await",
+			path: "dropped_guard.rs",
+			source: `async fn update(lock: Lock) {
+	let guard = lock.lock().unwrap();
+	consume(&guard);
+	drop(guard);
+	work().await;
+}
+`,
+		},
+		{
+			name: "Rust CSPRNG secret and non-secret fast RNG",
+			path: "safe_rng.rs",
+			source: `fn values(mut os_rng: rand::rngs::OsRng) {
+	let session_token = os_rng.next_u64();
+	let retry_jitter = fastrand::u64(..);
+}
+`,
+		},
+		{
+			name: "Rust clap argument is not process execution",
+			path: "clap.rs",
+			source: `fn configure(request: Request, command: clap::Command) {
+	let name = request.uri().path();
+	command.arg(name);
+}
+`,
+		},
+		{
+			name: "Rust custom open method is not filesystem access",
+			path: "custom_open.rs",
+			source: `fn handler(request: Request, archive: Archive) {
+	let member = request.uri().path();
+	archive.open(member);
+}
+`,
+		},
+		{
+			name: "Rust nanorand ChaCha is a CSPRNG",
+			path: "nanorand_chacha.rs",
+			source: `fn issue() {
+	let mut rng = nanorand::ChaCha::new();
+	let session_token = rng.generate::<u64>();
+}
+`,
+		},
+		{
+			name: "Rust clap command constructor is not process execution",
+			path: "clap_constructor.rs",
+			source: `fn configure(request: Request) {
+	let name = request.uri().path();
+	clap::Command::new(name);
+}
+`,
+		},
+		{
+			name: "Rust local fs module is not std fs",
+			path: "local_fs.rs",
+			source: `mod fs { fn read(path: &str) {} }
+fn handler(request: Request) {
+	let member = request.uri().path();
+	fs::read(member);
+}
+`,
+		},
+		{
+			name: "Rust custom File is not std File",
+			path: "custom_file.rs",
+			source: `struct File;
+impl File { fn open(path: &str) {} }
+fn handler(request: Request) {
+	let member = request.uri().path();
+	File::open(member);
+}
+`,
+		},
+		{
+			name: "Rust response body is not request input",
+			path: "response_body.rs",
+			source: `fn render(response: Response) {
+	let body = response.body();
+	body.unwrap();
+}
+`,
+		},
+		{
+			name: "Rust blocking lock dropped with qualified drop",
+			path: "qualified_drop.rs",
+			source: `async fn update(lock: Lock) {
+	let mut guard = lock.blocking_lock();
+	consume(&mut guard);
+	std::mem::drop(guard);
+	work().await;
+}
+`,
+		},
+		{
+			name: "Rust blocking lock dropped with core drop",
+			path: "core_drop.rs",
+			source: `async fn update(lock: Lock) {
+	let guard = lock.lock().expect("lock");
+	consume(&guard);
+	core::mem::drop(guard);
+	work().await;
+}
+`,
+		},
 	}
 
 	for _, test := range tests {
@@ -186,6 +510,91 @@ func handler(db *sql.DB, r *http.Request) {
 	}
 	if response.Signals[0].Kind != "SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT" || response.Signals[0].Location.StartLine != 7 {
 		t.Fatalf("signals = %+v", response.Signals)
+	}
+}
+
+func TestSemgrepCoreIntegrationIncludesAddedSources(t *testing.T) {
+	core, config := integrationPaths(t)
+	tests := []struct {
+		name, source, signal  string
+		addedLine, resultLine int
+	}{
+		{
+			name: "command source",
+			source: `fn handler(request: Request) {
+	let value = request.uri().path();
+	std::process::Command::new("tool").arg(value);
+}
+`,
+			signal:     "SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT",
+			addedLine:  2,
+			resultLine: 3,
+		},
+		{
+			name: "panic source",
+			source: `fn handler(request: Request) {
+	let value = request.headers().get("x-value");
+	value.expect("required");
+}
+`,
+			signal:     "SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH",
+			addedLine:  2,
+			resultLine: 3,
+		},
+		{
+			name: "filesystem source",
+			source: `fn handler(request: Request) {
+	let path = request.uri().path();
+	std::fs::read(path);
+}
+`,
+			signal:     "SIGNAL_KIND_RUST_UNTRUSTED_PATH",
+			addedLine:  2,
+			resultLine: 3,
+		},
+		{
+			name: "RNG source",
+			source: `fn issue() {
+	let random = fastrand::u64(..);
+	let session_token = random;
+}
+`,
+			signal:     "SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET",
+			addedLine:  2,
+			resultLine: 3,
+		},
+		{
+			name: "blocking lock acquisition",
+			source: `async fn update(lock: Lock) {
+	let guard = lock.lock().unwrap();
+	work().await;
+	consume(guard);
+}
+`,
+			signal:     "SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT",
+			addedLine:  2,
+			resultLine: 2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := t.TempDir()
+			path := "source_only.rs"
+			if err := os.WriteFile(filepath.Join(repository, path), []byte(test.source), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			lines := strings.Split(strings.TrimSuffix(test.source, "\n"), "\n")
+			diff := []byte(fmt.Sprintf("diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n@@ -%d,0 +%d @@\n+%s\n", path, path, path, path, test.addedLine-1, test.addedLine, lines[test.addedLine-1]))
+			adapter, err := newAdapter(core, config, repository, append([]string(nil), integrationSignals...))
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+			if response.Status != completeStatus || len(response.Signals) != 1 || response.Signals[0].Kind != test.signal || response.Signals[0].Location.StartLine != int32(test.resultLine) {
+				t.Fatalf("response = %+v", response)
+			}
+		})
 	}
 }
 

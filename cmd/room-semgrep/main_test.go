@@ -56,6 +56,85 @@ func TestAdapterMapsSemgrepMetadataAndFiltersToAddedLines(t *testing.T) {
 	}
 }
 
+func TestAdapterFiltersAgainstSemgrepDataflowTrace(t *testing.T) {
+	_, repository := workspace(t)
+	source := "fn handler() {\n\tlet query = input();\n\tdb.Query(query);\n}\n"
+	if err := os.WriteFile(filepath.Join(repository, "handler.go"), []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	report := `{
+  "version":"1.139.0",
+  "errors":[],
+  "paths":{"scanned":["handler.go"],"skipped":[]},
+  "skipped_rules":[],
+  "results":[{"check_id":"taint","path":"handler.go","start":{"line":3},"end":{"line":3},"extra":{
+    "metadata":{"room_signal":"SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","room_confidence_basis_points":9000},
+    "dataflow_trace":{
+      "taint_source":["CliLoc",[{"path":"handler.go","start":{"line":2},"end":{"line":2}},"input()"]],
+      "intermediate_vars":[],
+      "taint_sink":["CliLoc",[{"path":"handler.go","start":{"line":3},"end":{"line":3}},"query"]]
+    }
+  }}]
+}`
+	config := writeFile(t, "rules.yml", testRules)
+	adapter, err := newAdapter(fakeSemgrep(t, report, 0), config, repository, []string{sqlSignal})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -1,0 +2 @@\n+\tlet query = input();\n")
+	response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	if response.Status != completeStatus || len(response.Signals) != 1 || response.Signals[0].Location.StartLine != 3 {
+		t.Fatalf("source-intersection response = %+v", response)
+	}
+
+	diff = []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -0,0 +1 @@\n+fn handler() {\n")
+	response = adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	if response.Status != completeStatus || len(response.Signals) != 0 {
+		t.Fatalf("non-intersection response = %+v", response)
+	}
+}
+
+func TestAdapterRejectsInvalidSemgrepRanges(t *testing.T) {
+	tests := []struct {
+		name, resultEnd, tracePath string
+		traceLine                  int
+	}{
+		{name: "result beyond file", resultEnd: "9223372036854775807", tracePath: "handler.go", traceLine: 2},
+		{name: "trace beyond file", resultEnd: "3", tracePath: "handler.go", traceLine: 999},
+		{name: "trace outside target", resultEnd: "3", tracePath: "../handler.go", traceLine: 2},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, repository := workspace(t)
+			source := "fn handler() {\n\tlet query = input();\n\tdb.Query(query);\n}\n"
+			if err := os.WriteFile(filepath.Join(repository, "handler.go"), []byte(source), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			report := fmt.Sprintf(`{
+  "version":"1.139.0","errors":[],"paths":{"scanned":["handler.go"],"skipped":[]},"skipped_rules":[],
+  "results":[{"check_id":"taint","path":"handler.go","start":{"line":3},"end":{"line":%s},"extra":{
+    "metadata":{"room_signal":"SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","room_confidence_basis_points":9000},
+    "dataflow_trace":{
+      "taint_source":["CliLoc",[{"path":%q,"start":{"line":%d},"end":{"line":%d}},"input()"]],
+      "intermediate_vars":[],
+      "taint_sink":["CliLoc",[{"path":"handler.go","start":{"line":3},"end":{"line":3}},"query"]]
+    }
+  }}]}`, test.resultEnd, test.tracePath, test.traceLine, test.traceLine)
+			config := writeFile(t, "rules.yml", testRules)
+			adapter, err := newAdapter(fakeSemgrep(t, report, 0), config, repository, []string{sqlSignal})
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff := []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -1,0 +2 @@\n+\tlet query = input();\n")
+			response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+			if response.Status != failedStatus || response.FailureCode != "semgrep_result_invalid" {
+				t.Fatalf("response = %+v", response)
+			}
+		})
+	}
+}
+
 func TestAdapterReturnsPartialForPlansWithoutRunningSemgrep(t *testing.T) {
 	root, repository := workspace(t)
 	config := writeFile(t, "rules.yml", testRules)
@@ -104,7 +183,7 @@ func TestAdapterRejectsMalformedSemgrepResult(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repository, "main.go"), []byte("package main\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	semgrep := fakeSemgrep(t, `{"version":"1","errors":[],"paths":{"scanned":["main.go"],"skipped":[]},"skipped_rules":[],"results":[{"check_id":"bad","path":"main.go","start":{"line":0},"end":{"line":0}}]}`, 0)
+	semgrep := fakeSemgrep(t, `{"version":"1.139.0","errors":[],"paths":{"scanned":["main.go"],"skipped":[]},"skipped_rules":[],"results":[{"check_id":"bad","path":"main.go","start":{"line":0},"end":{"line":0}}]}`, 0)
 	config := writeFile(t, "rules.yml", testRules)
 	adapter, err := newAdapter(semgrep, config, repository, []string{sqlSignal})
 	if err != nil {
@@ -121,9 +200,10 @@ func TestAdapterFailsClosedForIncompleteOrSkippedScans(t *testing.T) {
 	tests := []struct {
 		name, report, code string
 	}{
-		{"target missing", `{"version":"1","errors":[],"paths":{"scanned":[],"skipped":[]},"skipped_rules":[],"results":[]}`, "semgrep_targets_incomplete"},
-		{"target skipped", `{"version":"1","errors":[],"paths":{"scanned":["main.go"],"skipped":[{"path":"main.go"}]},"skipped_rules":[],"results":[]}`, "semgrep_report_invalid"},
-		{"scan error", `{"version":"1","errors":[{"message":"parse failed"}],"paths":{"scanned":["main.go"],"skipped":[]},"skipped_rules":[],"results":[]}`, "semgrep_report_invalid"},
+		{"version mismatch", `{"version":"1.139.1","errors":[],"paths":{"scanned":["main.go"],"skipped":[]},"skipped_rules":[],"results":[]}`, "semgrep_report_invalid"},
+		{"target missing", `{"version":"1.139.0","errors":[],"paths":{"scanned":[],"skipped":[]},"skipped_rules":[],"results":[]}`, "semgrep_targets_incomplete"},
+		{"target skipped", `{"version":"1.139.0","errors":[],"paths":{"scanned":["main.go"],"skipped":[{"path":"main.go"}]},"skipped_rules":[],"results":[]}`, "semgrep_report_invalid"},
+		{"scan error", `{"version":"1.139.0","errors":[{"message":"parse failed"}],"paths":{"scanned":["main.go"],"skipped":[]},"skipped_rules":[],"results":[]}`, "semgrep_report_invalid"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -201,6 +281,40 @@ func TestAdapterRejectsUnimplementedCoverageAndTraversalDiff(t *testing.T) {
 	diff := []byte("diff --git a/x b/x\n--- a/../../x\n+++ /dev/null\n@@ -1 +0,0 @@\n-secret\n")
 	if _, err := parseDiff(diff); err == nil {
 		t.Fatal("expected traversal diff to be rejected")
+	}
+}
+
+func TestSemgrepTraceRanges(t *testing.T) {
+	trace := []byte(`{"taint_source":["CliLoc",[{"path":"main.rs","start":{"line":2},"end":{"line":3}},"source"]],"intermediate_vars":[{"location":{"path":"main.rs","start":{"line":4},"end":{"line":4}},"content":"value"}],"taint_sink":["CliLoc",[{"path":"main.rs","start":{"line":5},"end":{"line":5}},"sink"]]}`)
+	ranges, err := semgrepTraceRanges(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []semgrepTraceRange{{Path: "main.rs", Start: 2, End: 3}, {Path: "main.rs", Start: 4, End: 4}, {Path: "main.rs", Start: 5, End: 5}}
+	if fmt.Sprint(ranges) != fmt.Sprint(want) {
+		t.Fatalf("ranges = %+v, want %+v", ranges, want)
+	}
+	nested := []byte(`{"taint_source":["CliCall",[[{"path":"main.rs","start":{"line":1},"end":{"line":1}},"call"],[],["CliLoc",[{"path":"main.rs","start":{"line":2},"end":{"line":2}},"source"]]]],"taint_sink":["CliLoc",[{"path":"main.rs","start":{"line":3},"end":{"line":3}},"sink"]]}`)
+	ranges, err = semgrepTraceRanges(nested)
+	if err != nil || len(ranges) != 3 {
+		t.Fatalf("nested ranges = %+v, error = %v", ranges, err)
+	}
+
+	for _, invalid := range []string{
+		`null`,
+		`"trace"`,
+		`{}`,
+		`{"taint_source":[],"taint_sink":[]}`,
+		`{"taint_source":["Unknown",[]],"taint_sink":["CliLoc",[{"path":"main.rs","start":{"line":1},"end":{"line":1}},"sink"]]}`,
+		`{"taint_source":["CliCall",[]],"taint_sink":["CliLoc",[{"path":"main.rs","start":{"line":1},"end":{"line":1}},"sink"]]}`,
+		`{"taint_source":["CliLoc",[{"path":"main.rs","start":{"line":0},"end":{"line":1}},"source"]],"taint_sink":["CliLoc",[{"path":"main.rs","start":{"line":1},"end":{"line":1}},"sink"]]}`,
+		`{"taint_source":["CliLoc",[{"path":"main.rs","start":{"line":2},"end":{"line":1}},"source"]],"taint_sink":["CliLoc",[{"path":"main.rs","start":{"line":1},"end":{"line":1}},"sink"]]}`,
+		`{"taint_source":["CliLoc",[{"path":"main.rs","start":{"line":"2"},"end":{"line":2}},"source"]],"taint_sink":["CliLoc",[{"path":"main.rs","start":{"line":1},"end":{"line":1}},"sink"]]}`,
+		`{} {}`,
+	} {
+		if _, err := semgrepTraceRanges([]byte(invalid)); err == nil {
+			t.Fatalf("expected invalid trace %q to fail", invalid)
+		}
 	}
 }
 

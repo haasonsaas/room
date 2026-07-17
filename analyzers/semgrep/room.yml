@@ -76,15 +76,311 @@ rules:
     pattern-sources:
       - pattern-either:
           - pattern: std::env::args().nth(...)
+          - pattern: std::env::args_os().nth(...)
+          - pattern: std::env::args()
+          - pattern: std::env::args_os()
           - pattern: std::env::var(...)
+          - pattern: std::env::var_os(...)
           - pattern: $REQUEST.uri().query()
           - pattern: $REQUEST.uri().path()
           - pattern: $REQUEST.headers().get(...)
+          - pattern: $REQUEST.query_string()
+          - pattern: $REQUEST.match_info().get(...)
+          - pattern: $REQUEST.take_payload()
     pattern-sinks:
       - patterns:
           - pattern-either:
               - pattern: std::process::Command::new($VALUE)
-              - pattern: Command::new($VALUE)
+              - pattern: tokio::process::Command::new($VALUE)
+              - pattern: std::process::Command::new(...).arg($VALUE)
+              - pattern: std::process::Command::new(...).args($VALUE)
+              - pattern: tokio::process::Command::new(...).arg($VALUE)
+              - pattern: tokio::process::Command::new(...).args($VALUE)
+          - focus-metavariable: $VALUE
+      - patterns:
+          - pattern-either:
               - pattern: $COMMAND.arg($VALUE)
               - pattern: $COMMAND.args($VALUE)
+          - pattern-either:
+              - pattern-inside: |
+                  let mut $COMMAND = std::process::Command::new(...);
+                  ...
+              - pattern-inside: |
+                  let $COMMAND = std::process::Command::new(...);
+                  ...
+              - pattern-inside: |
+                  let mut $COMMAND = tokio::process::Command::new(...);
+                  ...
+              - pattern-inside: |
+                  let $COMMAND = tokio::process::Command::new(...);
+                  ...
+          - focus-metavariable: $VALUE
+
+  - id: room.rust.request-input-panics
+    message: Request-derived input reaches unwrap, expect, or an explicit panic.
+    severity: ERROR
+    languages: [rust]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQUEST.uri().query()
+          - pattern: $REQUEST.uri().path()
+          - pattern: $REQUEST.headers().get(...)
+          - pattern: $REQUEST.query_string()
+          - pattern: $REQUEST.match_info().get(...)
+          - pattern: $REQUEST.take_payload()
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $VALUE.unwrap()
+              - pattern: $VALUE.expect(...)
+          - focus-metavariable: $VALUE
+      - patterns:
+          - pattern-either:
+              - pattern: panic!($VALUE)
+              - pattern: panic!(..., $VALUE, ...)
+          - focus-metavariable: $VALUE
+
+  - id: room.rust.untrusted-filesystem-path
+    message: Process or request input reaches a filesystem path operation.
+    severity: ERROR
+    languages: [rust]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_UNTRUSTED_PATH
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: std::env::args().nth(...)
+          - pattern: std::env::args_os().nth(...)
+          - pattern: std::env::args()
+          - pattern: std::env::args_os()
+          - pattern: std::env::var(...)
+          - pattern: std::env::var_os(...)
+          - pattern: $REQUEST.uri().query()
+          - pattern: $REQUEST.uri().path()
+          - pattern: $REQUEST.headers().get(...)
+          - pattern: $REQUEST.query_string()
+          - pattern: $REQUEST.match_info().get(...)
+          - pattern: $REQUEST.take_payload()
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: std::fs::read($PATH)
+              - pattern: std::fs::read_to_string($PATH)
+              - pattern: std::fs::write($PATH, ...)
+              - pattern: std::fs::remove_file($PATH)
+              - pattern: std::fs::remove_dir($PATH)
+              - pattern: std::fs::remove_dir_all($PATH)
+              - pattern: std::fs::metadata($PATH)
+              - pattern: std::fs::symlink_metadata($PATH)
+              - pattern: std::fs::create_dir($PATH)
+              - pattern: std::fs::create_dir_all($PATH)
+              - pattern: std::fs::File::open($PATH)
+              - pattern: std::fs::File::create($PATH)
+              - pattern: tokio::fs::read($PATH)
+              - pattern: tokio::fs::read_to_string($PATH)
+              - pattern: tokio::fs::write($PATH, ...)
+              - pattern: tokio::fs::remove_file($PATH)
+              - pattern: tokio::fs::remove_dir($PATH)
+              - pattern: tokio::fs::remove_dir_all($PATH)
+              - pattern: tokio::fs::metadata($PATH)
+              - pattern: tokio::fs::create_dir($PATH)
+              - pattern: tokio::fs::create_dir_all($PATH)
+              - pattern: tokio::fs::File::open($PATH)
+              - pattern: tokio::fs::File::create($PATH)
+          - focus-metavariable: $PATH
+      - patterns:
+          - pattern-either:
+              - pattern: $FS::read($PATH)
+              - pattern: $FS::read_to_string($PATH)
+              - pattern: $FS::write($PATH, ...)
+              - pattern: $FS::remove_file($PATH)
+              - pattern: $FS::remove_dir($PATH)
+              - pattern: $FS::remove_dir_all($PATH)
+              - pattern: $FS::metadata($PATH)
+              - pattern: $FS::create_dir($PATH)
+              - pattern: $FS::create_dir_all($PATH)
+          - pattern-either:
+              - pattern-inside: |
+                  use std::fs as $FS;
+                  ...
+              - pattern-inside: |
+                  use tokio::fs as $FS;
+                  ...
+          - focus-metavariable: $PATH
+      - patterns:
+          - pattern-either:
+              - pattern: std::fs::rename($PATH, ...)
+              - pattern: std::fs::copy($PATH, ...)
+              - pattern: tokio::fs::rename($PATH, ...)
+              - pattern: tokio::fs::copy($PATH, ...)
+          - focus-metavariable: $PATH
+      - patterns:
+          - pattern-either:
+              - pattern: std::fs::rename(..., $PATH)
+              - pattern: std::fs::copy(..., $PATH)
+              - pattern: tokio::fs::rename(..., $PATH)
+              - pattern: tokio::fs::copy(..., $PATH)
+          - focus-metavariable: $PATH
+
+  - id: room.rust.blocking-lock-across-await
+    message: A blocking lock guard remains live across an await point.
+    severity: ERROR
+    languages: [rust]
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT
+      room_confidence_basis_points: 9000
+    patterns:
+      - pattern-either:
+          - pattern: |
+              let $GUARD = $LOCK.lock().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.read().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.write().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.lock().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.read().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.write().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.lock().expect(...);
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.read().expect(...);
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.write().expect(...);
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.blocking_lock();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.blocking_read();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.blocking_write();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.blocking_lock();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.blocking_read();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.blocking_write();
+              ...
+              $AWAITED.await
+      - pattern-not: |
+          let $GUARD = $ACQUIRE;
+          ...
+          drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let mut $GUARD = $ACQUIRE;
+          ...
+          drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let $GUARD = $ACQUIRE;
+          ...
+          std::mem::drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let mut $GUARD = $ACQUIRE;
+          ...
+          std::mem::drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let $GUARD = $ACQUIRE;
+          ...
+          core::mem::drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let mut $GUARD = $ACQUIRE;
+          ...
+          core::mem::drop($GUARD);
+          ...
+          $AWAITED.await
+
+  - id: room.rust.weak-rng-for-secret
+    message: A secret-like value is generated with a known non-cryptographic RNG.
+    severity: ERROR
+    languages: [rust]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern: fastrand::$METHOD(...)
+      - patterns:
+          - pattern: $RNG.$METHOD(...)
+          - pattern-inside: |
+              let mut $RNG = fastrand::Rng::$CONSTRUCTOR(...);
+              ...
+      - patterns:
+          - pattern: $RNG.$METHOD(...)
+          - pattern-inside: |
+              let mut $RNG = rand::rngs::SmallRng::$CONSTRUCTOR(...);
+              ...
+      - patterns:
+          - pattern: $RNG.$METHOD(...)
+          - pattern-inside: |
+              let mut $RNG = SmallRng::$CONSTRUCTOR(...);
+              ...
+      - patterns:
+          - pattern: $RNG.$METHOD(...)
+          - pattern-inside: |
+              let mut $RNG = oorandom::$TYPE::new(...);
+              ...
+          - metavariable-regex:
+              metavariable: $TYPE
+              regex: '^(?:Rand32|Rand64)$'
+      - patterns:
+          - pattern: $RNG.$METHOD(...)
+          - pattern-inside: |
+              let mut $RNG = nanorand::$TYPE::new(...);
+              ...
+          - metavariable-regex:
+              metavariable: $TYPE
+              regex: '^(?:WyRand|Pcg64)$'
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: let $SECRET = $VALUE;
+              - pattern: let mut $SECRET = $VALUE;
+              - pattern: $SECRET = $VALUE;
+          - metavariable-regex:
+              metavariable: $SECRET
+              regex: '(?i)^(?:.*_)?(?:secret|token|api_key|private_key|password|passwd|session_id|session_token|nonce|salt|otp)(?:_.*)?$'
           - focus-metavariable: $VALUE
