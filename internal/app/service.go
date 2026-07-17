@@ -108,7 +108,7 @@ func (s *Service) PreviewRuleset(ctx context.Context, req *connect.Request[roomv
 	if phaseErr != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, phaseErr)
 	}
-	report := s.analyze(ctx, phase, content, input.GetContext().GetChangedFiles())
+	report := s.analyze(ctx, phase, content, input.GetContext().GetChangedFiles(), input.GetContext().GetCwd())
 	result := s.evaluationPolicy.Evaluate(preview, input.GetContext(), report)
 	return connect.NewResponse(&roomv1.PreviewRulesetResponse{Result: result}), nil
 }
@@ -210,7 +210,7 @@ func (s *Service) evaluate(ctx context.Context, phase roomv1.AnalysisPhase, inpu
 	if input != nil && phase == roomv1.AnalysisPhase_ANALYSIS_PHASE_DIFF {
 		content = input.GetDiff()
 	}
-	report := s.analyze(ctx, phase, []byte(content), verified.GetChangedFiles())
+	report := s.analyze(ctx, phase, []byte(content), verified.GetChangedFiles(), verified.GetCwd())
 	ruleset := scopedRuleset(s.store.ActiveRuleset(), principal)
 	result := s.evaluationPolicy.Evaluate(ruleset, verified, report)
 	eventID, auditErr := s.store.AppendAudit(evaluationEvent(principal, phase, result))
@@ -754,9 +754,9 @@ func candidateRepository(candidate *roomv1.PolicyCandidate) (string, error) {
 	return repositories[0], nil
 }
 
-func (s *Service) analyze(ctx context.Context, phase roomv1.AnalysisPhase, content []byte, changedFiles []string) *roomv1.AnalysisReport {
+func (s *Service) analyze(ctx context.Context, phase roomv1.AnalysisPhase, content []byte, changedFiles []string, workingDirectory string) *roomv1.AnalysisReport {
 	if s.analyzer != nil {
-		return s.analyzer.Analyze(ctx, analyzer.Input{Phase: phase, Content: content, ChangedFiles: changedFiles})
+		return s.analyzer.Analyze(ctx, analyzer.Input{Phase: phase, Content: content, ChangedFiles: changedFiles, WorkingDirectory: workingDirectory})
 	}
 	digest := sha256.Sum256(content)
 	return &roomv1.AnalysisReport{ReportId: "unavailable", Status: roomv1.AnalysisStatus_ANALYSIS_STATUS_UNAVAILABLE, Artifact: &roomv1.ArtifactRef{Phase: phase, Sha256: digest[:], ChangedFiles: append([]string(nil), changedFiles...)}}

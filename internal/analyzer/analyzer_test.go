@@ -22,6 +22,7 @@ func TestExternalAnalyzerStampsTrustedIdentityAndArtifact(t *testing.T) {
 	executable := writeProvider(t, fmt.Sprintf(`{
   "phase":"ANALYSIS_PHASE_DIFF",
   "status":"ANALYSIS_STATUS_COMPLETE",
+  "changed_files":["api.go"],
   "languages":[" Go ","SQL"],
   "frameworks":["ConnectRPC"],
   "covered_signals":["SIGNAL_KIND_SECRET_LITERAL"],
@@ -52,6 +53,9 @@ func TestExternalAnalyzerStampsTrustedIdentityAndArtifact(t *testing.T) {
 	}
 	if got := report.GetArtifact().GetPhase(); got != input.Phase {
 		t.Fatalf("phase = %s", got)
+	}
+	if fmt.Sprint(report.GetArtifact().GetChangedFiles()) != "[api.go]" {
+		t.Fatalf("changed files = %v", report.GetArtifact().GetChangedFiles())
 	}
 	if fmt.Sprint(report.GetArtifact().GetLanguages()) != "[go sql]" || fmt.Sprint(report.GetArtifact().GetFrameworks()) != "[connectrpc]" {
 		t.Fatalf("artifact classification = languages %v frameworks %v", report.GetArtifact().GetLanguages(), report.GetArtifact().GetFrameworks())
@@ -187,7 +191,7 @@ func TestNewExternalDefaultsAndValidatesOutputLimit(t *testing.T) {
 }
 
 func TestExternalAnalyzerUsesJSONStdinAndLiteralArguments(t *testing.T) {
-	input := Input{Phase: roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN, Content: []byte("binary\x00artifact"), ChangedFiles: []string{"one.go", "two.go"}}
+	input := Input{Phase: roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN, Content: []byte("binary\x00artifact"), ChangedFiles: []string{"one.go", "two.go"}, WorkingDirectory: "/workspace/repo"}
 	digest := sha256.Sum256(input.Content)
 	temp := t.TempDir()
 	capture := filepath.Join(temp, "request.json")
@@ -199,7 +203,9 @@ func TestExternalAnalyzerUsesJSONStdinAndLiteralArguments(t *testing.T) {
 	if err := os.WriteFile(executable, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a, err := NewExternal(Config{ID: "boundary", Version: "1", Executable: executable, Args: []string{literalArgument}, CoveredSignals: []roomv1.SignalKind{secretSignal}})
+	configBytes := []byte("rules-v4")
+	wantConfigDigest := sha256.Sum256(configBytes)
+	a, err := NewExternal(Config{ID: "boundary", Version: "1", Executable: executable, Args: []string{literalArgument}, Config: configBytes, CoveredSignals: []roomv1.SignalKind{secretSignal}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,6 +228,12 @@ func TestExternalAnalyzerUsesJSONStdinAndLiteralArguments(t *testing.T) {
 	}
 	if fmt.Sprint(request.ChangedFiles) != fmt.Sprint(input.ChangedFiles) {
 		t.Fatalf("changed files = %v", request.ChangedFiles)
+	}
+	if request.WorkingDirectory != input.WorkingDirectory {
+		t.Fatalf("working directory = %q", request.WorkingDirectory)
+	}
+	if request.ConfigSHA256 != hex.EncodeToString(wantConfigDigest[:]) {
+		t.Fatalf("config digest = %q", request.ConfigSHA256)
 	}
 }
 
