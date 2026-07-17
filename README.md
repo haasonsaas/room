@@ -4,7 +4,17 @@ Room is a self-hosted guardrail control plane for coding agents. It publishes
 immutable, scoped rulesets; evaluates trusted analyzer receipts; governs typed
 MCP identities; and records durable audit events.
 
-## What it includes
+```mermaid
+flowchart LR
+    Agent["Coding agent"] --> MCP["Room MCP"]
+    MCP --> API["Room control plane"]
+    API --> Analyzer["Trusted analyzer"]
+    API --> DB[("SQLite audit and policy store")]
+    Operator["Human operator"] --> Dashboard["Dashboard"]
+    Dashboard --> API
+```
+
+## Capabilities
 
 - ConnectRPC and Protobuf admin/agent APIs.
 - Four focused MCP tools: `room_get_rules`, `room_analyze_plan`, `room_check_diff`, and `room_open_policy_control`.
@@ -16,8 +26,8 @@ MCP identities; and records durable audit events.
 
 ## Local setup
 
-Create an admin credential and a repository-scoped agent credential. Tokens are
-shown once; the credential registry stores only SHA-256 digests.
+Create admin, reviewer, and repository-scoped agent credentials. Token plaintext
+is written to private output files; the registry stores only SHA-256 digests.
 
 ```bash
 go run ./cmd/roomctl token issue \
@@ -32,47 +42,47 @@ go run ./cmd/roomctl token issue \
   --output .room/agent.token
 ```
 
-Install [Semgrep Community Edition](https://semgrep.dev/docs/getting-started/),
-build the Linux adapter, and configure the repository it may scan:
+Start `roomd`, then open `http://127.0.0.1:8787` and paste the admin token into
+the in-memory token field. The dashboard does not persist tokens.
 
 ```bash
-go build -o ~/.local/bin/room-semgrep ./cmd/room-semgrep
-
-ROOM_ANALYZER_EXECUTABLE="$HOME/.local/bin/room-semgrep" \
-ROOM_ANALYZER_ARGS='["--semgrep-core","/absolute/path/to/semgrep-core","--config","/absolute/path/to/room/analyzers/semgrep/room.yml","--repository-root","/absolute/path/to/repository","--covered-signal","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT"]' \
-ROOM_ANALYZER_CONFIG_FILE=/absolute/path/to/room/analyzers/semgrep/room.yml \
-ROOM_ANALYZER_ID=room.semgrep \
-ROOM_ANALYZER_VERSION=1 \
-ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT"]' \
 go run ./cmd/roomd
 ```
 
-The included rule detects Go HTTP input that reaches SQL query text. The
-adapter invokes the OSS `semgrep-core` binary directly so core parser and rule
-skips remain visible. It snapshots regular changed files beneath
-`--repository-root` and emits findings only when their source range intersects
-an added diff line. Plan evaluation remains indeterminate because Semgrep
-requires source files.
-
 Without an analyzer, evaluations return `INDETERMINATE`; enforcement callers
-block that result. For local development only, authentication may be disabled on
-a loopback listener with `ROOM_AUTH_MODE=disabled`.
+block that result. Local development can disable authentication on a loopback
+listener with `ROOM_AUTH_MODE=disabled`.
 
-Open `http://127.0.0.1:8787` and paste the admin token into the in-memory token
-field. The dashboard never persists tokens.
+### Semgrep analyzer
 
-The Rules catalog includes learned candidates beside authored rules. Review
-findings are ingested with a typed claim kind, source identity, confidence, and
-cost metadata. Fixes, resolutions, reactions, merges, reverts, regressions, and
-agent adjudications are recorded as separate durable evidence. Room can then
-infer candidates, replay them over the stored corpus, tune their confidence
-threshold, and advance them through draft, shadow, warn, and block stages.
-All blocking policies require an authenticated human operator and explicit
-approval; pause and rollback remain human-only emergency controls.
-Review automation should use the least-privilege `reviewer` credential. It can
-ingest evidence, infer, replay, tune, and advance eligible non-protected staged
-policies, but it cannot directly edit or publish arbitrary rulesets, change MCP
-trust policy, or exercise human-only controls.
+The Linux Semgrep adapter scans source snapshots with the OSS `semgrep-core`
+binary. The included rule detects Go HTTP input that reaches SQL query text.
+
+```bash
+go build -o ~/.local/bin/room-semgrep ./cmd/room-semgrep
+```
+
+See the [analyzer contract](docs/analyzer.md#semgrep-adapter) for the required
+`semgrep-core`, repository, rule, coverage, and timeout configuration.
+
+## Review intelligence
+
+Room records review claims and outcomes as typed evidence. Replays measure
+candidate precision and recall before each rollout promotion.
+
+```mermaid
+flowchart LR
+    Finding["Typed finding and outcomes"] --> Draft["Draft candidate"]
+    Draft -->|"fresh replay"| Shadow
+    Shadow -->|"precision and recall thresholds"| Warn
+    Warn -->|"block thresholds and human approval"| Block
+```
+
+The `reviewer` credential can ingest evidence, infer candidates, run replays,
+tune thresholds, and advance eligible non-protected policies. Block, pause, and
+rollback require an authenticated human operator.
+
+## MCP integration
 
 Run the MCP sidecar separately:
 
@@ -104,7 +114,9 @@ candidate and Rollout tab but never changes policy. The actual transition still
 requires the dashboard's human-operator credential, confirmation, and
 compare-and-swap checks. Do not put credentials in the control-plane URL.
 
-For Codex, keep general approvals locked down while allowing the user to review
+### Codex
+
+Keep general approvals locked down while allowing the user to review
 MCP elicitations:
 
 ```toml
@@ -144,8 +156,12 @@ through the bootstrap command; scope changes require the authenticated,
 human-confirmed dashboard workflow, which rotates the token and records the
 mutation receipt atomically without restarting `roomd` or `room-mcp`.
 
-See [architecture](docs/architecture.md), [analyzer contract](docs/analyzer.md),
-[rules](docs/rules.md), and [hooks](docs/hooks.md).
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Analyzer contract](docs/analyzer.md)
+- [Rules](docs/rules.md)
+- [Hooks](docs/hooks.md)
 
 ## Development
 
