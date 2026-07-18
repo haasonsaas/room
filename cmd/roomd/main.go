@@ -44,10 +44,18 @@ func main() {
 				log.Fatalf("read analyzer config: %v", err)
 			}
 		}
+		var analyzerTool []byte
+		if cfg.AnalyzerToolFile != "" {
+			analyzerTool, err = os.ReadFile(cfg.AnalyzerToolFile)
+			if err != nil {
+				log.Fatalf("read analyzer tool: %v", err)
+			}
+		}
 		provider, buildErr := analyzer.NewExternal(analyzer.Config{
 			ID: cfg.AnalyzerID, Version: cfg.AnalyzerVersion, Executable: cfg.AnalyzerExecutable,
-			Args: cfg.AnalyzerArgs, Config: analyzerConfig, CoveredSignals: coveredSignals, Timeout: cfg.AnalyzerTimeout,
+			Args: cfg.AnalyzerArgs, Config: analyzerConfig, Tool: analyzerTool, CoveredSignals: coveredSignals, Timeout: cfg.AnalyzerTimeout,
 		})
+		analyzerTool = nil // the digest is bound; the binary bytes stay out of resident memory
 		if buildErr != nil {
 			log.Fatalf("configure analyzer: %v", buildErr)
 		}

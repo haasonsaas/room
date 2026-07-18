@@ -283,6 +283,11 @@ func canonicalAnalyzer(value *roomv1.AnalyzerIdentity) (*roomv1.AnalyzerIdentity
 	if err := validateDigest(copyValue.GetConfigSha256(), "identity config"); err != nil {
 		return nil, err
 	}
+	if tool := copyValue.GetToolSha256(); len(tool) != 0 {
+		if err := validateDigest(tool, "identity tool"); err != nil {
+			return nil, err
+		}
+	}
 	return copyValue, nil
 }
 

@@ -2,7 +2,9 @@
 
 Room launches one explicitly configured absolute executable without a shell.
 The request is strict JSON on stdin and contains the analysis phase, base64 JSON
-content bytes, changed files, working directory, and SHA-256 input digest. The
+content bytes, changed files, working directory, and SHA-256 digests for the
+input, the analyzer configuration, and—when `ROOM_ANALYZER_TOOL_FILE` is
+set—the tool binary. The
 executable must return exactly one JSON object on stdout; unknown or trailing
 fields are rejected. The working directory is caller-supplied and must be
 restricted by analyzers that read files.
@@ -15,7 +17,8 @@ policy uses them only when the report contains a valid receipt from the configur
 analyzer. Agent-supplied classification cannot narrow a rule's scope. Every signal
 has a stable fingerprint, a confidence from 0–10000, and optional typed
 location/evidence hashes. Room—not the provider—stamps the configured analyzer
-ID, version, and configuration digest onto accepted receipts.
+ID, version, configuration digest, and tool-binary digest onto accepted
+receipts.
 
 For `COMPLETE`, all signals configured for the analyzer must be present in
 `covered_signals`, even when no finding exists. Process failure, digest mismatch,
@@ -30,6 +33,7 @@ ROOM_ANALYZER_EXECUTABLE=/absolute/path/to/analyzer
 ROOM_ANALYZER_ARGS='["--format","room-v1"]'
 ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT","SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH"]'
 ROOM_ANALYZER_CONFIG_FILE=/path/to/analyzer-config
+ROOM_ANALYZER_TOOL_FILE=/path/to/scanner-binary   # optional; SHA-256 bound into receipts
 ROOM_ANALYZER_ID=company.security-analyzer
 ROOM_ANALYZER_VERSION=1
 ROOM_ANALYZER_TIMEOUT=30s
@@ -115,12 +119,20 @@ go build -o ~/.local/bin/room-semgrep ./cmd/room-semgrep
 ROOM_ANALYZER_EXECUTABLE="$HOME/.local/bin/room-semgrep"
 ROOM_ANALYZER_ARGS='["--semgrep-core","/absolute/path/to/semgrep-core","--config","/absolute/path/to/room/analyzers/semgrep/room.yml","--repository-root","/srv/repos/my-repository","--covered-signal","SIGNAL_KIND_SECRET_LITERAL","--covered-signal","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","--covered-signal","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","--covered-signal","SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH","--covered-signal","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT","--covered-signal","SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET","--covered-signal","SIGNAL_KIND_RUST_UNTRUSTED_PATH","--covered-signal","SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT"]'
 ROOM_ANALYZER_CONFIG_FILE=/absolute/path/to/room/analyzers/semgrep/room.yml
+ROOM_ANALYZER_TOOL_FILE=/absolute/path/to/semgrep-core
 ROOM_ANALYZER_COVERED_SIGNALS='["SIGNAL_KIND_SECRET_LITERAL","SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION","SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH","SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT","SIGNAL_KIND_RUST_WEAK_RNG_FOR_SECRET","SIGNAL_KIND_RUST_UNTRUSTED_PATH","SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT"]'
 ROOM_ANALYZER_ID=room.semgrep
 ROOM_ANALYZER_VERSION=1
 ```
 
 `ROOM_ANALYZER_CONFIG_FILE` binds the rules file contents to Room's analyzer
-identity. Update `ROOM_ANALYZER_VERSION` when the `semgrep-core` binary changes.
+identity, and `ROOM_ANALYZER_TOOL_FILE` binds the `semgrep-core` binary the
+same way. The setting is optional in the analyzer contract, but the stock
+`room-semgrep` adapter requires it: without a digest, every diff request fails
+with `tool_digest_mismatch`. The adapter resolves the tool path at
+startup—pipx-style symlinked installs work—hashes the resolved binary once,
+and re-resolves it on every diff request; a binary that changed since startup
+also fails with `tool_digest_mismatch`. Restart the adapter after upgrading
+`semgrep-core`.
 The adapter returns `PARTIAL` for plan analysis and does not claim signal
 coverage for plans.

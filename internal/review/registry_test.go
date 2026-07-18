@@ -25,6 +25,7 @@ func TestRegistryConstruction(t *testing.T) {
 		{name: "missing id", values: []*roomv1.ReviewVerifierIdentity{mutateVerifier(validDeterministic, func(v *roomv1.ReviewVerifierIdentity) { v.Analyzer.Id = "" })}},
 		{name: "missing version", values: []*roomv1.ReviewVerifierIdentity{mutateVerifier(validDeterministic, func(v *roomv1.ReviewVerifierIdentity) { v.Analyzer.Version = "" })}},
 		{name: "short config digest", values: []*roomv1.ReviewVerifierIdentity{mutateVerifier(validDeterministic, func(v *roomv1.ReviewVerifierIdentity) { v.Analyzer.ConfigSha256 = []byte{1} })}},
+		{name: "short tool digest", values: []*roomv1.ReviewVerifierIdentity{mutateVerifier(validDeterministic, func(v *roomv1.ReviewVerifierIdentity) { v.Analyzer.ToolSha256 = []byte{1} })}},
 		{name: "unknown kind", values: []*roomv1.ReviewVerifierIdentity{mutateVerifier(validDeterministic, func(v *roomv1.ReviewVerifierIdentity) { v.Kind = roomv1.ReviewVerifierKind(99) })}},
 		{name: "empty coverage", values: []*roomv1.ReviewVerifierIdentity{mutateVerifier(validDeterministic, func(v *roomv1.ReviewVerifierIdentity) { v.CoveredClaims = nil })}},
 		{name: "unspecified coverage", values: []*roomv1.ReviewVerifierIdentity{mutateVerifier(validDeterministic, func(v *roomv1.ReviewVerifierIdentity) {

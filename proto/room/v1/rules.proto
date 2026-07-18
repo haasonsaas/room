@@ -330,6 +330,7 @@ message AnalyzerIdentity {
   string id = 1;
   string version = 2;
   bytes config_sha256 = 3;
+  bytes tool_sha256 = 4;
 }
 
 message SecuritySignal {

@@ -30,7 +30,7 @@ func handler(db *sql.DB, r *http.Request) {
 		t.Fatal(err)
 	}
 	diff := []byte("diff --git a/query.go b/query.go\n--- a/query.go\n+++ b/query.go\n@@ -6,0 +7 @@\n+\tdb.Query(second)\n")
-	response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	response := adapter.analyze(t.Context(), requestFor(repository, config, core, diff))
 	if response.Status != completeStatus || len(response.Signals) != 1 {
 		t.Fatalf("response = %+v", response)
 	}
@@ -116,7 +116,7 @@ func TestSemgrepCoreIntegrationIncludesAddedSources(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+			response := adapter.analyze(t.Context(), requestFor(repository, config, core, diff))
 			if response.Status != completeStatus || len(response.Signals) != 1 || response.Signals[0].Kind != test.signal || response.Signals[0].Location.StartLine != int32(test.resultLine) {
 				t.Fatalf("response = %+v", response)
 			}
@@ -149,7 +149,7 @@ func TestSemgrepCoreIntegrationRejectsInvalidRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := adapter.analyze(t.Context(), requestFor(repository, config, newFileDiff("main.go", source)))
+	response := adapter.analyze(t.Context(), requestFor(repository, config, core, newFileDiff("main.go", source)))
 	if response.Status != failedStatus || response.FailureCode != "semgrep_report_invalid" {
 		t.Fatalf("response = %+v", response)
 	}
@@ -166,7 +166,7 @@ func TestSemgrepCoreIntegrationFailsClosedForUnsupportedLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := adapter.analyze(t.Context(), requestFor(repository, config, newFileDiff("credentials.txt", source)))
+	response := adapter.analyze(t.Context(), requestFor(repository, config, core, newFileDiff("credentials.txt", source)))
 	if response.Status != failedStatus || response.FailureCode != "semgrep_targets_incomplete" {
 		t.Fatalf("response = %+v", response)
 	}

@@ -62,6 +62,9 @@ func canonicalVerifier(value *roomv1.ReviewVerifierIdentity, rejectDuplicateCove
 	if len(copyValue.Analyzer.GetConfigSha256()) != sha256.Size {
 		return nil, errors.New("analyzer config digest must be SHA-256")
 	}
+	if tool := copyValue.Analyzer.GetToolSha256(); len(tool) != 0 && len(tool) != sha256.Size {
+		return nil, errors.New("analyzer tool digest must be SHA-256")
+	}
 	if _, ok := roomv1.ReviewVerifierKind_name[int32(copyValue.GetKind())]; !ok || copyValue.GetKind() == roomv1.ReviewVerifierKind_REVIEW_VERIFIER_KIND_UNSPECIFIED {
 		return nil, errors.New("verifier kind is required")
 	}

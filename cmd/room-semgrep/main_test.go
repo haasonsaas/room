@@ -43,7 +43,7 @@ func TestAdapterMapsSemgrepMetadataAndFiltersToAddedLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	diff := []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -7,0 +8 @@\n+db.Query(query)\n")
-	response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	response := adapter.analyze(t.Context(), requestFor(repository, config, semgrep, diff))
 
 	if response.Status != completeStatus || fmt.Sprint(response.CoveredSignals) != "["+sqlSignal+"]" {
 		t.Fatalf("response = %+v", response)
@@ -77,19 +77,20 @@ func TestAdapterFiltersAgainstSemgrepDataflowTrace(t *testing.T) {
   }}]
 }`
 	config := writeFile(t, "rules.yml", testRules)
-	adapter, err := newAdapter(fakeSemgrep(t, report, 0), config, repository, []string{sqlSignal})
+	semgrep := fakeSemgrep(t, report, 0)
+	adapter, err := newAdapter(semgrep, config, repository, []string{sqlSignal})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	diff := []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -1,0 +2 @@\n+\tlet query = input();\n")
-	response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	response := adapter.analyze(t.Context(), requestFor(repository, config, semgrep, diff))
 	if response.Status != completeStatus || len(response.Signals) != 1 || response.Signals[0].Location.StartLine != 3 {
 		t.Fatalf("source-intersection response = %+v", response)
 	}
 
 	diff = []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -0,0 +1 @@\n+fn handler() {\n")
-	response = adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	response = adapter.analyze(t.Context(), requestFor(repository, config, semgrep, diff))
 	if response.Status != completeStatus || len(response.Signals) != 0 {
 		t.Fatalf("non-intersection response = %+v", response)
 	}
@@ -122,12 +123,13 @@ func TestAdapterRejectsInvalidSemgrepRanges(t *testing.T) {
     }
   }}]}`, test.resultEnd, test.tracePath, test.traceLine, test.traceLine)
 			config := writeFile(t, "rules.yml", testRules)
-			adapter, err := newAdapter(fakeSemgrep(t, report, 0), config, repository, []string{sqlSignal})
+			semgrep := fakeSemgrep(t, report, 0)
+			adapter, err := newAdapter(semgrep, config, repository, []string{sqlSignal})
 			if err != nil {
 				t.Fatal(err)
 			}
 			diff := []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -1,0 +2 @@\n+\tlet query = input();\n")
-			response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+			response := adapter.analyze(t.Context(), requestFor(repository, config, semgrep, diff))
 			if response.Status != failedStatus || response.FailureCode != "semgrep_result_invalid" {
 				t.Fatalf("response = %+v", response)
 			}
@@ -138,7 +140,7 @@ func TestAdapterRejectsInvalidSemgrepRanges(t *testing.T) {
 func TestAdapterReturnsPartialForPlansWithoutRunningSemgrep(t *testing.T) {
 	root, repository := workspace(t)
 	config := writeFile(t, "rules.yml", testRules)
-	adapter, err := newAdapter("/missing/semgrep", config, root, []string{sqlSignal})
+	adapter, err := newAdapter(fakeTool(t), config, root, []string{sqlSignal})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,11 +159,12 @@ func TestAdapterRejectsWorkspaceOutsideConfiguredRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(outside, "main.go"), []byte("package main\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	adapter, err := newAdapter("/missing/semgrep", config, repository, []string{sqlSignal})
+	tool := fakeTool(t)
+	adapter, err := newAdapter(tool, config, repository, []string{sqlSignal})
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := adapter.analyze(t.Context(), requestFor(outside, config, diff))
+	response := adapter.analyze(t.Context(), requestFor(outside, config, tool, diff))
 	if response.Status != failedStatus || response.FailureCode != "snapshot_invalid" {
 		t.Fatalf("response = %+v", response)
 	}
@@ -190,7 +193,7 @@ func TestAdapterRejectsMalformedSemgrepResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	diff := []byte("diff --git a/main.go b/main.go\n--- a/main.go\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n")
-	response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	response := adapter.analyze(t.Context(), requestFor(repository, config, semgrep, diff))
 	if response.Status != failedStatus || response.FailureCode != "semgrep_result_invalid" {
 		t.Fatalf("response = %+v", response)
 	}
@@ -212,12 +215,13 @@ func TestAdapterFailsClosedForIncompleteOrSkippedScans(t *testing.T) {
 				t.Fatal(err)
 			}
 			config := writeFile(t, "rules.yml", testRules)
-			adapter, err := newAdapter(fakeSemgrep(t, tt.report, 0), config, repository, []string{sqlSignal})
+			semgrep := fakeSemgrep(t, tt.report, 0)
+			adapter, err := newAdapter(semgrep, config, repository, []string{sqlSignal})
 			if err != nil {
 				t.Fatal(err)
 			}
 			diff := []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n")
-			response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+			response := adapter.analyze(t.Context(), requestFor(repository, config, semgrep, diff))
 			if response.Status != failedStatus || response.FailureCode != tt.code {
 				t.Fatalf("response = %+v", response)
 			}
@@ -231,24 +235,60 @@ func TestAdapterBindsConfigAndSourcePostimage(t *testing.T) {
 		t.Fatal(err)
 	}
 	config := writeFile(t, "rules.yml", testRules)
-	adapter, err := newAdapter("/missing/semgrep", config, repository, []string{sqlSignal})
+	tool := fakeTool(t)
+	adapter, err := newAdapter(tool, config, repository, []string{sqlSignal})
 	if err != nil {
 		t.Fatal(err)
 	}
 	diff := []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n")
-	response := adapter.analyze(t.Context(), requestFor(repository, config, diff))
+	response := adapter.analyze(t.Context(), requestFor(repository, config, tool, diff))
 	if response.FailureCode != "snapshot_invalid" {
 		t.Fatalf("source mismatch response = %+v", response)
 	}
 
 	deletion := []byte("diff --git a/old.go b/old.go\n--- a/old.go\n+++ /dev/null\n@@ -1 +0,0 @@\n-package old\n")
-	request := requestFor(repository, config, deletion)
+	request := requestFor(repository, config, tool, deletion)
 	if err := os.WriteFile(config, []byte(testRules+"# changed\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	response = adapter.analyze(t.Context(), request)
 	if response.FailureCode != "config_digest_mismatch" {
 		t.Fatalf("config mismatch response = %+v", response)
+	}
+}
+
+func TestAdapterBindsToolDigest(t *testing.T) {
+	_, repository := workspace(t)
+	if err := os.WriteFile(filepath.Join(repository, "handler.go"), []byte(strings.Repeat("\n", 7)+"db.Query(query)\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	report := `{
+  "version":"1.139.0",
+  "errors":[],
+  "paths":{"scanned":["handler.go"],"skipped":[]},
+  "skipped_rules":[],
+  "results":[
+    {"check_id":"old","path":"handler.go","start":{"line":3},"end":{"line":3},"extra":{"metadata":{"room_signal":"SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","room_confidence_basis_points":9000}}},
+    {"check_id":"new","path":"handler.go","start":{"line":8},"end":{"line":8},"extra":{"metadata":{"room_signal":"SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT","room_confidence_basis_points":9000}}}
+  ]
+}`
+	semgrep := fakeSemgrep(t, report, 0)
+	config := writeFile(t, "rules.yml", testRules)
+	adapter, err := newAdapter(semgrep, config, repository, []string{sqlSignal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	diff := []byte("diff --git a/handler.go b/handler.go\n--- a/handler.go\n+++ b/handler.go\n@@ -7,0 +8 @@\n+db.Query(query)\n")
+	request := requestFor(repository, config, semgrep, diff)
+
+	request.ToolSHA256 = ""
+	if response := adapter.analyze(t.Context(), request); response.Status != failedStatus || response.FailureCode != "tool_digest_mismatch" {
+		t.Fatalf("empty tool digest response = %+v", response)
+	}
+	other := sha256.Sum256([]byte("other-binary"))
+	request.ToolSHA256 = hex.EncodeToString(other[:])
+	if response := adapter.analyze(t.Context(), request); response.Status != failedStatus || response.FailureCode != "tool_digest_mismatch" {
+		t.Fatalf("wrong tool digest response = %+v", response)
 	}
 }
 
@@ -262,12 +302,13 @@ func TestAdapterRejectsSymlinkTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 	config := writeFile(t, "rules.yml", testRules)
-	adapter, err := newAdapter("/missing/semgrep", config, repository, []string{sqlSignal})
+	tool := fakeTool(t)
+	adapter, err := newAdapter(tool, config, repository, []string{sqlSignal})
 	if err != nil {
 		t.Fatal(err)
 	}
 	diff := []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n")
-	if response := adapter.analyze(t.Context(), requestFor(repository, config, diff)); response.FailureCode != "snapshot_invalid" {
+	if response := adapter.analyze(t.Context(), requestFor(repository, config, tool, diff)); response.FailureCode != "snapshot_invalid" {
 		t.Fatalf("response = %+v", response)
 	}
 }
@@ -279,8 +320,27 @@ func TestAdapterRejectsSymlinkedConfig(t *testing.T) {
 	if err := os.Symlink(target, linked); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newAdapter("/missing/semgrep", linked, repository, []string{sqlSignal}); err == nil {
+	if _, err := newAdapter(fakeTool(t), linked, repository, []string{sqlSignal}); err == nil {
 		t.Fatal("expected symlinked config to be rejected")
+	}
+}
+
+func TestAdapterBindsSymlinkedToolToRegularTarget(t *testing.T) {
+	_, repository := workspace(t)
+	config := writeFile(t, "rules.yml", testRules)
+	linked := filepath.Join(t.TempDir(), "semgrep-core")
+	if err := os.Symlink(fakeTool(t), linked); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newAdapter(linked, config, repository, []string{sqlSignal}); err != nil {
+		t.Fatalf("symlink to a regular tool must be accepted: %v", err)
+	}
+	dangling := filepath.Join(t.TempDir(), "dangling-core")
+	if err := os.Symlink(filepath.Join(t.TempDir(), "missing"), dangling); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newAdapter(dangling, config, repository, []string{sqlSignal}); err == nil {
+		t.Fatal("expected dangling symlink to be rejected")
 	}
 }
 
@@ -290,11 +350,12 @@ func TestAdapterFailsClosedWhenConfigBecomesSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	config := writeFile(t, "rules.yml", testRules)
-	adapter, err := newAdapter("/missing/semgrep", config, repository, []string{sqlSignal})
+	tool := fakeTool(t)
+	adapter, err := newAdapter(tool, config, repository, []string{sqlSignal})
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := requestFor(repository, config, []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n"))
+	request := requestFor(repository, config, tool, []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n"))
 	target := writeFile(t, "same-rules.yml", testRules)
 	if err := os.Remove(config); err != nil {
 		t.Fatal(err)
@@ -307,10 +368,30 @@ func TestAdapterFailsClosedWhenConfigBecomesSymlink(t *testing.T) {
 	}
 }
 
+func TestAdapterFailsClosedWhenToolChanges(t *testing.T) {
+	_, repository := workspace(t)
+	if err := os.WriteFile(filepath.Join(repository, "main.go"), []byte("package main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tool := fakeTool(t)
+	config := writeFile(t, "rules.yml", testRules)
+	adapter, err := newAdapter(tool, config, repository, []string{sqlSignal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := requestFor(repository, config, tool, []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n"))
+	if err := os.WriteFile(tool, []byte("#!/bin/sh\nexit 2\n# changed\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if response := adapter.analyze(t.Context(), request); response.Status != failedStatus || response.FailureCode != "tool_digest_mismatch" {
+		t.Fatalf("response = %+v", response)
+	}
+}
+
 func TestAdapterRejectsUnimplementedCoverageAndTraversalDiff(t *testing.T) {
 	_, repository := workspace(t)
 	emptyConfig := writeFile(t, "empty.yml", "rules: []\n")
-	if _, err := newAdapter("/missing/semgrep", emptyConfig, repository, []string{sqlSignal}); err == nil {
+	if _, err := newAdapter(fakeTool(t), emptyConfig, repository, []string{sqlSignal}); err == nil {
 		t.Fatal("expected empty ruleset to be rejected")
 	}
 	diff := []byte("diff --git a/x b/x\n--- a/../../x\n+++ /dev/null\n@@ -1 +0,0 @@\n-secret\n")
@@ -363,11 +444,14 @@ func workspace(t *testing.T) (string, string) {
 	return root, repository
 }
 
-func requestFor(repository, config string, content []byte) analyzerRequest {
+func requestFor(repository, config, semgrepCore string, content []byte) analyzerRequest {
 	request := requestForPhase(repository, content, "ANALYSIS_PHASE_DIFF")
 	configData, _ := os.ReadFile(config)
 	configDigest := sha256.Sum256(configData)
 	request.ConfigSHA256 = hex.EncodeToString(configDigest[:])
+	toolData, _ := os.ReadFile(semgrepCore)
+	toolDigest := sha256.Sum256(toolData)
+	request.ToolSHA256 = hex.EncodeToString(toolDigest[:])
 	return request
 }
 
@@ -379,6 +463,11 @@ func requestForPhase(repository string, content []byte, phase string) analyzerRe
 func fakeSemgrep(t *testing.T, report string, exitCode int) string {
 	t.Helper()
 	return writeExecutable(t, "semgrep", fmt.Sprintf("#!/bin/sh\nprintf '%%s' '%s'\nexit %d\n", report, exitCode))
+}
+
+func fakeTool(t *testing.T) string {
+	t.Helper()
+	return writeExecutable(t, "semgrep-core", "#!/bin/sh\nexit 1\n")
 }
 
 func writeExecutable(t *testing.T, name, content string) string {
@@ -406,7 +495,7 @@ func TestRunEmitsStrictProviderJSON(t *testing.T) {
 	encoded, _ := json.Marshal(request)
 	var stdout, stderr bytes.Buffer
 	config := writeFile(t, "rules.yml", testRules)
-	args := []string{"--semgrep-core", "/missing/semgrep-core", "--config", config, "--repository-root", repository, "--covered-signal", sqlSignal}
+	args := []string{"--semgrep-core", fakeTool(t), "--config", config, "--repository-root", repository, "--covered-signal", sqlSignal}
 	if code := run(args, bytes.NewReader(encoded), &stdout, &stderr); code != 0 {
 		t.Fatalf("run exit %d: %s", code, stderr.String())
 	}

@@ -21,6 +21,7 @@ type adapter struct {
 	repositoryRoot string
 	covered        []string
 	coveredSet     map[string]bool
+	tool           toolBinding
 }
 
 func newAdapter(semgrepCore, config, repositoryRoot string, covered []string) (*adapter, error) {
@@ -51,8 +52,26 @@ func newAdapter(semgrepCore, config, repositoryRoot string, covered []string) (*
 	if err := validateRuleCoverage(configData, coveredSet); err != nil {
 		return nil, err
 	}
+	resolvedCore, err := filepath.EvalSymlinks(semgrepCore)
+	if err != nil {
+		return nil, errors.New("semgrep-core executable cannot be resolved")
+	}
+	tool, err := hashToolBinary(resolvedCore)
+	if err != nil {
+		return nil, fmt.Errorf("semgrep-core executable must resolve to a regular file: %w", err)
+	}
 	sort.Strings(covered)
-	return &adapter{semgrepCore: semgrepCore, config: config, repositoryRoot: repositoryRoot, covered: covered, coveredSet: coveredSet}, nil
+	return &adapter{semgrepCore: semgrepCore, config: config, repositoryRoot: repositoryRoot, covered: covered, coveredSet: coveredSet, tool: tool}, nil
+}
+
+// toolMatches reports whether the binary the semgrep-core path currently
+// resolves to is still the startup-pinned binary with the expected digest.
+func (a *adapter) toolMatches(expected string) bool {
+	resolved, err := filepath.EvalSymlinks(a.semgrepCore)
+	if err != nil {
+		return false
+	}
+	return a.tool.matches(resolved, expected)
 }
 
 func validateRuleCoverage(config []byte, covered map[string]bool) error {
@@ -132,6 +151,10 @@ func (a *adapter) analyze(ctx context.Context, request analyzerRequest) analyzer
 	}
 	if !a.configMatches(request.ConfigSHA256) {
 		response.FailureCode = "config_digest_mismatch"
+		return response
+	}
+	if !a.toolMatches(request.ToolSHA256) {
+		response.FailureCode = "tool_digest_mismatch"
 		return response
 	}
 	snapshot, err := a.createSnapshot(request, artifact)

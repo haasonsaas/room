@@ -29,6 +29,7 @@ type Config struct {
 	AnalyzerSignals      []string
 	AnalyzerSignalsValid bool
 	AnalyzerConfigFile   string
+	AnalyzerToolFile     string
 	AnalyzerTimeout      time.Duration
 	AnalyzerTimeoutValid bool
 	AuditOnly            bool
@@ -74,6 +75,7 @@ func Load() Config {
 		AnalyzerSignals:      analyzerSignals,
 		AnalyzerSignalsValid: analyzerSignalsValid,
 		AnalyzerConfigFile:   strings.TrimSpace(os.Getenv("ROOM_ANALYZER_CONFIG_FILE")),
+		AnalyzerToolFile:     strings.TrimSpace(os.Getenv("ROOM_ANALYZER_TOOL_FILE")),
 		AnalyzerTimeout:      analyzerTimeout,
 		AnalyzerTimeoutValid: analyzerTimeoutValid,
 		AuditOnly:            auditOnly,

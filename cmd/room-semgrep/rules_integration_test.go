@@ -281,7 +281,7 @@ fn load() {
 			if err != nil {
 				t.Fatal(err)
 			}
-			response := adapter.analyze(t.Context(), requestFor(repository, config, newFileDiff(test.path, test.source)))
+			response := adapter.analyze(t.Context(), requestFor(repository, config, core, newFileDiff(test.path, test.source)))
 			if response.Status != completeStatus {
 				t.Fatalf("response = %+v", response)
 			}

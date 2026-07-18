@@ -131,6 +131,48 @@ func (a *adapter) createSnapshot(request analyzerRequest, artifact diffArtifact)
 	return snapshot{directory: repository, config: configPath, targetsFile: targetsPath, targets: targets, lineCounts: lineCounts}, nil
 }
 
+// toolBinding pins one scanner binary by digest and filesystem metadata. The
+// caller resolves symlinks before hashing and again on every request, so
+// pipx-style symlinked tool paths are supported while a swapped or upgraded
+// binary still fails closed until the adapter restarts.
+type toolBinding struct {
+	digest string
+	stat   unix.Stat_t
+}
+
+func hashToolBinary(path string) (toolBinding, error) {
+	fileFD, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	if err != nil {
+		return toolBinding{}, err
+	}
+	file := os.NewFile(uintptr(fileFD), path)
+	defer file.Close()
+	var before, after unix.Stat_t
+	if err := unix.Fstat(fileFD, &before); err != nil || before.Mode&unix.S_IFMT != unix.S_IFREG {
+		return toolBinding{}, errors.New("must be a regular file")
+	}
+	digest := sha256.New()
+	if _, err := io.Copy(digest, file); err != nil {
+		return toolBinding{}, err
+	}
+	if err := unix.Fstat(fileFD, &after); err != nil || before.Dev != after.Dev || before.Ino != after.Ino || before.Size != after.Size || before.Mtim != after.Mtim || before.Ctim != after.Ctim {
+		return toolBinding{}, errors.New("changed while being read")
+	}
+	return toolBinding{digest: hex.EncodeToString(digest.Sum(nil)), stat: before}, nil
+}
+
+func (binding toolBinding) matches(path, expected string) bool {
+	var current unix.Stat_t
+	if err := unix.Lstat(path, &current); err != nil {
+		return false
+	}
+	before := binding.stat
+	if current.Dev != before.Dev || current.Ino != before.Ino || current.Size != before.Size || current.Mtim != before.Mtim || current.Ctim != before.Ctim {
+		return false
+	}
+	return expected != "" && strings.EqualFold(expected, binding.digest)
+}
+
 func readRegularBeneath(rootFD int, path string) ([]byte, error) {
 	fileFD, err := unix.Openat2(rootFD, filepath.FromSlash(path), &unix.OpenHow{
 		Flags:   unix.O_RDONLY | unix.O_CLOEXEC | unix.O_NOFOLLOW,

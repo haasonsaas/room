@@ -38,7 +38,7 @@ func TestExternalAnalyzerStampsTrustedIdentityAndArtifact(t *testing.T) {
 
 	analyzer, err := NewExternal(Config{
 		ID: "semgrep", Version: "1.2.3", Executable: executable,
-		Args: []string{"--mode", "room"}, Config: []byte("rules-v4"), CoveredSignals: []roomv1.SignalKind{secretSignal},
+		Args: []string{"--mode", "room"}, Config: []byte("rules-v4"), Tool: []byte("semgrep-core-1.139.0"), CoveredSignals: []roomv1.SignalKind{secretSignal},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -62,17 +62,24 @@ func TestExternalAnalyzerStampsTrustedIdentityAndArtifact(t *testing.T) {
 	}
 	receipt := report.GetReceipts()[0]
 	wantConfigDigest := sha256.Sum256([]byte("rules-v4"))
+	wantToolDigest := sha256.Sum256([]byte("semgrep-core-1.139.0"))
 	if receipt.GetAnalyzer().GetId() != "semgrep" || receipt.GetAnalyzer().GetVersion() != "1.2.3" {
 		t.Fatalf("identity = %+v", receipt.GetAnalyzer())
 	}
 	if string(receipt.GetAnalyzer().GetConfigSha256()) != string(wantConfigDigest[:]) {
 		t.Fatalf("config digest = %x", receipt.GetAnalyzer().GetConfigSha256())
 	}
+	if string(receipt.GetAnalyzer().GetToolSha256()) != string(wantToolDigest[:]) {
+		t.Fatalf("tool digest = %x", receipt.GetAnalyzer().GetToolSha256())
+	}
 	if string(receipt.GetInputSha256()) != string(digest[:]) {
 		t.Fatalf("input digest = %x", receipt.GetInputSha256())
 	}
-	if got := receipt.GetSignals()[0].GetAnalyzer(); got.GetId() != "semgrep" || string(got.GetConfigSha256()) != string(wantConfigDigest[:]) {
+	if got := receipt.GetSignals()[0].GetAnalyzer(); got.GetId() != "semgrep" || string(got.GetConfigSha256()) != string(wantConfigDigest[:]) || string(got.GetToolSha256()) != string(wantToolDigest[:]) {
 		t.Fatalf("signal identity = %+v", got)
+	}
+	if got := analyzer.(*externalAnalyzer).config.Tool; len(got) != 0 {
+		t.Fatalf("tool bytes retained: %q", got)
 	}
 }
 
@@ -205,7 +212,9 @@ func TestExternalAnalyzerUsesJSONStdinAndLiteralArguments(t *testing.T) {
 	}
 	configBytes := []byte("rules-v4")
 	wantConfigDigest := sha256.Sum256(configBytes)
-	a, err := NewExternal(Config{ID: "boundary", Version: "1", Executable: executable, Args: []string{literalArgument}, Config: configBytes, CoveredSignals: []roomv1.SignalKind{secretSignal}})
+	toolBytes := []byte("tool-bytes")
+	wantToolDigest := sha256.Sum256(toolBytes)
+	a, err := NewExternal(Config{ID: "boundary", Version: "1", Executable: executable, Args: []string{literalArgument}, Config: configBytes, Tool: toolBytes, CoveredSignals: []roomv1.SignalKind{secretSignal}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,6 +243,9 @@ func TestExternalAnalyzerUsesJSONStdinAndLiteralArguments(t *testing.T) {
 	}
 	if request.ConfigSHA256 != hex.EncodeToString(wantConfigDigest[:]) {
 		t.Fatalf("config digest = %q", request.ConfigSHA256)
+	}
+	if request.ToolSHA256 != hex.EncodeToString(wantToolDigest[:]) {
+		t.Fatalf("tool digest = %q", request.ToolSHA256)
 	}
 }
 

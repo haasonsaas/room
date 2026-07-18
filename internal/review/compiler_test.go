@@ -94,6 +94,7 @@ func TestHypothesisDigestRejectsInvalidAuthorityFields(t *testing.T) {
 		{name: "invalid location", mutate: func(h *roomv1.ReviewHypothesis) { h.AffectedLocations[0].EndLine = 1 }},
 		{name: "missing producer", mutate: func(h *roomv1.ReviewHypothesis) { h.Producer = nil }},
 		{name: "short producer config", mutate: func(h *roomv1.ReviewHypothesis) { h.Producer.ConfigSha256 = []byte{1} }},
+		{name: "short producer tool", mutate: func(h *roomv1.ReviewHypothesis) { h.Producer.ToolSha256 = []byte{1} }},
 		{name: "unknown severity", mutate: func(h *roomv1.ReviewHypothesis) { h.Severity = roomv1.Severity(99) }},
 		{name: "confidence overflow", mutate: func(h *roomv1.ReviewHypothesis) { h.ConfidenceBasisPoints = 10001 }},
 		{name: "missing timestamp", mutate: func(h *roomv1.ReviewHypothesis) { h.CreatedAt = nil }},

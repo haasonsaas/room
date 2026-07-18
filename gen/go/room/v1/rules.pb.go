@@ -1892,6 +1892,7 @@ type AnalyzerIdentity struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	ConfigSha256  []byte                 `protobuf:"bytes,3,opt,name=config_sha256,json=configSha256,proto3" json:"config_sha256,omitempty"`
+	ToolSha256    []byte                 `protobuf:"bytes,4,opt,name=tool_sha256,json=toolSha256,proto3" json:"tool_sha256,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1943,6 +1944,13 @@ func (x *AnalyzerIdentity) GetVersion() string {
 func (x *AnalyzerIdentity) GetConfigSha256() []byte {
 	if x != nil {
 		return x.ConfigSha256
+	}
+	return nil
+}
+
+func (x *AnalyzerIdentity) GetToolSha256() []byte {
+	if x != nil {
+		return x.ToolSha256
 	}
 	return nil
 }
@@ -7924,11 +7932,13 @@ const file_room_v1_rules_proto_rawDesc = "" +
 	"\tlanguages\x18\x04 \x03(\tR\tlanguages\x12\x1e\n" +
 	"\n" +
 	"frameworks\x18\x05 \x03(\tR\n" +
-	"frameworks\"a\n" +
+	"frameworks\"\x82\x01\n" +
 	"\x10AnalyzerIdentity\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12#\n" +
-	"\rconfig_sha256\x18\x03 \x01(\fR\fconfigSha256\"\xa8\x02\n" +
+	"\rconfig_sha256\x18\x03 \x01(\fR\fconfigSha256\x12\x1f\n" +
+	"\vtool_sha256\x18\x04 \x01(\fR\n" +
+	"toolSha256\"\xa8\x02\n" +
 	"\x0eSecuritySignal\x12'\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x13.room.v1.SignalKindR\x04kind\x12 \n" +
 	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\x125\n" +

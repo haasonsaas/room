@@ -34,6 +34,7 @@ type analyzerRequest struct {
 	ChangedFiles     []string `json:"changed_files,omitempty"`
 	WorkingDirectory string   `json:"working_directory,omitempty"`
 	ConfigSHA256     string   `json:"config_sha256"`
+	ToolSHA256       string   `json:"tool_sha256,omitempty"`
 	InputSHA256      string   `json:"input_sha256"`
 }
 

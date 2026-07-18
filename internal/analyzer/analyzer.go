@@ -34,13 +34,16 @@ type Input struct {
 }
 
 // Config identifies and launches one analyzer. Args are passed directly to the
-// executable; they are never interpreted by a shell.
+// executable; they are never interpreted by a shell. Tool optionally holds the
+// bytes of the analyzer's underlying scanner binary; they are hashed into the
+// analyzer identity and then discarded, never retained.
 type Config struct {
 	ID             string
 	Version        string
 	Executable     string
 	Args           []string
 	Config         []byte
+	Tool           []byte
 	CoveredSignals []roomv1.SignalKind
 	MaxOutputBytes int64
 	Timeout        time.Duration
@@ -98,12 +101,18 @@ func NewExternal(config Config) (Analyzer, error) {
 		coverage[signal] = struct{}{}
 	}
 	configDigest := sha256.Sum256(config.Config)
+	var toolDigest []byte
+	if len(config.Tool) > 0 {
+		digest := sha256.Sum256(config.Tool)
+		toolDigest = digest[:]
+	}
 	config.Args = append([]string(nil), config.Args...)
 	config.Config = append([]byte(nil), config.Config...)
+	config.Tool = nil
 	config.CoveredSignals = append([]roomv1.SignalKind(nil), config.CoveredSignals...)
 	return &externalAnalyzer{
 		config:         config,
-		identity:       &roomv1.AnalyzerIdentity{Id: config.ID, Version: config.Version, ConfigSha256: configDigest[:]},
+		identity:       &roomv1.AnalyzerIdentity{Id: config.ID, Version: config.Version, ConfigSha256: configDigest[:], ToolSha256: toolDigest},
 		coverage:       coverage,
 		maxOutputBytes: maxOutputBytes,
 		timeout:        timeout,
@@ -144,6 +153,7 @@ type providerRequest struct {
 	ChangedFiles     []string `json:"changed_files,omitempty"`
 	WorkingDirectory string   `json:"working_directory,omitempty"`
 	ConfigSHA256     string   `json:"config_sha256"`
+	ToolSHA256       string   `json:"tool_sha256,omitempty"`
 	InputSHA256      string   `json:"input_sha256"`
 }
 
@@ -189,6 +199,9 @@ func (a *externalAnalyzer) Analyze(ctx context.Context, input Input) *roomv1.Ana
 		Phase: input.Phase.String(), Content: input.Content,
 		ChangedFiles: append([]string(nil), input.ChangedFiles...), WorkingDirectory: input.WorkingDirectory,
 		ConfigSHA256: hex.EncodeToString(a.identity.GetConfigSha256()), InputSHA256: hex.EncodeToString(digest[:]),
+	}
+	if tool := a.identity.GetToolSha256(); len(tool) > 0 {
+		request.ToolSHA256 = hex.EncodeToString(tool)
 	}
 	requestJSON, err := json.Marshal(request)
 	if err != nil {
