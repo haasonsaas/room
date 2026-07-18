@@ -1,0 +1,51 @@
+rules:
+  - id: room.rust.command-with-untrusted-argument
+    message: Untrusted process or request input reaches a process command or argument.
+    severity: ERROR
+    languages: [rust]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_COMMAND_WITH_UNTRUSTED_ARGUMENT
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: std::env::args().nth(...)
+          - pattern: std::env::args_os().nth(...)
+          - pattern: std::env::args()
+          - pattern: std::env::args_os()
+          - pattern: std::env::var(...)
+          - pattern: std::env::var_os(...)
+          - pattern: $REQUEST.uri().query()
+          - pattern: $REQUEST.uri().path()
+          - pattern: $REQUEST.headers().get(...)
+          - pattern: $REQUEST.query_string()
+          - pattern: $REQUEST.match_info().get(...)
+          - pattern: $REQUEST.take_payload()
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: std::process::Command::new($VALUE)
+              - pattern: tokio::process::Command::new($VALUE)
+              - pattern: std::process::Command::new(...).arg($VALUE)
+              - pattern: std::process::Command::new(...).args($VALUE)
+              - pattern: tokio::process::Command::new(...).arg($VALUE)
+              - pattern: tokio::process::Command::new(...).args($VALUE)
+          - focus-metavariable: $VALUE
+      - patterns:
+          - pattern-either:
+              - pattern: $COMMAND.arg($VALUE)
+              - pattern: $COMMAND.args($VALUE)
+          - pattern-either:
+              - pattern-inside: |
+                  let mut $COMMAND = std::process::Command::new(...);
+                  ...
+              - pattern-inside: |
+                  let $COMMAND = std::process::Command::new(...);
+                  ...
+              - pattern-inside: |
+                  let mut $COMMAND = tokio::process::Command::new(...);
+                  ...
+              - pattern-inside: |
+                  let $COMMAND = tokio::process::Command::new(...);
+                  ...
+          - focus-metavariable: $VALUE

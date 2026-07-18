@@ -1,0 +1,28 @@
+rules:
+  - id: room.rust.request-input-panics
+    message: Request-derived input reaches unwrap, expect, or an explicit panic.
+    severity: ERROR
+    languages: [rust]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_PANIC_IN_REQUEST_PATH
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQUEST.uri().query()
+          - pattern: $REQUEST.uri().path()
+          - pattern: $REQUEST.headers().get(...)
+          - pattern: $REQUEST.query_string()
+          - pattern: $REQUEST.match_info().get(...)
+          - pattern: $REQUEST.take_payload()
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $VALUE.unwrap()
+              - pattern: $VALUE.expect(...)
+          - focus-metavariable: $VALUE
+      - patterns:
+          - pattern-either:
+              - pattern: panic!($VALUE)
+              - pattern: panic!(..., $VALUE, ...)
+          - focus-metavariable: $VALUE

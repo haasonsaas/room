@@ -8,6 +8,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	golang.org/x/sys v0.44.0
 	google.golang.org/protobuf v1.36.11
+	go.yaml.in/yaml/v3 v3.0.4
 	modernc.org/sqlite v1.53.0
 )
 
@@ -21,7 +22,6 @@ require (
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	modernc.org/libc v1.73.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

@@ -72,6 +72,12 @@ metadata:
   room_confidence_basis_points: 9000
 ```
 
+Rules are authored as YAML fragments under `analyzers/semgrep/rules`, with one
+rule per file. After editing a fragment, run `go generate ./analyzers/semgrep`
+and commit the regenerated `analyzers/semgrep/room.yml`. That generated regular
+file remains the production input passed to `cmd/room-semgrep`; Room SHA-256
+binds its exact bytes as `ROOM_ANALYZER_CONFIG_FILE`.
+
 Pass every metadata signal through a repeated `--covered-signal` argument and
 list the same signals in `ROOM_ANALYZER_COVERED_SIGNALS`. A finding that names an
 undeclared signal or an invalid confidence produces a failed receipt. Findings

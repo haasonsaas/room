@@ -1,0 +1,106 @@
+rules:
+  - id: room.rust.blocking-lock-across-await
+    message: A blocking lock guard remains live across an await point.
+    severity: ERROR
+    languages: [rust]
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT
+      room_confidence_basis_points: 9000
+    patterns:
+      - pattern-either:
+          - pattern: |
+              let $GUARD = $LOCK.lock().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.read().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.write().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.lock().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.read().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.write().unwrap();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.lock().expect(...);
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.read().expect(...);
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.write().expect(...);
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.blocking_lock();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.blocking_read();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let $GUARD = $LOCK.blocking_write();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.blocking_lock();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.blocking_read();
+              ...
+              $AWAITED.await
+          - pattern: |
+              let mut $GUARD = $LOCK.blocking_write();
+              ...
+              $AWAITED.await
+      - pattern-not: |
+          let $GUARD = $ACQUIRE;
+          ...
+          drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let mut $GUARD = $ACQUIRE;
+          ...
+          drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let $GUARD = $ACQUIRE;
+          ...
+          std::mem::drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let mut $GUARD = $ACQUIRE;
+          ...
+          std::mem::drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let $GUARD = $ACQUIRE;
+          ...
+          core::mem::drop($GUARD);
+          ...
+          $AWAITED.await
+      - pattern-not: |
+          let mut $GUARD = $ACQUIRE;
+          ...
+          core::mem::drop($GUARD);
+          ...
+          $AWAITED.await

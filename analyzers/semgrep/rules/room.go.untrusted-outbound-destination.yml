@@ -1,0 +1,25 @@
+rules:
+  - id: room.go.untrusted-outbound-destination
+    message: Untrusted HTTP input reaches an outbound request destination.
+    severity: ERROR
+    languages: [go]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_UNTRUSTED_OUTBOUND_DESTINATION
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.URL.Query().Get(...)
+          - pattern: $REQ.FormValue(...)
+          - pattern: $REQ.PostFormValue(...)
+          - pattern: $REQ.Header.Get(...)
+          - pattern: $REQ.PathValue(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: http.Get($URL)
+              - pattern: http.Post($URL, ...)
+              - pattern: http.PostForm($URL, ...)
+              - pattern: http.NewRequest($METHOD, $URL, ...)
+              - pattern: http.NewRequestWithContext($CTX, $METHOD, $URL, ...)
+          - focus-metavariable: $URL

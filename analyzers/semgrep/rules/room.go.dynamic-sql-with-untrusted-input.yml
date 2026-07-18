@@ -1,0 +1,28 @@
+rules:
+  - id: room.go.dynamic-sql-with-untrusted-input
+    message: Untrusted HTTP input reaches the SQL query text.
+    severity: ERROR
+    languages: [go]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.URL.Query().Get(...)
+          - pattern: $REQ.FormValue(...)
+          - pattern: $REQ.PostFormValue(...)
+          - pattern: $REQ.Header.Get(...)
+          - pattern: $REQ.PathValue(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.Query($QUERY, ...)
+              - pattern: $DB.QueryContext($CTX, $QUERY, ...)
+              - pattern: $DB.QueryRow($QUERY, ...)
+              - pattern: $DB.QueryRowContext($CTX, $QUERY, ...)
+              - pattern: $DB.Exec($QUERY, ...)
+              - pattern: $DB.ExecContext($CTX, $QUERY, ...)
+              - pattern: $DB.Prepare($QUERY)
+              - pattern: $DB.PrepareContext($CTX, $QUERY)
+          - focus-metavariable: $QUERY

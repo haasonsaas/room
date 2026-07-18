@@ -1,0 +1,83 @@
+rules:
+  - id: room.rust.untrusted-filesystem-path
+    message: Process or request input reaches a filesystem path operation.
+    severity: ERROR
+    languages: [rust]
+    mode: taint
+    metadata:
+      room_signal: SIGNAL_KIND_RUST_UNTRUSTED_PATH
+      room_confidence_basis_points: 9000
+    pattern-sources:
+      - pattern-either:
+          - pattern: std::env::args().nth(...)
+          - pattern: std::env::args_os().nth(...)
+          - pattern: std::env::args()
+          - pattern: std::env::args_os()
+          - pattern: std::env::var(...)
+          - pattern: std::env::var_os(...)
+          - pattern: $REQUEST.uri().query()
+          - pattern: $REQUEST.uri().path()
+          - pattern: $REQUEST.headers().get(...)
+          - pattern: $REQUEST.query_string()
+          - pattern: $REQUEST.match_info().get(...)
+          - pattern: $REQUEST.take_payload()
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: std::fs::read($PATH)
+              - pattern: std::fs::read_to_string($PATH)
+              - pattern: std::fs::write($PATH, ...)
+              - pattern: std::fs::remove_file($PATH)
+              - pattern: std::fs::remove_dir($PATH)
+              - pattern: std::fs::remove_dir_all($PATH)
+              - pattern: std::fs::metadata($PATH)
+              - pattern: std::fs::symlink_metadata($PATH)
+              - pattern: std::fs::create_dir($PATH)
+              - pattern: std::fs::create_dir_all($PATH)
+              - pattern: std::fs::File::open($PATH)
+              - pattern: std::fs::File::create($PATH)
+              - pattern: tokio::fs::read($PATH)
+              - pattern: tokio::fs::read_to_string($PATH)
+              - pattern: tokio::fs::write($PATH, ...)
+              - pattern: tokio::fs::remove_file($PATH)
+              - pattern: tokio::fs::remove_dir($PATH)
+              - pattern: tokio::fs::remove_dir_all($PATH)
+              - pattern: tokio::fs::metadata($PATH)
+              - pattern: tokio::fs::create_dir($PATH)
+              - pattern: tokio::fs::create_dir_all($PATH)
+              - pattern: tokio::fs::File::open($PATH)
+              - pattern: tokio::fs::File::create($PATH)
+          - focus-metavariable: $PATH
+      - patterns:
+          - pattern-either:
+              - pattern: $FS::read($PATH)
+              - pattern: $FS::read_to_string($PATH)
+              - pattern: $FS::write($PATH, ...)
+              - pattern: $FS::remove_file($PATH)
+              - pattern: $FS::remove_dir($PATH)
+              - pattern: $FS::remove_dir_all($PATH)
+              - pattern: $FS::metadata($PATH)
+              - pattern: $FS::create_dir($PATH)
+              - pattern: $FS::create_dir_all($PATH)
+          - pattern-either:
+              - pattern-inside: |
+                  use std::fs as $FS;
+                  ...
+              - pattern-inside: |
+                  use tokio::fs as $FS;
+                  ...
+          - focus-metavariable: $PATH
+      - patterns:
+          - pattern-either:
+              - pattern: std::fs::rename($PATH, ...)
+              - pattern: std::fs::copy($PATH, ...)
+              - pattern: tokio::fs::rename($PATH, ...)
+              - pattern: tokio::fs::copy($PATH, ...)
+          - focus-metavariable: $PATH
+      - patterns:
+          - pattern-either:
+              - pattern: std::fs::rename(..., $PATH)
+              - pattern: std::fs::copy(..., $PATH)
+              - pattern: tokio::fs::rename(..., $PATH)
+              - pattern: tokio::fs::copy(..., $PATH)
+          - focus-metavariable: $PATH
