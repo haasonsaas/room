@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -46,7 +47,7 @@ func (a *adapter) createSnapshot(request analyzerRequest, artifact diffArtifact)
 	if unix.Fstat(rootFD, &rootStat) != nil || unix.Fstat(workingFD, &workingStat) != nil || rootStat.Dev != workingStat.Dev || rootStat.Ino != workingStat.Ino {
 		return snapshot{}, errors.New("working directory does not match repository root")
 	}
-	config, err := os.ReadFile(a.config)
+	config, err := readRegularFile(a.config)
 	if err != nil {
 		return snapshot{}, err
 	}
@@ -138,18 +139,32 @@ func readRegularBeneath(rootFD int, path string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("diff target cannot be opened safely")
 	}
+	return readRegularFD(fileFD, path, "diff target")
+}
+
+// readRegularFile reads an operator-owned absolute path without following a
+// symlink at its final component.
+func readRegularFile(path string) ([]byte, error) {
+	fileFD, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, err
+	}
+	return readRegularFD(fileFD, path, path)
+}
+
+func readRegularFD(fileFD int, path, what string) ([]byte, error) {
 	file := os.NewFile(uintptr(fileFD), path)
 	defer file.Close()
 	var before, after unix.Stat_t
 	if err := unix.Fstat(fileFD, &before); err != nil || before.Mode&unix.S_IFMT != unix.S_IFREG || before.Size < 0 || before.Size > 64<<20 {
-		return nil, errors.New("diff target must be a regular file of at most 64 MiB")
+		return nil, fmt.Errorf("%s must be a regular file of at most 64 MiB", what)
 	}
 	data, err := io.ReadAll(io.LimitReader(file, before.Size+1))
 	if err != nil || int64(len(data)) != before.Size {
-		return nil, errors.New("diff target changed while being read")
+		return nil, fmt.Errorf("%s changed while being read", what)
 	}
 	if err := unix.Fstat(fileFD, &after); err != nil || before.Ino != after.Ino || before.Size != after.Size || before.Mtim != after.Mtim || before.Ctim != after.Ctim {
-		return nil, errors.New("diff target changed while being read")
+		return nil, fmt.Errorf("%s changed while being read", what)
 	}
 	return data, nil
 }

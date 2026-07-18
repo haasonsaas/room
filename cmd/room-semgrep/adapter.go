@@ -29,10 +29,6 @@ func newAdapter(semgrepCore, config, repositoryRoot string, covered []string) (*
 			return nil, fmt.Errorf("%s must be an absolute path", name)
 		}
 	}
-	configInfo, err := os.Stat(config)
-	if err != nil || !configInfo.Mode().IsRegular() {
-		return nil, errors.New("Semgrep config must be a regular file")
-	}
 	rootInfo, err := os.Stat(repositoryRoot)
 	if err != nil || !rootInfo.IsDir() {
 		return nil, errors.New("repository root must be a directory")
@@ -48,9 +44,9 @@ func newAdapter(semgrepCore, config, repositoryRoot string, covered []string) (*
 		}
 		coveredSet[signal] = true
 	}
-	configData, err := os.ReadFile(config)
+	configData, err := readRegularFile(config)
 	if err != nil {
-		return nil, errors.New("read Semgrep config")
+		return nil, errors.New("Semgrep config must be a regular file")
 	}
 	if err := validateRuleCoverage(configData, coveredSet); err != nil {
 		return nil, err
@@ -235,7 +231,7 @@ func failed(response analyzerResponse, code string) analyzerResponse {
 }
 
 func (a *adapter) configMatches(expected string) bool {
-	config, err := os.ReadFile(a.config)
+	config, err := readRegularFile(a.config)
 	if err != nil {
 		return false
 	}

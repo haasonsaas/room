@@ -272,6 +272,41 @@ func TestAdapterRejectsSymlinkTargets(t *testing.T) {
 	}
 }
 
+func TestAdapterRejectsSymlinkedConfig(t *testing.T) {
+	_, repository := workspace(t)
+	target := writeFile(t, "real-rules.yml", testRules)
+	linked := filepath.Join(t.TempDir(), "rules.yml")
+	if err := os.Symlink(target, linked); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newAdapter("/missing/semgrep", linked, repository, []string{sqlSignal}); err == nil {
+		t.Fatal("expected symlinked config to be rejected")
+	}
+}
+
+func TestAdapterFailsClosedWhenConfigBecomesSymlink(t *testing.T) {
+	_, repository := workspace(t)
+	if err := os.WriteFile(filepath.Join(repository, "main.go"), []byte("package main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	config := writeFile(t, "rules.yml", testRules)
+	adapter, err := newAdapter("/missing/semgrep", config, repository, []string{sqlSignal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := requestFor(repository, config, []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n"))
+	target := writeFile(t, "same-rules.yml", testRules)
+	if err := os.Remove(config); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, config); err != nil {
+		t.Fatal(err)
+	}
+	if response := adapter.analyze(t.Context(), request); response.FailureCode != "config_digest_mismatch" {
+		t.Fatalf("response = %+v", response)
+	}
+}
+
 func TestAdapterRejectsUnimplementedCoverageAndTraversalDiff(t *testing.T) {
 	_, repository := workspace(t)
 	emptyConfig := writeFile(t, "empty.yml", "rules: []\n")
