@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -496,14 +497,22 @@ func workspace(t *testing.T) (string, string) {
 	return root, repository
 }
 
+// toolDigests caches tool-binary hashes so integration tests do not re-read
+// the 200 MiB semgrep-core binary for every request.
+var toolDigests sync.Map
+
 func requestFor(repository, config, semgrepCore string, content []byte) analyzerRequest {
 	request := requestForPhase(repository, content, "ANALYSIS_PHASE_DIFF")
 	configData, _ := os.ReadFile(config)
 	configDigest := sha256.Sum256(configData)
 	request.ConfigSHA256 = hex.EncodeToString(configDigest[:])
-	toolData, _ := os.ReadFile(semgrepCore)
-	toolDigest := sha256.Sum256(toolData)
-	request.ToolSHA256 = hex.EncodeToString(toolDigest[:])
+	digest, ok := toolDigests.Load(semgrepCore)
+	if !ok {
+		toolData, _ := os.ReadFile(semgrepCore)
+		toolDigest := sha256.Sum256(toolData)
+		digest, _ = toolDigests.LoadOrStore(semgrepCore, hex.EncodeToString(toolDigest[:]))
+	}
+	request.ToolSHA256 = digest.(string)
 	return request
 }
 

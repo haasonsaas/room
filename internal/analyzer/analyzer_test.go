@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -246,6 +247,33 @@ func TestExternalAnalyzerUsesJSONStdinAndLiteralArguments(t *testing.T) {
 	}
 	if request.ToolSHA256 != hex.EncodeToString(wantToolDigest[:]) {
 		t.Fatalf("tool digest = %q", request.ToolSHA256)
+	}
+}
+
+func TestExternalAnalyzerOmitsToolDigestWithoutTool(t *testing.T) {
+	input := Input{Phase: roomv1.AnalysisPhase_ANALYSIS_PHASE_PLAN, Content: []byte("plan")}
+	digest := sha256.Sum256(input.Content)
+	temp := t.TempDir()
+	capture := filepath.Join(temp, "request.json")
+	response := fmt.Sprintf(`{"phase":"ANALYSIS_PHASE_PLAN","status":"ANALYSIS_STATUS_COMPLETE","covered_signals":["SIGNAL_KIND_SECRET_LITERAL"],"input_sha256":%q}`, hex.EncodeToString(digest[:]))
+	executable := filepath.Join(temp, "capture-provider")
+	script := fmt.Sprintf("#!/bin/sh\ncat > '%s'\nprintf '%%s' '%s'\n", capture, response)
+	if err := os.WriteFile(executable, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a, err := NewExternal(Config{ID: "plain", Version: "1", Executable: executable, CoveredSignals: []roomv1.SignalKind{secretSignal}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := a.Analyze(context.Background(), input).GetStatus(); got != roomv1.AnalysisStatus_ANALYSIS_STATUS_COMPLETE {
+		t.Fatalf("status = %s", got)
+	}
+	captured, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(captured), "tool_sha256") {
+		t.Fatalf("request named a tool digest without a configured tool: %s", captured)
 	}
 }
 

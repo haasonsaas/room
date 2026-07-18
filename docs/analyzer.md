@@ -66,6 +66,8 @@ renames, binary patches, and malformed or incomplete unified diffs produce a
 failed receipt. The adapter invokes `semgrep-core` with explicit snapshotted
 targets, strict rule validation, disabled timeouts, and no ignore-file target
 discovery. Any core parser error, target skip, or rule skip fails the receipt.
+The scan runs in its own process group, so canceling the analysis kills
+`semgrep-core` and anything it spawned.
 Registry configuration URLs are not accepted.
 
 Each policy-bearing Semgrep rule must provide these metadata fields:
@@ -101,10 +103,18 @@ The bundled rules provide these coverage claims:
 | `SIGNAL_KIND_RUST_BLOCKING_LOCK_ACROSS_AWAIT` | Rust | `lock`/`read`/`write` bindings using `unwrap` or `expect`, and `blocking_lock`/`blocking_read`/`blocking_write` bindings, followed by await without a matched explicit drop |
 
 These rules model the listed source and sink families, not every framework API
-or validation function. The adapter uses Semgrep's private core interface and
-is pinned and integration-tested against `semgrep-core` 1.139.0. For taint
+or validation function. Semgrep CE tracks taint within a single file, so a
+flow that crosses a file boundary produces no finding. The adapter uses
+Semgrep's private core interface and is pinned and integration-tested against
+`semgrep-core` 1.139.0. For taint
 rules, a finding is retained when the added lines intersect either the reported
 sink or a source/intermediate location in the core's dataflow trace.
+
+Upgrading `semgrep-core` means: bump `semgrepCoreVersion` in
+`cmd/room-semgrep/main.go`, the `semgrep==` pin, and the `-version` assertion
+in `.github/workflows/ci.yml`, then rerun the integration suite. A version
+mismatch or a change to the core's private target-manifest or dataflow-trace
+schema fails closed.
 
 The bundled Semgrep rules do not claim
 `SIGNAL_KIND_RUST_UNSAFE_WITHOUT_SAFETY_CONTRACT`,
