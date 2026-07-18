@@ -208,6 +208,7 @@ func (a *externalAnalyzer) Analyze(ctx context.Context, input Input) *roomv1.Ana
 		return a.failure(report, roomv1.AnalysisStatus_ANALYSIS_STATUS_FAILED, "request_encoding_failed", digest[:])
 	}
 	command := exec.CommandContext(ctx, a.config.Executable, a.config.Args...)
+	arrangeGroupKill(command)
 	command.Stdin = bytes.NewReader(requestJSON)
 	stdout := boundedDrainWriter{limit: a.maxOutputBytes}
 	command.Stdout = &stdout

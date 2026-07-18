@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"syscall"
 )
 
 type semgrepReport struct {
@@ -43,6 +44,13 @@ type semgrepResult struct {
 func (a *adapter) scan(ctx context.Context, snapshot snapshot) (semgrepReport, string, string) {
 	args := []string{"-json_nodots", "-strict", "-rules", snapshot.config, "-targets", snapshot.targetsFile, "-j", "1", "-timeout", "0", "-timeout_threshold", "0", "-max_memory", "0"}
 	command := exec.CommandContext(ctx, a.semgrepCore, args...)
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Cancel = func() error {
+		if err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
+			return err
+		}
+		return nil
+	}
 	command.Dir = snapshot.directory
 	var stdout, stderr limitedBuffer
 	stdout.limit, stderr.limit = maxOutputBytes, 1<<20

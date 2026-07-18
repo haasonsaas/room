@@ -2,14 +2,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 const sqlSignal = "SIGNAL_KIND_DYNAMIC_SQL_WITH_UNTRUSTED_INPUT"
@@ -311,6 +315,54 @@ func TestAdapterRejectsSymlinkTargets(t *testing.T) {
 	if response := adapter.analyze(t.Context(), requestFor(repository, config, tool, diff)); response.FailureCode != "snapshot_invalid" {
 		t.Fatalf("response = %+v", response)
 	}
+}
+
+func TestAdapterKillsSemgrepProcessGroup(t *testing.T) {
+	_, repository := workspace(t)
+	if err := os.WriteFile(filepath.Join(repository, "main.go"), []byte("package main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pidFile := filepath.Join(t.TempDir(), "child.pid")
+	semgrep := writeExecutable(t, "semgrep", "#!/bin/sh\nsleep 60 &\necho $! > '"+pidFile+"'\nwait\n")
+	config := writeFile(t, "rules.yml", testRules)
+	adapter, err := newAdapter(semgrep, config, repository, []string{sqlSignal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	diff := []byte("diff --git a/main.go b/main.go\n--- /dev/null\n+++ b/main.go\n@@ -0,0 +1 @@\n+package main\n")
+	response := adapter.analyze(ctx, requestFor(repository, config, semgrep, diff))
+	if response.Status != failedStatus || response.FailureCode != "semgrep_failed" {
+		t.Fatalf("response = %+v", response)
+	}
+	assertProcessDies(t, pidFile)
+}
+
+func assertProcessDies(t *testing.T, pidFile string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	var pid int
+	for time.Now().Before(deadline) {
+		data, err := os.ReadFile(pidFile)
+		if err == nil {
+			pid, err = strconv.Atoi(strings.TrimSpace(string(data)))
+			if err == nil && pid > 0 {
+				break
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if pid <= 0 {
+		t.Fatal("child pid was not recorded")
+	}
+	for time.Now().Before(deadline) {
+		if err := syscall.Kill(pid, 0); err == syscall.ESRCH {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("process %d survived the group kill", pid)
 }
 
 func TestAdapterRejectsSymlinkedConfig(t *testing.T) {

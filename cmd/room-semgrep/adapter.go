@@ -47,7 +47,7 @@ func newAdapter(semgrepCore, config, repositoryRoot string, covered []string) (*
 	}
 	configData, err := readRegularFile(config)
 	if err != nil {
-		return nil, errors.New("Semgrep config must be a regular file")
+		return nil, fmt.Errorf("Semgrep config must be a regular file: %w", err)
 	}
 	if err := validateRuleCoverage(configData, coveredSet); err != nil {
 		return nil, err
